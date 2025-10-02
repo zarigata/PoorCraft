@@ -4,11 +4,14 @@ A simple yet functional Minecraft clone with AI NPCs and procedural texture gene
 
 ## Features
 
-- **4 Biomes**: Desert, Snow, Jungle, Plains with unique terrain generation
-- **Procedural Textures**: Up to 256 unique 16x16 block skins generated at startup
-- **AI NPCs**: Conversational NPCs powered by Ollama, Gemini, OpenRouter, or OpenAI
-- **Multiplayer**: Client-server architecture with chunk-based world
-- **Modding**: Easy Python-based modding system with comprehensive API
+- **4 Biomes**: Desert, Snow, Jungle, Plains with unique terrain generation ✅ **IMPLEMENTED**
+- **Infinite World**: Chunk-based world with seed support and dynamic loading/unloading ✅ **IMPLEMENTED**
+- **Procedural Terrain**: Simplex noise-based height maps with biome-specific features ✅ **IMPLEMENTED**
+- **Biome Features**: Trees in plains/jungle, cacti in desert, snow layers in snow biome ✅ **IMPLEMENTED**
+- **Procedural Textures**: Up to 256 unique 16x16 block skins generated at startup ⏳ **COMING SOON**
+- **AI NPCs**: Conversational NPCs powered by Ollama, Gemini, OpenRouter, or OpenAI ⏳ **COMING SOON**
+- **Multiplayer**: Client-server architecture with chunk-based world ⏳ **COMING SOON**
+- **Modding**: Easy Python-based modding system with comprehensive API ⏳ **COMING SOON**
 
 ## Requirements
 
@@ -40,9 +43,27 @@ pip install -r python/requirements.txt
 java -jar target/poorcraft-0.1.0-SNAPSHOT-jar-with-dependencies.jar
 ```
 
+## World Generation
+
+PoorCraft uses a sophisticated procedural generation system:
+
+- **Seed-based**: Every world has a seed (configurable in settings) for reproducible terrain
+- **Biome System**: Temperature and humidity noise determine biome distribution
+- **Height Maps**: Multi-octave Simplex noise creates natural-looking terrain
+- **Dynamic Loading**: Chunks load/unload automatically based on player position
+- **Features**: Biome-specific structures (trees, cacti, snow) generate deterministically
+
+Configure world generation in `config/settings.json` under the `world` section:
+- `seed`: World seed (0 for random)
+- `chunkLoadDistance`: How many chunks to load around player (default: 8)
+- `chunkUnloadDistance`: Distance before unloading chunks (default: 10)
+- `generateStructures`: Enable/disable feature generation (default: true)
+
 ## Project Structure
 
 - **src/main/java/** - Java game engine (LWJGL3, OpenGL rendering, core game logic)
+  - **src/main/java/com/poorcraft/world/** - World system (chunks, blocks, generation)
+  - **src/main/java/com/poorcraft/config/** - Configuration management
 - **python/** - Python modding framework and API
 - **mods/** - Official and user-created mods
   - **mods/skin_generator/** - Procedural texture generation mod

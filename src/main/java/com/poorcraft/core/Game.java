@@ -3,6 +3,8 @@ package com.poorcraft.core;
 import com.poorcraft.camera.Camera;
 import com.poorcraft.config.Settings;
 import com.poorcraft.input.InputHandler;
+import com.poorcraft.world.ChunkManager;
+import com.poorcraft.world.World;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
@@ -22,6 +24,8 @@ public class Game {
     private InputHandler inputHandler;
     private Camera camera;
     private Settings settings;
+    private World world;
+    private ChunkManager chunkManager;
     
     private boolean running;
     private boolean escapePressed;  // Track ESC key state for toggle
@@ -68,6 +72,18 @@ public class Game {
             settings.camera.moveSpeed,
             settings.controls.mouseSensitivity
         );
+        
+        // Initialize world system
+        world = new World(settings.world.seed);
+        chunkManager = new ChunkManager(
+            world,
+            settings.world.chunkLoadDistance,
+            settings.world.chunkUnloadDistance
+        );
+        
+        // Initial chunk load around spawn
+        chunkManager.update(camera.getPosition());
+        System.out.println("[Game] World initialized with seed: " + world.getSeed());
         
         running = true;
         
@@ -131,22 +147,24 @@ public class Game {
         float adjustedDelta = deltaTime * speedMultiplier;
         
         // Process camera movement based on keybinds
-        if (inputHandler.isKeyPressed(settings.controls.keybinds.get("forward"))) {
+        // Using safe getKeybind() to avoid NPE when config is missing keys
+        // Because crashing on a missing keybind is so 2009
+        if (inputHandler.isKeyPressed(settings.controls.getKeybind("forward", 87))) {  // W
             camera.processKeyboard(Camera.FORWARD, adjustedDelta);
         }
-        if (inputHandler.isKeyPressed(settings.controls.keybinds.get("backward"))) {
+        if (inputHandler.isKeyPressed(settings.controls.getKeybind("backward", 83))) {  // S
             camera.processKeyboard(Camera.BACKWARD, adjustedDelta);
         }
-        if (inputHandler.isKeyPressed(settings.controls.keybinds.get("left"))) {
+        if (inputHandler.isKeyPressed(settings.controls.getKeybind("left", 65))) {  // A
             camera.processKeyboard(Camera.LEFT, adjustedDelta);
         }
-        if (inputHandler.isKeyPressed(settings.controls.keybinds.get("right"))) {
+        if (inputHandler.isKeyPressed(settings.controls.getKeybind("right", 68))) {  // D
             camera.processKeyboard(Camera.RIGHT, adjustedDelta);
         }
-        if (inputHandler.isKeyPressed(settings.controls.keybinds.get("jump"))) {
+        if (inputHandler.isKeyPressed(settings.controls.getKeybind("jump", 32))) {  // Space
             camera.processKeyboard(Camera.UP, adjustedDelta);
         }
-        if (inputHandler.isKeyPressed(settings.controls.keybinds.get("sneak"))) {
+        if (inputHandler.isKeyPressed(settings.controls.getKeybind("sneak", 340))) {  // Left Shift
             camera.processKeyboard(Camera.DOWN, adjustedDelta);
         }
         
@@ -157,6 +175,10 @@ public class Game {
                 (float) inputHandler.getMouseDeltaY()
             );
         }
+        
+        // Update chunk manager with camera position
+        // This handles dynamic chunk loading/unloading as player moves
+        chunkManager.update(camera.getPosition());
     }
     
     /**
@@ -167,12 +189,12 @@ public class Game {
      */
     private float getCurrentSpeedMultiplier() {
         // Check sprint first (higher priority)
-        if (inputHandler.isKeyPressed(settings.controls.keybinds.get("sprint"))) {
+        if (inputHandler.isKeyPressed(settings.controls.getKeybind("sprint", 341))) {  // Left Control
             return settings.camera.sprintMultiplier;
         }
         
         // Check sneak
-        if (inputHandler.isKeyPressed(settings.controls.keybinds.get("sneak"))) {
+        if (inputHandler.isKeyPressed(settings.controls.getKeybind("sneak", 340))) {  // Left Shift
             return settings.camera.sneakMultiplier;
         }
         
@@ -210,6 +232,11 @@ public class Game {
      */
     private void cleanup() {
         System.out.println("[Game] Cleaning up...");
+        
+        // Shutdown world system
+        chunkManager.shutdown();
+        System.out.println("[Game] World cleaned up");
+        
         window.destroy();
         System.out.println("[Game] Cleanup complete");
     }
@@ -220,5 +247,25 @@ public class Game {
      */
     public void stop() {
         running = false;
+    }
+    
+    /**
+     * Gets the world instance.
+     * Useful for future systems that need world access.
+     * 
+     * @return The game world
+     */
+    public World getWorld() {
+        return world;
+    }
+    
+    /**
+     * Gets the chunk manager instance.
+     * Useful for debugging and monitoring chunk loading.
+     * 
+     * @return The chunk manager
+     */
+    public ChunkManager getChunkManager() {
+        return chunkManager;
     }
 }
