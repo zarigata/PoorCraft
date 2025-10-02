@@ -1,0 +1,22 @@
+{
+  "id": "ai_npc",
+  "name": "AI NPC System",
+  "version": "0.1.0",
+  "description": "Adds conversational NPCs powered by LLMs (Ollama, Gemini, OpenRouter, OpenAI)",
+  "author": "PoorCraft Team",
+  "main": "ai_npc.main",
+  "enabled": true,
+  "server_only": true,
+  "config": {
+    "ai_provider": "ollama",
+    "ollama_url": "http://localhost:11434",
+    "api_keys": {
+      "gemini_api_key": "",
+      "openrouter_api_key": "",
+      "openai_api_key": ""
+    },
+    "model": "llama2",
+    "max_npcs": 10,
+    "npc_response_timeout": 30
+  }
+}

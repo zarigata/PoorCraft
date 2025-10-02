@@ -1,0 +1,34 @@
+# Java/Maven
+target/
+*.class
+*.jar
+*.war
+.mvn/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.eclipse/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Game Data
+worlds/
+logs/
+config/
+screenshots/
+
+# Sensitive
+*.key
+api_keys.json

@@ -1,0 +1,20 @@
+{
+  "id": "skin_generator",
+  "name": "Procedural Skin Generator",
+  "version": "0.1.0",
+  "description": "Generates up to 256 unique 16x16 block textures with biome-specific color palettes",
+  "author": "PoorCraft Team",
+  "main": "skin_generator.main",
+  "enabled": true,
+  "config": {
+    "max_textures": 256,
+    "texture_size": 16,
+    "randomize_on_startup": true,
+    "biome_palettes": {
+      "Desert": ["#EDC9AF", "#E4A672", "#C19A6B", "#D2B48C"],
+      "Snow": ["#FFFAFA", "#F0F8FF", "#E6E6FA", "#B0C4DE"],
+      "Jungle": ["#228B22", "#32CD32", "#90EE90", "#006400"],
+      "Plains": ["#9ACD32", "#6B8E23", "#556B2F", "#8FBC8F"]
+    }
+  }
+}
