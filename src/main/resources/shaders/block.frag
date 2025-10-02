@@ -1,0 +1,50 @@
+#version 330 core
+
+// Input variables from vertex shader
+in vec2 vTexCoord;  // Texture coordinates
+in vec3 vNormal;    // Normal vector (for lighting)
+in vec3 vFragPos;   // World position (for lighting)
+
+// Output color
+out vec4 FragColor;
+
+// Uniforms
+uniform sampler2D uTexture;        // Texture atlas sampler
+uniform vec3 uLightDirection;      // Directional light direction (normalized)
+uniform vec3 uLightColor;          // Directional light color
+uniform vec3 uAmbientColor;        // Ambient light color
+uniform float uAmbientStrength;    // Ambient light strength (0.0 to 1.0)
+
+void main() {
+    // Sample texture from atlas
+    vec4 texColor = texture(uTexture, vTexCoord);
+    
+    // Discard fully transparent fragments (for leaves, etc.)
+    if (texColor.a < 0.1) {
+        discard;
+    }
+    
+    // Calculate ambient lighting (base illumination)
+    vec3 ambient = uAmbientStrength * uAmbientColor;
+    
+    // Calculate diffuse lighting (Lambertian reflectance)
+    vec3 norm = normalize(vNormal);
+    
+    // Light direction points FROM the light source, so we negate it
+    // This gives us the direction TO the light, which is what we need for the dot product
+    float diff = max(dot(norm, -uLightDirection), 0.0);
+    vec3 diffuse = diff * uLightColor;
+    
+    // Combine lighting components
+    vec3 lighting = ambient + diffuse;
+    
+    // Clamp lighting to prevent over-brightening
+    // (Though honestly, who doesn't like a little extra glow?)
+    lighting = clamp(lighting, 0.0, 1.0);
+    
+    // Apply lighting to texture color
+    vec3 result = lighting * texColor.rgb;
+    
+    // Output final color with original alpha
+    FragColor = vec4(result, texColor.a);
+}

@@ -8,10 +8,14 @@ A simple yet functional Minecraft clone with AI NPCs and procedural texture gene
 - **Infinite World**: Chunk-based world with seed support and dynamic loading/unloading ✅ **IMPLEMENTED**
 - **Procedural Terrain**: Simplex noise-based height maps with biome-specific features ✅ **IMPLEMENTED**
 - **Biome Features**: Trees in plains/jungle, cacti in desert, snow layers in snow biome ✅ **IMPLEMENTED**
-- **Procedural Textures**: Up to 256 unique 16x16 block skins generated at startup ⏳ **COMING SOON**
-- **AI NPCs**: Conversational NPCs powered by Ollama, Gemini, OpenRouter, or OpenAI ⏳ **COMING SOON**
-- **Multiplayer**: Client-server architecture with chunk-based world ⏳ **COMING SOON**
-- **Modding**: Easy Python-based modding system with comprehensive API ⏳ **COMING SOON**
+- **Voxel Rendering**: OpenGL-based chunk renderer with greedy meshing optimization ✅ **IMPLEMENTED**
+- **Frustum Culling**: Only renders chunks visible in camera view ✅ **IMPLEMENTED**
+- **Lighting System**: Ambient + directional lighting with normal-based shading ✅ **IMPLEMENTED**
+- **Texture Atlas**: 16x16 block textures combined into efficient atlas ✅ **IMPLEMENTED**
+- **Procedural Textures**: Up to 256 unique block skin variations ⏳ **COMING SOON** (Skin Generator mod)
+- **AI NPCs**: Conversational NPCs powered by LLMs ⏳ **COMING SOON**
+- **Multiplayer**: Client-server architecture ⏳ **COMING SOON**
+- **Modding**: Python-based modding system ⏳ **COMING SOON**
 
 ## Requirements
 
@@ -59,16 +63,49 @@ Configure world generation in `config/settings.json` under the `world` section:
 - `chunkUnloadDistance`: Distance before unloading chunks (default: 10)
 - `generateStructures`: Enable/disable feature generation (default: true)
 
+## Rendering System
+
+PoorCraft uses a modern OpenGL 3.3+ rendering pipeline:
+
+**Greedy Meshing:**
+- Optimized mesh generation that merges adjacent same-type faces into larger quads
+- Reduces vertex count by 50-90% compared to naive per-block rendering
+- Dramatically improves performance for large view distances
+
+**Frustum Culling:**
+- Only renders chunks visible in the camera's view frustum
+- Uses Gribb-Hartmann plane extraction for efficient AABB testing
+- Typically culls 50-80% of loaded chunks depending on FOV
+
+**Lighting:**
+- Ambient lighting provides base illumination (configurable color and strength)
+- Directional lighting simulates sunlight with normal-based diffuse shading
+- Per-vertex normals enable smooth lighting across block faces
+
+**Texture Atlas:**
+- All block textures combined into a single 256×256 atlas
+- Reduces texture binding overhead (single bind per frame)
+- Supports up to 256 unique 16×16 textures
+- UV coordinates automatically calculated per block type and face
+
+**Performance:**
+- Efficient VAO/VBO/EBO management with automatic cleanup
+- Mesh regeneration only when blocks change (dirty flag system)
+- GPU resources freed immediately when chunks unload
+
 ## Project Structure
 
 - **src/main/java/** - Java game engine (LWJGL3, OpenGL rendering, core game logic)
   - **src/main/java/com/poorcraft/world/** - World system (chunks, blocks, generation)
+  - **src/main/java/com/poorcraft/render/** - Rendering system (shaders, textures, chunk rendering)
   - **src/main/java/com/poorcraft/config/** - Configuration management
+- **src/main/resources/** - Game assets (textures, shaders, configs)
+  - **src/main/resources/shaders/** - GLSL vertex and fragment shaders
+  - **src/main/resources/textures/blocks/** - 16×16 block textures
 - **python/** - Python modding framework and API
 - **mods/** - Official and user-created mods
   - **mods/skin_generator/** - Procedural texture generation mod
   - **mods/ai_npc/** - AI-powered NPC mod
-- **src/main/resources/** - Game assets (textures, shaders, configs)
 - **docs/** - Documentation and modding guides
 
 ## Modding

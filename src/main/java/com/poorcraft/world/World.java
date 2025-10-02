@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.Consumer;
 
 /**
  * Main World class that manages chunks and world state.
@@ -27,14 +28,17 @@ public class World {
     private final TerrainGenerator terrainGenerator;
     private final FeatureGenerator featureGenerator;
     private final BiomeGenerator biomeGenerator;
+    private final boolean generateStructures;
+    private Consumer<ChunkPos> chunkUnloadCallback;
     
     /**
      * Creates a new world with the given seed.
      * If seed is 0, generates a random seed.
      * 
      * @param seed World seed (0 for random)
+     * @param generateStructures Whether to generate biome features (trees, cacti, etc.)
      */
-    public World(long seed) {
+    public World(long seed, boolean generateStructures) {
         // Generate random seed if 0
         if (seed == 0) {
             this.seed = new Random().nextLong();
@@ -42,12 +46,25 @@ public class World {
             this.seed = seed;
         }
         
+        this.generateStructures = generateStructures;
         this.chunks = new HashMap<>();
         this.biomeGenerator = new BiomeGenerator(this.seed);
         this.terrainGenerator = new TerrainGenerator(this.seed);
         this.featureGenerator = new FeatureGenerator(this.seed, biomeGenerator, terrainGenerator);
+        this.chunkUnloadCallback = null;
         
         System.out.println("[World] Created world with seed: " + this.seed);
+        System.out.println("[World] Structure generation: " + (generateStructures ? "enabled" : "disabled"));
+    }
+    
+    /**
+     * Sets a callback to be invoked when chunks are unloaded.
+     * Used by the renderer to cleanup GPU resources.
+     * 
+     * @param callback Callback function that receives the unloaded chunk position
+     */
+    public void setChunkUnloadCallback(Consumer<ChunkPos> callback) {
+        this.chunkUnloadCallback = callback;
     }
     
     /**
@@ -103,8 +120,11 @@ public class World {
         // Generate terrain
         terrainGenerator.generateTerrain(chunk);
         
-        // Generate features
-        featureGenerator.generateFeatures(chunk);
+        // Generate features only if enabled
+        // I spent way too long debugging why my flat world had trees... this flag is important!
+        if (generateStructures) {
+            featureGenerator.generateFeatures(chunk);
+        }
         
         // Set up neighbor references for face culling
         setupNeighbors(chunk);
@@ -159,6 +179,11 @@ public class World {
     public void unloadChunk(ChunkPos pos) {
         Chunk chunk = chunks.remove(pos);
         if (chunk != null) {
+            // Notify callback before clearing references
+            if (chunkUnloadCallback != null) {
+                chunkUnloadCallback.accept(pos);
+            }
+            
             // Clear neighbor references in adjacent chunks
             clearNeighborReferences(chunk);
         }

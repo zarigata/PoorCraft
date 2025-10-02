@@ -1,5 +1,6 @@
 package com.poorcraft.world.chunk;
 
+import com.poorcraft.render.GreedyMeshGenerator;
 import com.poorcraft.world.block.BlockType;
 
 import java.util.ArrayList;
@@ -9,7 +10,8 @@ import java.util.List;
  * Main Chunk class with block storage and mesh generation.
  * 
  * Chunks are 16x256x16 blocks stored in a flat array for cache efficiency.
- * Mesh generation uses simple face culling - greedy meshing can be added later.
+ * Mesh generation uses greedy meshing algorithm for optimization.
+ * Greedy meshing merges adjacent same-type faces into larger quads, reducing vertex count by 50-90%.
  * 
  * This is where the magic happens. Or where your FPS drops to 2. One of the two.
  */
@@ -160,268 +162,17 @@ public class Chunk {
     }
     
     /**
-     * Generates mesh data for this chunk.
-     * Iterates through all blocks and adds faces that are adjacent to air/transparent blocks.
+     * Generates mesh data for this chunk using greedy meshing algorithm.
      * 
      * @return Generated chunk mesh
      */
     public ChunkMesh generateMesh() {
-        List<Float> vertices = new ArrayList<>();
-        List<Integer> indices = new ArrayList<>();
-        
-        // Iterate through all blocks
-        for (int y = 0; y < CHUNK_HEIGHT; y++) {
-            for (int z = 0; z < CHUNK_SIZE; z++) {
-                for (int x = 0; x < CHUNK_SIZE; x++) {
-                    BlockType blockType = getBlock(x, y, z);
-                    
-                    // Skip air blocks
-                    if (blockType == BlockType.AIR) {
-                        continue;
-                    }
-                    
-                    // Check all 6 faces
-                    // Face 0: Top (+Y)
-                    if (shouldRenderFace(x, y + 1, z)) {
-                        addFaceVertices(vertices, indices, x, y, z, 0, blockType);
-                    }
-                    
-                    // Face 1: Bottom (-Y)
-                    if (shouldRenderFace(x, y - 1, z)) {
-                        addFaceVertices(vertices, indices, x, y, z, 1, blockType);
-                    }
-                    
-                    // Face 2: North (-Z)
-                    if (shouldRenderFace(x, y, z - 1)) {
-                        addFaceVertices(vertices, indices, x, y, z, 2, blockType);
-                    }
-                    
-                    // Face 3: South (+Z)
-                    if (shouldRenderFace(x, y, z + 1)) {
-                        addFaceVertices(vertices, indices, x, y, z, 3, blockType);
-                    }
-                    
-                    // Face 4: West (-X)
-                    if (shouldRenderFace(x - 1, y, z)) {
-                        addFaceVertices(vertices, indices, x, y, z, 4, blockType);
-                    }
-                    
-                    // Face 5: East (+X)
-                    if (shouldRenderFace(x + 1, y, z)) {
-                        addFaceVertices(vertices, indices, x, y, z, 5, blockType);
-                    }
-                }
-            }
-        }
-        
-        // Convert lists to arrays
-        float[] vertexArray = new float[vertices.size()];
-        for (int i = 0; i < vertices.size(); i++) {
-            vertexArray[i] = vertices.get(i);
-        }
-        
-        int[] indexArray = new int[indices.size()];
-        for (int i = 0; i < indices.size(); i++) {
-            indexArray[i] = indices.get(i);
-        }
-        
-        // Cache mesh and mark as clean
-        mesh = new ChunkMesh(vertexArray, indexArray);
+        GreedyMeshGenerator generator = new GreedyMeshGenerator(this);
+        mesh = generator.generateMesh();
         meshDirty = false;
-        
         return mesh;
     }
     
-    /**
-     * Checks if a face should be rendered at the given coordinates.
-     * A face should be rendered if the adjacent block is air or transparent.
-     * 
-     * @param x Local X coordinate
-     * @param y Local Y coordinate
-     * @param z Local Z coordinate
-     * @return true if face should be rendered
-     */
-    private boolean shouldRenderFace(int x, int y, int z) {
-        BlockType adjacentBlock = getBlockOrNeighbor(x, y, z);
-        return adjacentBlock == BlockType.AIR || adjacentBlock.isTransparent();
-    }
-    
-    /**
-     * Adds vertices and indices for a single block face.
-     * Each face has 4 vertices and 6 indices (2 triangles).
-     * 
-     * Vertex format: position (3 floats) + texture coords (2 floats) + normal (3 floats) = 8 floats per vertex
-     * 
-     * @param vertices Vertex list to append to
-     * @param indices Index list to append to
-     * @param x Block X coordinate
-     * @param y Block Y coordinate
-     * @param z Block Z coordinate
-     * @param face Face direction (0=top, 1=bottom, 2=north, 3=south, 4=west, 5=east)
-     * @param blockType Block type (for future texture mapping)
-     */
-    private void addFaceVertices(List<Float> vertices, List<Integer> indices, 
-                                  int x, int y, int z, int face, BlockType blockType) {
-        int baseIndex = vertices.size() / 8;  // Current vertex count (8 floats per vertex)
-        
-        // Define face vertices based on direction
-        // Texture coords are placeholder (0,0 to 1,1) - actual atlas mapping happens in Rendering phase
-        switch (face) {
-            case 0 -> addTopFace(vertices, x, y, z);
-            case 1 -> addBottomFace(vertices, x, y, z);
-            case 2 -> addNorthFace(vertices, x, y, z);
-            case 3 -> addSouthFace(vertices, x, y, z);
-            case 4 -> addWestFace(vertices, x, y, z);
-            case 5 -> addEastFace(vertices, x, y, z);
-        }
-        
-        // Add indices for 2 triangles (0,1,2, 0,2,3 pattern)
-        indices.add(baseIndex);
-        indices.add(baseIndex + 1);
-        indices.add(baseIndex + 2);
-        indices.add(baseIndex);
-        indices.add(baseIndex + 2);
-        indices.add(baseIndex + 3);
-    }
-    
-    // Helper methods to add face vertices
-    // Format: position (x,y,z), texCoords (u,v), normal (nx,ny,nz)
-    
-    private void addTopFace(List<Float> v, int x, int y, int z) {
-        float x0 = x, x1 = x + 1;
-        float y0 = y + 1;
-        float z0 = z, z1 = z + 1;
-        
-        // Vertex 0
-        v.add(x0); v.add(y0); v.add(z0);  // Position
-        v.add(0.0f); v.add(0.0f);          // TexCoords
-        v.add(0.0f); v.add(1.0f); v.add(0.0f);  // Normal (+Y)
-        
-        // Vertex 1
-        v.add(x1); v.add(y0); v.add(z0);
-        v.add(1.0f); v.add(0.0f);
-        v.add(0.0f); v.add(1.0f); v.add(0.0f);
-        
-        // Vertex 2
-        v.add(x1); v.add(y0); v.add(z1);
-        v.add(1.0f); v.add(1.0f);
-        v.add(0.0f); v.add(1.0f); v.add(0.0f);
-        
-        // Vertex 3
-        v.add(x0); v.add(y0); v.add(z1);
-        v.add(0.0f); v.add(1.0f);
-        v.add(0.0f); v.add(1.0f); v.add(0.0f);
-    }
-    
-    private void addBottomFace(List<Float> v, int x, int y, int z) {
-        float x0 = x, x1 = x + 1;
-        float y0 = y;
-        float z0 = z, z1 = z + 1;
-        
-        v.add(x0); v.add(y0); v.add(z0);
-        v.add(0.0f); v.add(0.0f);
-        v.add(0.0f); v.add(-1.0f); v.add(0.0f);  // Normal (-Y)
-        
-        v.add(x0); v.add(y0); v.add(z1);
-        v.add(0.0f); v.add(1.0f);
-        v.add(0.0f); v.add(-1.0f); v.add(0.0f);
-        
-        v.add(x1); v.add(y0); v.add(z1);
-        v.add(1.0f); v.add(1.0f);
-        v.add(0.0f); v.add(-1.0f); v.add(0.0f);
-        
-        v.add(x1); v.add(y0); v.add(z0);
-        v.add(1.0f); v.add(0.0f);
-        v.add(0.0f); v.add(-1.0f); v.add(0.0f);
-    }
-    
-    private void addNorthFace(List<Float> v, int x, int y, int z) {
-        float x0 = x, x1 = x + 1;
-        float y0 = y, y1 = y + 1;
-        float z0 = z;
-        
-        v.add(x0); v.add(y0); v.add(z0);
-        v.add(0.0f); v.add(0.0f);
-        v.add(0.0f); v.add(0.0f); v.add(-1.0f);  // Normal (-Z)
-        
-        v.add(x0); v.add(y1); v.add(z0);
-        v.add(0.0f); v.add(1.0f);
-        v.add(0.0f); v.add(0.0f); v.add(-1.0f);
-        
-        v.add(x1); v.add(y1); v.add(z0);
-        v.add(1.0f); v.add(1.0f);
-        v.add(0.0f); v.add(0.0f); v.add(-1.0f);
-        
-        v.add(x1); v.add(y0); v.add(z0);
-        v.add(1.0f); v.add(0.0f);
-        v.add(0.0f); v.add(0.0f); v.add(-1.0f);
-    }
-    
-    private void addSouthFace(List<Float> v, int x, int y, int z) {
-        float x0 = x, x1 = x + 1;
-        float y0 = y, y1 = y + 1;
-        float z0 = z + 1;
-        
-        v.add(x0); v.add(y0); v.add(z0);
-        v.add(0.0f); v.add(0.0f);
-        v.add(0.0f); v.add(0.0f); v.add(1.0f);  // Normal (+Z)
-        
-        v.add(x1); v.add(y0); v.add(z0);
-        v.add(1.0f); v.add(0.0f);
-        v.add(0.0f); v.add(0.0f); v.add(1.0f);
-        
-        v.add(x1); v.add(y1); v.add(z0);
-        v.add(1.0f); v.add(1.0f);
-        v.add(0.0f); v.add(0.0f); v.add(1.0f);
-        
-        v.add(x0); v.add(y1); v.add(z0);
-        v.add(0.0f); v.add(1.0f);
-        v.add(0.0f); v.add(0.0f); v.add(1.0f);
-    }
-    
-    private void addWestFace(List<Float> v, int x, int y, int z) {
-        float x0 = x;
-        float y0 = y, y1 = y + 1;
-        float z0 = z, z1 = z + 1;
-        
-        v.add(x0); v.add(y0); v.add(z0);
-        v.add(0.0f); v.add(0.0f);
-        v.add(-1.0f); v.add(0.0f); v.add(0.0f);  // Normal (-X)
-        
-        v.add(x0); v.add(y0); v.add(z1);
-        v.add(1.0f); v.add(0.0f);
-        v.add(-1.0f); v.add(0.0f); v.add(0.0f);
-        
-        v.add(x0); v.add(y1); v.add(z1);
-        v.add(1.0f); v.add(1.0f);
-        v.add(-1.0f); v.add(0.0f); v.add(0.0f);
-        
-        v.add(x0); v.add(y1); v.add(z0);
-        v.add(0.0f); v.add(1.0f);
-        v.add(-1.0f); v.add(0.0f); v.add(0.0f);
-    }
-    
-    private void addEastFace(List<Float> v, int x, int y, int z) {
-        float x0 = x + 1;
-        float y0 = y, y1 = y + 1;
-        float z0 = z, z1 = z + 1;
-        
-        v.add(x0); v.add(y0); v.add(z0);
-        v.add(0.0f); v.add(0.0f);
-        v.add(1.0f); v.add(0.0f); v.add(0.0f);  // Normal (+X)
-        
-        v.add(x0); v.add(y1); v.add(z0);
-        v.add(0.0f); v.add(1.0f);
-        v.add(1.0f); v.add(0.0f); v.add(0.0f);
-        
-        v.add(x0); v.add(y1); v.add(z1);
-        v.add(1.0f); v.add(1.0f);
-        v.add(1.0f); v.add(0.0f); v.add(0.0f);
-        
-        v.add(x0); v.add(y0); v.add(z1);
-        v.add(1.0f); v.add(0.0f);
-        v.add(1.0f); v.add(0.0f); v.add(0.0f);
-    }
     
     /**
      * Gets the cached mesh, generating it if dirty.

@@ -34,11 +34,12 @@ public class ChunkPos {
      * @return Chunk position containing those world coordinates
      */
     public static ChunkPos fromWorldPos(float worldX, float worldZ) {
-        // Math.floorDiv handles negative numbers correctly
-        // Regular division would give wrong results for negative coords
+        // Floor the floats BEFORE casting to int, otherwise negative fractional positions
+        // like -0.5 truncate to 0 instead of flooring to -1
+        // This bug had me stuck at spawn for like 30 minutes wondering why chunks weren't loading...
         return new ChunkPos(
-            Math.floorDiv((int) worldX, 16),
-            Math.floorDiv((int) worldZ, 16)
+            Math.floorDiv((int) Math.floor(worldX), 16),
+            Math.floorDiv((int) Math.floor(worldZ), 16)
         );
     }
     

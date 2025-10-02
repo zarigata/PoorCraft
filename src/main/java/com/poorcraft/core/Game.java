@@ -3,10 +3,14 @@ package com.poorcraft.core;
 import com.poorcraft.camera.Camera;
 import com.poorcraft.config.Settings;
 import com.poorcraft.input.InputHandler;
+import com.poorcraft.render.ChunkRenderer;
 import com.poorcraft.world.ChunkManager;
 import com.poorcraft.world.World;
+import com.poorcraft.world.chunk.Chunk;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+
+import java.util.Collection;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -26,6 +30,7 @@ public class Game {
     private Settings settings;
     private World world;
     private ChunkManager chunkManager;
+    private ChunkRenderer chunkRenderer;
     
     private boolean running;
     private boolean escapePressed;  // Track ESC key state for toggle
@@ -74,7 +79,7 @@ public class Game {
         );
         
         // Initialize world system
-        world = new World(settings.world.seed);
+        world = new World(settings.world.seed, settings.world.generateStructures);
         chunkManager = new ChunkManager(
             world,
             settings.world.chunkLoadDistance,
@@ -84,6 +89,14 @@ public class Game {
         // Initial chunk load around spawn
         chunkManager.update(camera.getPosition());
         System.out.println("[Game] World initialized with seed: " + world.getSeed());
+        
+        // Initialize chunk renderer
+        chunkRenderer = new ChunkRenderer();
+        chunkRenderer.init();
+        System.out.println("[Game] Chunk renderer initialized");
+        
+        // Set up chunk unload callback
+        world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
         
         running = true;
         
@@ -204,10 +217,7 @@ public class Game {
     
     /**
      * Renders the current frame.
-     * Gets view and projection matrices from camera.
-     * 
-     * Actual rendering will be implemented in the Rendering System phase.
-     * For now, we just clear to sky blue and call it a day.
+     * Renders all loaded chunks with frustum culling and lighting.
      */
     private void render() {
         // Clear color and depth buffers
@@ -222,9 +232,9 @@ public class Game {
             1000.0f // Far plane
         );
         
-        // TODO: Rendering will be implemented in Rendering System phase
-        // For now, we just have a beautiful sky blue screen
-        // It's not much, but it's honest work
+        // Render all loaded chunks
+        Collection<Chunk> loadedChunks = world.getLoadedChunks();
+        chunkRenderer.render(loadedChunks, view, projection);
     }
     
     /**
@@ -232,6 +242,10 @@ public class Game {
      */
     private void cleanup() {
         System.out.println("[Game] Cleaning up...");
+        
+        // Cleanup chunk renderer
+        chunkRenderer.cleanup();
+        System.out.println("[Game] Chunk renderer cleaned up");
         
         // Shutdown world system
         chunkManager.shutdown();
@@ -267,5 +281,15 @@ public class Game {
      */
     public ChunkManager getChunkManager() {
         return chunkManager;
+    }
+    
+    /**
+     * Gets the chunk renderer instance.
+     * Useful for debugging and monitoring rendering stats.
+     * 
+     * @return The chunk renderer
+     */
+    public ChunkRenderer getChunkRenderer() {
+        return chunkRenderer;
     }
 }
