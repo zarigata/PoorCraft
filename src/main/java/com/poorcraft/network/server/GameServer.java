@@ -92,6 +92,13 @@ public class GameServer {
         
         // Create world
         world = new World(worldSeed, generateStructures);
+        
+        // Set EventBus on world so mods can receive server-side events
+        // Without this, server mods won't get block/chunk/player events. That'd be bad!
+        if (eventBus != null) {
+            world.setEventBus(eventBus);
+        }
+        
         chunkManager = new ChunkManager(world, 16, 20);
         
         // Set up Netty server

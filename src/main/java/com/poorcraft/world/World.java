@@ -35,6 +35,7 @@ public class World {
     private final boolean generateStructures;
     private Consumer<ChunkPos> chunkUnloadCallback;
     private EventBus eventBus;
+    private boolean worldLoadEventFired;  // Track if WorldLoadEvent has been fired
     
     /**
      * Creates a new world with the given seed.
@@ -58,14 +59,14 @@ public class World {
         this.featureGenerator = new FeatureGenerator(this.seed, biomeGenerator, terrainGenerator);
         this.chunkUnloadCallback = null;
         this.eventBus = null;
+        this.worldLoadEventFired = false;
         
         System.out.println("[World] Created world with seed: " + this.seed);
         System.out.println("[World] Structure generation: " + (generateStructures ? "enabled" : "disabled"));
         
-        // Fire mod event for world load
-        if (eventBus != null) {
-            eventBus.fire(new WorldLoadEvent(this.seed, generateStructures));
-        }
+        // WorldLoadEvent is now fired in setEventBus() after the bus is assigned
+        // Because firing it here when eventBus is null would be like shouting into the void
+        // And nobody wants that. Not even the void.
     }
     
     /**
@@ -80,12 +81,22 @@ public class World {
     
     /**
      * Sets the event bus for firing mod events.
+     * Fires WorldLoadEvent once when the bus is first assigned.
      * 
      * @param eventBus Event bus instance
      */
     public void setEventBus(EventBus eventBus) {
         this.eventBus = eventBus;
-        // Also set on terrain generator
+        
+        // Fire WorldLoadEvent now that we have a bus to fire it on
+        // This ensures mods actually receive the event (unlike before when we fired into the void)
+        if (eventBus != null && !worldLoadEventFired) {
+            eventBus.fire(new WorldLoadEvent(this.seed, generateStructures));
+            worldLoadEventFired = true;
+            System.out.println("[World] WorldLoadEvent fired to mods");
+        }
+        
+        // Also set on terrain generator so it can fire chunk generation events
         if (terrainGenerator != null) {
             terrainGenerator.setEventBus(eventBus);
         }

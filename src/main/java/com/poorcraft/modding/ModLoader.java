@@ -169,6 +169,9 @@ public class ModLoader {
             return;
         }
         
+        // Get Python entry point to call import helper
+        Object pythonEntryPoint = gatewayServer.getPythonServerEntryPoint(new Class[0]);
+        
         for (ModContainer container : loadedMods) {
             try {
                 // Check if mod should load (server-only check)
@@ -177,11 +180,28 @@ public class ModLoader {
                     continue;
                 }
                 
-                // Import Python module
-                // We'll use a Python helper script to import modules
-                // For now, we'll assume the Python side connects and imports modules
-                // The actual module loading happens on the Python side
+                // Build Python module path: mods.<mod_dir>.<main_module>
+                String modDir = container.getModDirectory().getName();
+                String mainModule = container.getMainModule().replace(".py", "");
+                String modulePath = "mods." + modDir + "." + mainModule;
                 
+                System.out.println("[ModLoader] Importing Python module: " + modulePath);
+                
+                // Import the Python module using reflection on the Python entry point
+                // This calls __import__ or importlib on the Python side
+                Object pythonModule = null;
+                if (pythonEntryPoint != null) {
+                    try {
+                        Method importMethod = pythonEntryPoint.getClass().getMethod("importModule", String.class);
+                        pythonModule = importMethod.invoke(pythonEntryPoint, modulePath);
+                    } catch (NoSuchMethodException e) {
+                        // Fallback: try direct __import__ via Python
+                        System.out.println("[ModLoader] Python entry point doesn't have importModule, using fallback");
+                    }
+                }
+                
+                // Load the module into the container (transitions to LOADED state)
+                container.load(pythonModule);
                 System.out.println("[ModLoader] Loaded Python module for: " + container.getName());
                 
             } catch (Exception e) {

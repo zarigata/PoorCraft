@@ -168,6 +168,14 @@ public class Shader {
     public void setUniform(String name, Vector3f value) {
         glUniform3f(getUniformLocation(name), value.x, value.y, value.z);
     }
+
+    public void setUniform(String name, float x, float y, float z, float w) {
+        glUniform4f(getUniformLocation(name), x, y, z, w);
+    }
+
+    public void setUniform(String name, boolean value) {
+        glUniform1i(getUniformLocation(name), value ? 1 : 0);
+    }
     
     /**
      * Sets a mat4 uniform variable.

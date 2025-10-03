@@ -350,6 +350,10 @@ public class Game {
             // Initialize world
             world = new World(seed, generateStructures);
             
+            // Set EventBus on world so mods can receive world/block/chunk events
+            // This is critical - without it, mods never get notified of world changes!
+            world.setEventBus(modLoader.getEventBus());
+            
             // Initialize chunk manager
             chunkManager = new ChunkManager(
                 world,
@@ -361,19 +365,22 @@ public class Game {
             chunkManager.update(camera.getPosition());
             System.out.println("[Game] World initialized with seed: " + world.getSeed());
         }
-        
+
         // Initialize chunk renderer if not already initialized
         if (chunkRenderer == null) {
             chunkRenderer = new ChunkRenderer();
+            chunkRenderer.setModLoader(modLoader);
             chunkRenderer.init();
             System.out.println("[Game] Chunk renderer initialized");
+        } else {
+            chunkRenderer.setModLoader(modLoader);
         }
-        
+
         // Set up chunk unload callback
         if (world != null) {
             world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
         }
-        
+
         // Mark world as loaded
         worldLoaded = true;
         
@@ -393,11 +400,18 @@ public class Game {
         this.multiplayerMode = true;
         this.world = world;
         
+        // Set EventBus on world so mods can receive world/block/chunk events
+        // Even in multiplayer, mods need to know about world changes
+        world.setEventBus(modLoader.getEventBus());
+        
         // Initialize chunk renderer if not already initialized
         if (chunkRenderer == null) {
             chunkRenderer = new ChunkRenderer();
+            chunkRenderer.setModLoader(modLoader);
             chunkRenderer.init();
             System.out.println("[Game] Chunk renderer initialized");
+        } else {
+            chunkRenderer.setModLoader(modLoader);
         }
         
         // Set up chunk unload callback

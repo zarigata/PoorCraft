@@ -1,13 +1,16 @@
 package com.poorcraft.render;
 
+import com.poorcraft.modding.ModLoader;
 import com.poorcraft.world.chunk.Chunk;
 import com.poorcraft.world.chunk.ChunkMesh;
 import com.poorcraft.world.chunk.ChunkPos;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.lwjgl.BufferUtils;
 
+import java.nio.ByteBuffer;
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.lwjgl.opengl.GL11.*;
@@ -37,6 +40,7 @@ public class ChunkRenderer {
     
     private Shader blockShader;
     private TextureAtlas textureAtlas;
+    private ModLoader modLoader;
     private Map<ChunkPos, ChunkRenderData> chunkRenderData;
     private Frustum frustum;
     private Matrix4f modelMatrix;
@@ -53,11 +57,20 @@ public class ChunkRenderer {
      * Creates a new chunk renderer.
      */
     public ChunkRenderer() {
-        this.chunkRenderData = new HashMap<>();
+        this.chunkRenderData = new LinkedHashMap<>();
         this.modelMatrix = new Matrix4f();
         this.viewProjectionMatrix = new Matrix4f();
     }
-    
+
+    /**
+     * Sets the mod loader reference so we can sneak in procedural textures before rendering starts.
+     *
+     * @param modLoader Active mod loader
+     */
+    public void setModLoader(ModLoader modLoader) {
+        this.modLoader = modLoader;
+    }
+
     /**
      * Initializes the chunk renderer.
      * Loads shaders, creates texture atlas, and sets up rendering resources.
@@ -69,14 +82,55 @@ public class ChunkRenderer {
         blockShader = Shader.loadFromResources("/shaders/block.vert", "/shaders/block.frag");
         System.out.println("[ChunkRenderer] Shaders compiled successfully");
         
-        // Create texture atlas
-        textureAtlas = TextureAtlas.createDefault();
-        System.out.println("[ChunkRenderer] Texture atlas created");
+        // Create texture atlas (mods can replace the default one before chunks render)
+        if (modLoader != null && modLoader.getModAPI() != null && modLoader.getModAPI().hasProceduralTextures()) {
+            textureAtlas = new TextureAtlas();
+            addMissingTexturePlaceholder(textureAtlas);
+
+            Map<String, ByteBuffer> textures = modLoader.getModAPI().getProceduralTextures();
+            int count = 0;
+            for (Map.Entry<String, ByteBuffer> entry : textures.entrySet()) {
+                textureAtlas.addTexture(entry.getKey(), entry.getValue(), TextureAtlas.TEXTURE_SIZE, TextureAtlas.TEXTURE_SIZE);
+                count++;
+            }
+
+            textureAtlas.build();
+            System.out.println("[ChunkRenderer] Built texture atlas with " + count + " procedural textures");
+        } else {
+            textureAtlas = TextureAtlas.createDefault();
+            System.out.println("[ChunkRenderer] Using default texture atlas (no procedural textures)");
+        }
         
         // Create frustum
         frustum = new Frustum();
         
         System.out.println("[ChunkRenderer] Initialization complete");
+    }
+
+    private void addMissingTexturePlaceholder(TextureAtlas atlas) {
+        ByteBuffer buffer = BufferUtils.createByteBuffer(TextureAtlas.TEXTURE_SIZE * TextureAtlas.TEXTURE_SIZE * 4);
+
+        for (int y = 0; y < TextureAtlas.TEXTURE_SIZE; y++) {
+            for (int x = 0; x < TextureAtlas.TEXTURE_SIZE; x++) {
+                boolean magenta = ((x / 4) + (y / 4)) % 2 == 0;
+
+                if (magenta) {
+                    buffer.put((byte) 255);
+                    buffer.put((byte) 0);
+                    buffer.put((byte) 255);
+                    buffer.put((byte) 255);
+                } else {
+                    buffer.put((byte) 0);
+                    buffer.put((byte) 0);
+                    buffer.put((byte) 0);
+                    buffer.put((byte) 255);
+                }
+            }
+        }
+
+        buffer.flip();
+        atlas.addTexture("missing", buffer, TextureAtlas.TEXTURE_SIZE, TextureAtlas.TEXTURE_SIZE);
+        // I don't know what is going on here but it's working, just like those Minecraft alpha days.
     }
     
     /**

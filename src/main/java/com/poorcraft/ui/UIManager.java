@@ -2,6 +2,7 @@ package com.poorcraft.ui;
 
 import com.poorcraft.config.ConfigManager;
 import com.poorcraft.config.Settings;
+import com.poorcraft.core.Game;
 import com.poorcraft.network.client.GameClient;
 import com.poorcraft.network.server.GameServer;
 
@@ -525,6 +526,20 @@ public class UIManager {
         
         // Create game server
         gameServer = new GameServer(port, settings);
+        
+        // Hook up the modding event bus to the integrated server
+        // This ensures server-side events (block/player/chunk) reach mods
+        // Without this, mods never get notified of server-side changes. Classic mistake!
+        try {
+            Game gameInstance = (Game) game;
+            if (gameInstance.getModLoader() != null) {
+                gameServer.setEventBus(gameInstance.getModLoader().getEventBus());
+                System.out.println("[UIManager] EventBus hooked up to integrated server");
+            }
+        } catch (Exception e) {
+            // Not fatal - server can still run without mod support
+            System.err.println("[UIManager] Failed to hook up EventBus: " + e.getMessage());
+        }
         
         // Transition to hosting state
         setState(GameState.HOSTING);

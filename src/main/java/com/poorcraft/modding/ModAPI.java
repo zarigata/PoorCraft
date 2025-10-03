@@ -1,10 +1,14 @@
 package com.poorcraft.modding;
 
+import com.google.gson.Gson;
 import com.poorcraft.core.Game;
 import com.poorcraft.world.World;
 import com.poorcraft.world.block.BlockType;
+import org.lwjgl.BufferUtils;
 
+import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -41,6 +45,7 @@ public class ModAPI {
     private final Game game;
     private final EventBus eventBus;
     private final Map<String, Object> sharedData;
+    private final Map<String, ByteBuffer> proceduralTextures;
     
     /**
      * Creates a new ModAPI instance.
@@ -52,6 +57,7 @@ public class ModAPI {
         this.game = game;
         this.eventBus = eventBus;
         this.sharedData = new HashMap<>();
+        this.proceduralTextures = new LinkedHashMap<>();
     }
     
     // ========== World Access Methods ==========
@@ -255,5 +261,155 @@ public class ModAPI {
      */
     public EventBus getEventBus() {
         return eventBus;
+    }
+    
+    /**
+     * Imports a Python module by path.
+     * This is called from Java to dynamically load Python mod modules.
+     * 
+     * <p>The Python side should implement this by using importlib or __import__.
+     * This method is designed to be called via Py4J callback.
+     * 
+     * @param modulePath Python module path (e.g., "mods.ai_npc.main")
+     * @return Python module object (Py4J proxy), or null if import fails
+     */
+    public Object importPythonModule(String modulePath) {
+        try {
+            // This method is a placeholder that will be overridden by Python
+            // The actual implementation happens on the Python side via callback
+            // We can't directly import Python modules from Java, so we need
+            // the Python gateway to provide this functionality
+            log("Java cannot directly import Python modules - this should be called from Python side");
+            return null;
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error importing Python module: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Registers a procedurally generated texture provided by a Python mod.
+     * Texture data must be a 16x16 image encoded as 1024 RGBA bytes.
+     *
+     * @param name     Unique texture name used by the renderer
+     * @param rgbaData Raw RGBA bytes (length must be 1024)
+     */
+    public void addProceduralTexture(String name, byte[] rgbaData) {
+        if (name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("Texture name cannot be null or empty");
+        }
+
+        if (rgbaData == null || rgbaData.length != 16 * 16 * 4) {
+            throw new IllegalArgumentException("Procedural textures must be 16x16 RGBA (1024 bytes)");
+        }
+
+        ByteBuffer buffer = BufferUtils.createByteBuffer(rgbaData.length);
+        buffer.put(rgbaData);
+        buffer.flip();
+
+        proceduralTextures.put(name, buffer);
+        System.out.println("[ModAPI] Registered procedural texture: " + name);
+
+        if (proceduralTextures.size() > 256) {
+            System.err.println("[ModAPI] Warning: Procedural texture count exceeds atlas capacity (256)");
+        }
+    }
+
+    /**
+     * Provides read-only access to all registered procedural textures.
+     *
+     * @return Map of texture names to RGBA byte buffers
+     */
+    public Map<String, ByteBuffer> getProceduralTextures() {
+        return proceduralTextures;
+    }
+
+    /**
+     * Indicates whether any procedural textures have been registered.
+     *
+     * @return true if at least one procedural texture exists
+     */
+    public boolean hasProceduralTextures() {
+        return !proceduralTextures.isEmpty();
+    }
+
+    /**
+     * Gets the number of registered procedural textures.
+     *
+     * @return Count of textures registered by mods
+     */
+    public int getProceduralTextureCount() {
+        return proceduralTextures.size();
+    }
+
+    /**
+     * Retrieves a mod's configuration as a JSON string for Python consumption.
+     *
+     * @param modId Target mod identifier
+     * @return JSON string of the configuration, or null if unavailable
+     */
+    public String getModConfig(String modId) {
+        if (modId == null || modId.isEmpty()) {
+            return null;
+        }
+
+        try {
+            ModLoader modLoader = game.getModLoader();
+            if (modLoader == null) {
+                return null;
+            }
+
+            ModContainer container = modLoader.getModById(modId);
+            if (container == null) {
+                return null;
+            }
+
+            return new Gson().toJson(container.getConfig());
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error retrieving config for mod '" + modId + "': " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Stores NPC metadata in shared data for mods that manage conversational NPCs.
+     * The entity system will pick this up once NPC spawning is implemented in Java.
+     *
+     * @param npcId       Unique NPC identifier
+     * @param name        NPC display name
+     * @param x           Spawn X coordinate
+     * @param y           Spawn Y coordinate
+     * @param z           Spawn Z coordinate
+     * @param personality Personality descriptor for AI systems
+     */
+    public void spawnNPC(int npcId, String name, float x, float y, float z, String personality) {
+        Map<String, Object> npcData = new HashMap<>();
+        npcData.put("id", npcId);
+        npcData.put("name", name);
+        npcData.put("position", new float[]{x, y, z});
+        npcData.put("personality", personality);
+
+        sharedData.put("npc_" + npcId, npcData);
+        System.out.println("[ModAPI] Spawned NPC (#" + npcId + ") " + name + " at (" + x + ", " + y + ", " + z + ")");
+    }
+
+    /**
+     * Removes NPC metadata from the shared data map.
+     *
+     * @param npcId Unique NPC identifier
+     */
+    public void despawnNPC(int npcId) {
+        sharedData.remove("npc_" + npcId);
+        System.out.println("[ModAPI] Despawned NPC (#" + npcId + ")");
+    }
+
+    /**
+     * Logs NPC dialogue so mods can provide conversational feedback.
+     *
+     * @param npcId   Unique NPC identifier
+     * @param message Dialogue text spoken by the NPC
+     */
+    public void npcSay(int npcId, String message) {
+        System.out.println("[NPC " + npcId + "] " + message);
     }
 }
