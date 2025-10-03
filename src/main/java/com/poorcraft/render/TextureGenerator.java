@@ -13,6 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -40,6 +41,9 @@ public final class TextureGenerator {
     private static final Map<String, TextureFactory> FLORA_FACTORIES = new LinkedHashMap<>();
     private static final Map<String, TextureFactory> SKIN_FACTORIES = new LinkedHashMap<>();
 
+    private static Map<String, ByteBuffer> cachedBlockTextures;
+    private static boolean auxiliaryEnsured;
+
     static {
         registerBlockFactories();
         registerFloraFactories();
@@ -53,12 +57,18 @@ public final class TextureGenerator {
      * Ensures every known block texture exists, generating procedural art when necessary.
      * The resulting RGBA buffers are returned for immediate atlas construction.
      */
-    public static Map<String, ByteBuffer> ensureDefaultBlockTextures() {
+    public static synchronized Map<String, ByteBuffer> ensureDefaultBlockTextures() {
+        if (cachedBlockTextures != null) {
+            return cachedBlockTextures;
+        }
+
         Map<String, ByteBuffer> textures = new LinkedHashMap<>();
         for (Map.Entry<String, TextureFactory> entry : BLOCK_FACTORIES.entrySet()) {
             textures.put(entry.getKey(), loadOrGenerate(entry.getKey(), entry.getValue(), WORKSPACE_BLOCK_DIR, OUTPUT_BLOCK_DIR, CLASSPATH_BLOCK_DIR));
         }
-        return textures;
+
+        cachedBlockTextures = Collections.unmodifiableMap(textures);
+        return cachedBlockTextures;
     }
 
     /**
@@ -66,13 +76,19 @@ public final class TextureGenerator {
      * something to tweak without starting from absolute zero. These files live under generated/
      * and can be swapped out by hand-crafted PNGs later.
      */
-    public static void ensureAuxiliaryTextures() {
+    public static synchronized void ensureAuxiliaryTextures() {
+        if (auxiliaryEnsured) {
+            return;
+        }
+
         for (Map.Entry<String, TextureFactory> entry : FLORA_FACTORIES.entrySet()) {
             loadOrGenerate(entry.getKey(), entry.getValue(), WORKSPACE_BLOCK_DIR, OUTPUT_BLOCK_DIR, CLASSPATH_BLOCK_DIR);
         }
         for (Map.Entry<String, TextureFactory> entry : SKIN_FACTORIES.entrySet()) {
             loadOrGenerate(entry.getKey(), entry.getValue(), WORKSPACE_SKIN_DIR, OUTPUT_SKIN_DIR, CLASSPATH_SKIN_DIR);
         }
+
+        auxiliaryEnsured = true;
     }
 
     private static ByteBuffer loadOrGenerate(String name,

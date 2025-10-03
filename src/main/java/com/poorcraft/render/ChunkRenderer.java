@@ -180,13 +180,9 @@ public class ChunkRenderer {
         frustum.update(viewProjectionMatrix);
         
         // Render chunks
-        int renderedChunks = 0;
-        int culledChunks = 0;
-        
         for (Chunk chunk : chunks) {
             // Frustum culling - skip chunks outside view
             if (!frustum.testChunk(chunk)) {
-                culledChunks++;
                 continue;
             }
             
@@ -211,7 +207,6 @@ public class ChunkRenderer {
             
             // Render chunk
             renderData.render();
-            renderedChunks++;
         }
         
         // Unbind shader

@@ -6,6 +6,7 @@ import com.poorcraft.config.Settings;
 import com.poorcraft.input.InputHandler;
 import com.poorcraft.modding.ModLoader;
 import com.poorcraft.render.ChunkRenderer;
+import com.poorcraft.render.TextureGenerator;
 import com.poorcraft.ui.GameState;
 import com.poorcraft.ui.UIManager;
 import com.poorcraft.world.ChunkManager;
@@ -14,7 +15,9 @@ import com.poorcraft.world.chunk.Chunk;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
+import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Map;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -96,7 +99,6 @@ public class Game {
         // Initialize UI manager
         uiManager = new UIManager(this, settings, configManager);
         uiManager.init(window.getWidth(), window.getHeight());
-        
         // Connect input handler to UI manager for cursor management
         uiManager.setInputHandler(inputHandler, window.getHandle());
         
@@ -106,7 +108,22 @@ public class Game {
         modLoader = new ModLoader(this);
         modLoader.init();
         System.out.println("[Game] Mod loader initialized");
-        
+
+        // Generate baseline textures before mods start tinkering with them
+        Map<String, ByteBuffer> generatedTextures = TextureGenerator.ensureDefaultBlockTextures();
+        TextureGenerator.ensureAuxiliaryTextures();
+
+        // Share generated textures with ModAPI so chunk renderer can combine them with mod assets
+        if (modLoader.getModAPI() != null) {
+            generatedTextures.forEach((name, buffer) -> {
+                if (buffer != null) {
+                    byte[] rgba = new byte[buffer.remaining()];
+                    buffer.duplicate().get(rgba);
+                    modLoader.getModAPI().addProceduralTexture(name, rgba);
+                }
+            });
+        }
+
         // Set up input callbacks for UI
         inputHandler.setKeyPressCallback(key -> uiManager.onKeyPress(key, 0));
         inputHandler.setCharInputCallback(character -> uiManager.onCharInput(character));
