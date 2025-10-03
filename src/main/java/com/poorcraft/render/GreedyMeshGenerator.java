@@ -97,9 +97,9 @@ public class GreedyMeshGenerator {
                 depth = Chunk.CHUNK_SIZE;
             }
             default -> { // West/East (scan YZ plane, iterate through X)
-                width = Chunk.CHUNK_HEIGHT;
-                height = Chunk.CHUNK_SIZE;
-                depth = Chunk.CHUNK_SIZE;
+                width = Chunk.CHUNK_SIZE;    // Z dimension (horizontal)
+                height = Chunk.CHUNK_HEIGHT; // Y dimension (vertical)
+                depth = Chunk.CHUNK_SIZE;    // X dimension (depth through chunks)
             }
         }
         
@@ -141,21 +141,44 @@ public class GreedyMeshGenerator {
                             adjX = x; adjY = y; adjZ = z + 1;
                         }
                         case 4 -> { // West (-X)
-                            x = d; y = w; z = h;
+                            x = d; y = h; z = w;
                             adjX = x - 1; adjY = y; adjZ = z;
                         }
                         default -> { // East (+X)
-                            x = d; y = w; z = h;
+                            x = d; y = h; z = w;
                             adjX = x + 1; adjY = y; adjZ = z;
                         }
                     }
                     
                     // Check if face should be rendered
+                    // Core principle: only render faces between different block types
+                    // This prevents internal faces while preserving boundaries
                     BlockType currentBlock = getBlockSafe(x, y, z);
                     BlockType adjacentBlock = getBlockSafe(adjX, adjY, adjZ);
                     
-                    if (currentBlock != BlockType.AIR && 
-                        (adjacentBlock == BlockType.AIR || adjacentBlock.isTransparent())) {
+                    // Don't render faces for air blocks
+                    if (currentBlock == BlockType.AIR) {
+                        continue;
+                    }
+                    
+                    // Render face if:
+                    // 1. Adjacent to air (exposed to open space)
+                    // 2. Adjacent to a different block type (material boundary)
+                    // 3. Same transparent type but we want to see through (e.g., glass-to-glass still shows seam)
+                    
+                    boolean shouldRender = false;
+                    
+                    if (adjacentBlock == BlockType.AIR) {
+                        // Always render faces exposed to air
+                        shouldRender = true;
+                    } else if (currentBlock != adjacentBlock) {
+                        // Render faces between different block types
+                        shouldRender = true;
+                    }
+                    // Note: Same solid blocks touching = no face (internal)
+                    // Note: Same transparent blocks touching = no face (seamless glass/leaves)
+                    
+                    if (shouldRender) {
                         mask[h][w] = currentBlock;
                     }
                 }
@@ -275,14 +298,14 @@ public class GreedyMeshGenerator {
             }
             case 4 -> { // West (-X)
                 x0 = depth; x1 = depth;
-                y0 = w; y1 = w + quadWidth;
-                z0 = h; z1 = h + quadHeight;
+                y0 = h; y1 = h + quadHeight;
+                z0 = w; z1 = w + quadWidth;
                 nx = -1; ny = 0; nz = 0;
             }
             default -> { // East (+X)
                 x0 = depth + 1; x1 = depth + 1;
-                y0 = w; y1 = w + quadWidth;
-                z0 = h; z1 = h + quadHeight;
+                y0 = h; y1 = h + quadHeight;
+                z0 = w; z1 = w + quadWidth;
                 nx = 1; ny = 0; nz = 0;
             }
         }
@@ -296,104 +319,54 @@ public class GreedyMeshGenerator {
         float atlasU1 = uvBounds[2];
         float atlasV1 = uvBounds[3];
         
-        // Tile texture coordinates based on quad size
-        // This makes the texture repeat across the merged quad
         float u0 = atlasU0;
         float v0 = atlasV0;
-        float u1 = atlasU0 + (atlasU1 - atlasU0) * quadWidth;
-        float v1 = atlasV0 + (atlasV1 - atlasV0) * quadHeight;
-        
-        float[][] positions = new float[4][3];
-        float[][] uvs;
+        float u1 = atlasU1;
+        float v1 = atlasV1;
 
         switch (direction) {
             case 0 -> { // Top (+Y)
                 float y = depth + 1;
-                positions[0] = new float[]{x0, y, z0};
-                positions[1] = new float[]{x1, y, z0};
-                positions[2] = new float[]{x1, y, z1};
-                positions[3] = new float[]{x0, y, z1};
-                uvs = new float[][]{
-                    {u0, v0},
-                    {u1, v0},
-                    {u1, v1},
-                    {u0, v1}
-                };
+                addVertex(vertices, x0, y, z0, u0, v0, nx, ny, nz);
+                addVertex(vertices, x0, y, z1, u0, v1, nx, ny, nz);
+                addVertex(vertices, x1, y, z1, u1, v1, nx, ny, nz);
+                addVertex(vertices, x1, y, z0, u1, v0, nx, ny, nz);
             }
             case 1 -> { // Bottom (-Y)
                 float y = depth;
-                positions[0] = new float[]{x0, y, z1};
-                positions[1] = new float[]{x1, y, z1};
-                positions[2] = new float[]{x1, y, z0};
-                positions[3] = new float[]{x0, y, z0};
-                uvs = new float[][]{
-                    {u0, v1},
-                    {u1, v1},
-                    {u1, v0},
-                    {u0, v0}
-                };
+                addVertex(vertices, x0, y, z0, u0, v0, nx, ny, nz);
+                addVertex(vertices, x1, y, z0, u1, v0, nx, ny, nz);
+                addVertex(vertices, x1, y, z1, u1, v1, nx, ny, nz);
+                addVertex(vertices, x0, y, z1, u0, v1, nx, ny, nz);
             }
             case 2 -> { // North (-Z)
-                positions[0] = new float[]{x1, y0, z0};
-                positions[1] = new float[]{x0, y0, z0};
-                positions[2] = new float[]{x0, y1, z0};
-                positions[3] = new float[]{x1, y1, z0};
-                uvs = new float[][]{
-                    {u1, v0},
-                    {u0, v0},
-                    {u0, v1},
-                    {u1, v1}
-                };
+                float z = depth;
+                addVertex(vertices, x1, y0, z, u1, v0, nx, ny, nz);
+                addVertex(vertices, x0, y0, z, u0, v0, nx, ny, nz);
+                addVertex(vertices, x0, y1, z, u0, v1, nx, ny, nz);
+                addVertex(vertices, x1, y1, z, u1, v1, nx, ny, nz);
             }
-            case 3 -> { // South (+Z)
-                positions[0] = new float[]{x0, y0, z1};
-                positions[1] = new float[]{x0, y1, z1};
-                positions[2] = new float[]{x1, y1, z1};
-                positions[3] = new float[]{x1, y0, z1};
-                uvs = new float[][]{
-                    {u0, v0},
-                    {u0, v1},
-                    {u1, v1},
-                    {u1, v0}
-                };
+            case 3 -> { // South (+Z) - CCW when viewed from outside (-Z looking toward +Z)
+                float z = depth + 1;
+                addVertex(vertices, x0, y0, z, u0, v0, nx, ny, nz);  // bottom-left
+                addVertex(vertices, x1, y0, z, u1, v0, nx, ny, nz);  // bottom-right
+                addVertex(vertices, x1, y1, z, u1, v1, nx, ny, nz);  // top-right
+                addVertex(vertices, x0, y1, z, u0, v1, nx, ny, nz);  // top-left
             }
             case 4 -> { // West (-X)
-                positions[0] = new float[]{x0, y0, z1};
-                positions[1] = new float[]{x0, y0, z0};
-                positions[2] = new float[]{x0, y1, z0};
-                positions[3] = new float[]{x0, y1, z1};
-                uvs = new float[][]{
-                    {u1, v0},
-                    {u0, v0},
-                    {u0, v1},
-                    {u1, v1}
-                };
+                float x = depth;
+                addVertex(vertices, x, y0, z0, u0, v0, nx, ny, nz);
+                addVertex(vertices, x, y0, z1, u1, v0, nx, ny, nz);
+                addVertex(vertices, x, y1, z1, u1, v1, nx, ny, nz);
+                addVertex(vertices, x, y1, z0, u0, v1, nx, ny, nz);
             }
             default -> { // East (+X)
-                positions[0] = new float[]{x1, y0, z0};
-                positions[1] = new float[]{x1, y0, z1};
-                positions[2] = new float[]{x1, y1, z1};
-                positions[3] = new float[]{x1, y1, z0};
-                uvs = new float[][]{
-                    {u0, v0},
-                    {u0, v1},
-                    {u1, v1},
-                    {u1, v0}
-                };
+                float x = depth + 1;
+                addVertex(vertices, x, y0, z1, u1, v0, nx, ny, nz);
+                addVertex(vertices, x, y0, z0, u0, v0, nx, ny, nz);
+                addVertex(vertices, x, y1, z0, u0, v1, nx, ny, nz);
+                addVertex(vertices, x, y1, z1, u1, v1, nx, ny, nz);
             }
-        }
-
-        for (int i = 0; i < 4; i++) {
-            float[] pos = positions[i];
-            float[] uv = uvs[i];
-            vertices.add(pos[0]);
-            vertices.add(pos[1]);
-            vertices.add(pos[2]);
-            vertices.add(uv[0]);
-            vertices.add(uv[1]);
-            vertices.add(nx);
-            vertices.add(ny);
-            vertices.add(nz);
         }
         
         // Add indices for 2 triangles
@@ -403,5 +376,24 @@ public class GreedyMeshGenerator {
         indices.add(baseIndex);
         indices.add(baseIndex + 2);
         indices.add(baseIndex + 3);
+    }
+
+    private void addVertex(List<Float> vertices,
+                           float x,
+                           float y,
+                           float z,
+                           float u,
+                           float v,
+                           float nx,
+                           float ny,
+                           float nz) {
+        vertices.add(x);
+        vertices.add(y);
+        vertices.add(z);
+        vertices.add(u);
+        vertices.add(v);
+        vertices.add(nx);
+        vertices.add(ny);
+        vertices.add(nz);
     }
 }

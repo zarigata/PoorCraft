@@ -93,13 +93,16 @@ public class UIManager {
         uiRenderer = new UIRenderer();
         uiRenderer.init(windowWidth, windowHeight);
         
-        fontRenderer = new FontRenderer(uiRenderer, 18);
+        // Initialize font renderer with Silkscreen font for that retro vibe
+        // Using size 20 for better readability with the pixelated font
+        fontRenderer = new FontRenderer(uiRenderer, 20);
         try {
-            // Try to load default font
-            fontRenderer.init("/fonts/default.ttf");
+            // Try to load Silkscreen font (the one we just added!)
+            fontRenderer.init("src/main/resources/fonts/Silkscreen-Regular.ttf");
+            System.out.println("[UIManager] Loaded Silkscreen font - looking retro!");
         } catch (Exception e) {
-            System.err.println("[UIManager] Failed to load default font, using fallback: " + e.getMessage());
-            // Font renderer will handle fallback internally
+            System.err.println("[UIManager] Failed to load Silkscreen font, using fallback: " + e.getMessage());
+            // Font renderer will handle fallback internally (probably system font)
         }
         
         // Create all screens
