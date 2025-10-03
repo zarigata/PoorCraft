@@ -3,6 +3,7 @@ package com.poorcraft.core;
 import com.poorcraft.camera.Camera;
 import com.poorcraft.config.ConfigManager;
 import com.poorcraft.config.Settings;
+import com.poorcraft.discord.DiscordRichPresenceManager;
 import com.poorcraft.input.InputHandler;
 import com.poorcraft.modding.ModLoader;
 import com.poorcraft.render.ChunkRenderer;
@@ -12,6 +13,7 @@ import com.poorcraft.ui.UIManager;
 import com.poorcraft.world.ChunkManager;
 import com.poorcraft.world.World;
 import com.poorcraft.world.chunk.Chunk;
+import com.poorcraft.world.generation.BiomeType;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
@@ -42,10 +44,14 @@ public class Game {
     private ChunkManager chunkManager;
     private ChunkRenderer chunkRenderer;
     private ModLoader modLoader;
+    private DiscordRichPresenceManager discordRPC;
     
     private boolean running;
     private boolean worldLoaded;  // Track if world is loaded
     private boolean multiplayerMode;  // Flag indicating if game is in multiplayer mode
+    private GameState lastGameState;  // Track last game state for Discord presence updates
+    private BiomeType lastBiome;  // Track last biome for Discord presence updates
+    private float discordUpdateTimer;  // Timer for periodic Discord updates
     
     private static final float FIXED_TIME_STEP = 1.0f / 60.0f;  // 60 updates per second
     
@@ -61,6 +67,9 @@ public class Game {
         this.running = false;
         this.worldLoaded = false;
         this.multiplayerMode = false;
+        this.lastGameState = null;
+        this.lastBiome = null;
+        this.discordUpdateTimer = 0.0f;
     }
     
     /**
@@ -143,6 +152,17 @@ public class Game {
         // Don't create world yet - wait for player to click "Create World" in UI
         // World creation moved to createWorld() method
         
+        // Initialize Discord Rich Presence
+        // This is where we tell Discord we're cool enough to have Rich Presence
+        // Spoiler: we're not, but Discord doesn't need to know that
+        discordRPC = new DiscordRichPresenceManager();
+        if (discordRPC.init()) {
+            System.out.println("[Game] Discord Rich Presence enabled");
+            discordRPC.updateMainMenu();
+        } else {
+            System.out.println("[Game] Discord Rich Presence disabled (Discord not running or init failed)");
+        }
+        
         running = true;
         
         System.out.println("[Game] Initialization complete!");
@@ -193,6 +213,20 @@ public class Game {
         // Update UI
         uiManager.update(deltaTime);
         
+        // Update Discord Rich Presence callbacks
+        // Discord needs regular updates or it'll think we froze
+        // Kind of like a needy friend who needs constant attention
+        if (discordRPC != null && discordRPC.isInitialized()) {
+            discordRPC.runCallbacks();
+            
+            // Update Discord presence based on game state (but not every frame, that's overkill)
+            discordUpdateTimer += deltaTime;
+            if (discordUpdateTimer >= 2.0f) {  // Update every 2 seconds
+                updateDiscordPresence();
+                discordUpdateTimer = 0.0f;
+            }
+        }
+        
         // Only update gameplay if in IN_GAME state
         if (uiManager.getCurrentState() != GameState.IN_GAME) {
             return;
@@ -231,6 +265,10 @@ public class Game {
         // Render world if loaded and in appropriate state
         if (worldLoaded && (uiManager.getCurrentState() == GameState.IN_GAME || 
                            uiManager.getCurrentState() == GameState.PAUSED)) {
+            // Enable depth testing for 3D world rendering
+            glEnable(GL_DEPTH_TEST);
+            glDepthFunc(GL_LESS);
+            
             // Get matrices from camera
             Matrix4f view = camera.getViewMatrix();
             Matrix4f projection = camera.getProjectionMatrix(
@@ -245,7 +283,15 @@ public class Game {
             chunkRenderer.render(loadedChunks, view, projection);
         }
         
-        // Render UI on top
+        // Reset OpenGL state before UI rendering
+        // This is crucial! The 3D world might leave weird state that breaks 2D UI
+        // I learned this the hard way after spending 2 hours debugging invisible menus
+        glDisable(GL_DEPTH_TEST);  // UI doesn't need depth testing
+        glDisable(GL_CULL_FACE);   // Make sure back-face culling is off
+        glEnable(GL_BLEND);        // Need blending for transparency
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        // Render UI on top (UIRenderer.begin() will set up the rest)
         uiManager.render();
     }
     
@@ -254,6 +300,13 @@ public class Game {
      */
     private void cleanup() {
         System.out.println("[Game] Cleaning up...");
+        
+        // Shutdown Discord Rich Presence
+        // Important: Do this first so Discord knows we're leaving
+        // Otherwise your friends will think you rage quit
+        if (discordRPC != null) {
+            discordRPC.shutdown();
+        }
         
         // Shutdown mod loader
         if (modLoader != null) {
@@ -443,5 +496,81 @@ public class Game {
      */
     public ModLoader getModLoader() {
         return modLoader;
+    }
+    
+    /**
+     * Updates Discord Rich Presence based on current game state.
+     * Called periodically from the update loop.
+     * 
+     * This is where the magic happens - we tell Discord what we're doing.
+     * Or what we want Discord to think we're doing. Same thing really.
+     */
+    private void updateDiscordPresence() {
+        if (discordRPC == null || !discordRPC.isInitialized()) {
+            return;
+        }
+        
+        GameState currentState = uiManager.getCurrentState();
+        
+        // Check if state changed
+        boolean stateChanged = (lastGameState != currentState);
+        lastGameState = currentState;
+        
+        switch (currentState) {
+            case MAIN_MENU:
+                if (stateChanged) {
+                    discordRPC.updateMainMenu();
+                }
+                break;
+                
+            case WORLD_CREATION:
+                if (stateChanged) {
+                    discordRPC.updateCreatingWorld();
+                }
+                break;
+                
+            case SETTINGS_MENU:
+            case MULTIPLAYER_MENU:
+                if (stateChanged) {
+                    discordRPC.updateMainMenu();
+                }
+                break;
+                
+            case CONNECTING:
+            case HOSTING:
+                if (stateChanged) {
+                    discordRPC.updateConnectingMultiplayer("server");
+                }
+                break;
+                
+            case PAUSED:
+                if (stateChanged) {
+                    discordRPC.updatePaused();
+                }
+                break;
+                
+            case IN_GAME:
+                // Update biome info if in game
+                if (world != null && playerController != null) {
+                    Vector3f pos = playerController.getPosition();
+                    BiomeType currentBiome = world.getBiome((int)pos.x, (int)pos.z);
+                    
+                    // Update if biome changed or state changed
+                    if (stateChanged || currentBiome != lastBiome) {
+                        discordRPC.updateInGame(currentBiome, multiplayerMode, world.getSeed());
+                        lastBiome = currentBiome;
+                    }
+                }
+                break;
+        }
+    }
+    
+    /**
+     * Gets the Discord RPC manager.
+     * 
+     * @return Discord RPC manager instance
+     */
+    public DiscordRichPresenceManager getDiscordRPC() {
+        return discordRPC;
     }
 }

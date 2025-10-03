@@ -155,6 +155,13 @@
             <artifactId>netty-all</artifactId>
             <version>4.1.100.Final</version>
         </dependency>
+
+        <!-- Discord RPC (Rich Presence) -->
+        <dependency>
+            <groupId>club.minnced</groupId>
+            <artifactId>discord-rpc-release</artifactId>
+            <version>v3.4.0</version>
+        </dependency>
     </dependencies>
 
     <build>
