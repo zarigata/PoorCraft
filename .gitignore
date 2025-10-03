@@ -48,3 +48,12 @@ mods/*/config.json
 # Build artifacts
 *.log
 hs_err_pid*
+
+# Runtime & Temporary Files
+*.tmp
+*.temp
+*.cache
+*.pid
+.cache/
+runtime/
+temp/
