@@ -29,86 +29,86 @@ public class MainMenuScreen extends UIScreen {
     public MainMenuScreen(int windowWidth, int windowHeight, UIManager uiManager) {
         super(windowWidth, windowHeight);
         this.uiManager = uiManager;
+        this.background = new MenuBackground();
     }
     
     @Override
     public void init() {
+        // Clear old components to start fresh
         clearComponents();
         
-        // Calculate centered layout with responsive sizing
-        // This math ensures the menu looks good on any screen size
+        // Layout calculations - adaptive but with sensible constraints
         float centerX = windowWidth / 2.0f;
-        float usableHeight = windowHeight * 0.70f;
-        float topOffset = windowHeight * 0.15f;
-
-        // Button sizing scales with window size
-        // Min: 280px, Max: 45% of screen width (capped at 500px for ultra-wide displays)
-        float buttonWidth = clamp(windowWidth * 0.30f, 280f, Math.min(500f, windowWidth * 0.45f));
-        float buttonHeight = clamp(windowHeight * 0.075f, 52f, 80f);
-        float buttonSpacing = Math.max(buttonHeight * 0.30f, 16f);
         
-        // Calculate total menu height and center it vertically
-        float menuHeight = buttonHeight * 4 + buttonSpacing * 3;
-        float centerY = topOffset + (usableHeight - menuHeight) / 2.0f;
-
-        // Title positioning - scales with window
-        float titleY = Math.max(topOffset * 0.4f, 40f);
-        float titleSize = clamp(windowHeight * 0.08f, 40f, 80f);
+        // Button dimensions that scale nicely
+        float buttonWidth = clamp(windowWidth * 0.28f, 250f, 450f);
+        float buttonHeight = clamp(windowHeight * 0.07f, 50f, 75f);
+        float buttonSpacing = clamp(buttonHeight * 0.25f, 12f, 20f);
         
-        // Title label with vaporwave colors (cyan)
+        // Calculate vertical centering
+        float totalMenuHeight = (buttonHeight * 4) + (buttonSpacing * 3);
+        float topMargin = (windowHeight - totalMenuHeight) / 2.0f - 60f;  // -60 for title space
+        
+        // Title
+        float titleY = clamp(topMargin * 0.6f, 30f, 100f);
         Label titleLabel = new Label(centerX, titleY, "PoorCraft",
-            0.0f, 0.95f, 0.95f, 1.0f);  // Electric cyan
+            0.0f, 0.95f, 0.95f, 1.0f);  // Cyan
         titleLabel.setCentered(true);
         addComponent(titleLabel);
         
-        // Subtitle with pink accent
-        float subtitleY = titleY + Math.max(titleSize * 0.6f, 30f);
-        Label versionLabel = new Label(centerX, subtitleY, "RETRO EDITION",
-            0.98f, 0.26f, 0.63f, 0.9f);  // Hot pink
-        versionLabel.setCentered(true);
-        addComponent(versionLabel);
+        // Subtitle
+        float subtitleY = titleY + 28f;
+        Label subtitleLabel = new Label(centerX, subtitleY, "RETRO EDITION",
+            0.98f, 0.26f, 0.63f, 0.9f);  // Pink
+        subtitleLabel.setCentered(true);
+        addComponent(subtitleLabel);
         
+        // Button starting position
         float buttonX = centerX - buttonWidth / 2;
+        float firstButtonY = topMargin + 80f;
         
-        // Singleplayer button - now with STYLE
-        VaporwaveButton singleplayerButton = new VaporwaveButton(
-            buttonX, centerY, buttonWidth, buttonHeight,
+        // Create buttons with MenuButton (not VaporwaveButton)
+        MenuButton singleplayerButton = new MenuButton(
+            buttonX, firstButtonY, 
+            buttonWidth, buttonHeight,
             "SINGLEPLAYER",
             () -> uiManager.setState(GameState.WORLD_CREATION)
         );
         addComponent(singleplayerButton);
         
-        // Multiplayer button
-        VaporwaveButton multiplayerButton = new VaporwaveButton(
-            buttonX, centerY + buttonHeight + buttonSpacing, buttonWidth, buttonHeight,
+        MenuButton multiplayerButton = new MenuButton(
+            buttonX, firstButtonY + (buttonHeight + buttonSpacing), 
+            buttonWidth, buttonHeight,
             "MULTIPLAYER",
             () -> uiManager.setState(GameState.MULTIPLAYER_MENU)
         );
         addComponent(multiplayerButton);
         
-        // Settings button
-        VaporwaveButton settingsButton = new VaporwaveButton(
-            buttonX, centerY + (buttonHeight + buttonSpacing) * 2, buttonWidth, buttonHeight,
+        MenuButton settingsButton = new MenuButton(
+            buttonX, firstButtonY + (buttonHeight + buttonSpacing) * 2, 
+            buttonWidth, buttonHeight,
             "SETTINGS",
             () -> uiManager.setState(GameState.SETTINGS_MENU)
         );
         addComponent(settingsButton);
         
-        // Quit button
-        VaporwaveButton quitButton = new VaporwaveButton(
-            buttonX, centerY + (buttonHeight + buttonSpacing) * 3, buttonWidth, buttonHeight,
+        MenuButton quitButton = new MenuButton(
+            buttonX, firstButtonY + (buttonHeight + buttonSpacing) * 3, 
+            buttonWidth, buttonHeight,
             "QUIT",
             () -> uiManager.quit()
         );
         addComponent(quitButton);
         
-        // Footer label with subtle purple tint
-        float footerY = Math.min(windowHeight - 35, windowHeight * 0.96f);
-        Label footerLabel = new Label(centerX, footerY, 
-            "~ A E S T H E T I C  M I N E C R A F T ~", 
+        // Footer
+        float footerY = windowHeight - 25f;
+        Label footerLabel = new Label(centerX, footerY,
+            "~ Press buttons to navigate - they're the rectangles! ~",
             0.7f, 0.5f, 0.9f, 0.7f);
         footerLabel.setCentered(true);
         addComponent(footerLabel);
+        
+        System.out.println("[MainMenuScreen] Layout initialized for " + windowWidth + "x" + windowHeight);
     }
 
     /**
@@ -121,9 +121,17 @@ public class MainMenuScreen extends UIScreen {
     
     @Override
     public void onResize(int width, int height) {
+        System.out.println("[MainMenuScreen] Resize detected: " + width + "x" + height);
+        
+        // Update dimensions
         this.windowWidth = width;
         this.windowHeight = height;
-        init(); // Rebuild layout with new dimensions
+        
+        // Completely rebuild the layout
+        // This ensures all component positions and sizes are recalculated
+        init();
+        
+        System.out.println("[MainMenuScreen] Resize complete, components rebuilt");
     }
     
     @Override
@@ -134,35 +142,24 @@ public class MainMenuScreen extends UIScreen {
     
     @Override
     public void render(UIRenderer renderer, FontRenderer fontRenderer) {
-        // Draw vaporwave gradient background
-        // Dark purple at top, fading to dark blue at bottom
-        // This creates that classic vaporwave sunset vibe
-        int gradientSteps = 40;
-        float stepHeight = windowHeight / (float) gradientSteps;
+        // Render textured background (block textures at 20% opacity)
+        background.render(renderer, windowWidth, windowHeight);
         
-        // Top color: Deep purple
-        float[] topColor = {0.15f, 0.05f, 0.25f};
-        // Bottom color: Dark blue with a hint of cyan
-        float[] bottomColor = {0.05f, 0.1f, 0.2f};
-        
-        for (int i = 0; i < gradientSteps; i++) {
-            float t = i / (float) gradientSteps;
-            // Smooth gradient interpolation
-            float r = topColor[0] + (bottomColor[0] - topColor[0]) * t;
-            float g = topColor[1] + (bottomColor[1] - topColor[1]) * t;
-            float b = topColor[2] + (bottomColor[2] - topColor[2]) * t;
-            
-            renderer.drawRect(0, i * stepHeight, windowWidth, stepHeight + 1,
-                r, g, b, 1.0f);
-        }
-        
-        // Add subtle animated scan lines for that retro CRT effect
-        // I don't know what I'm doing here but it looks cool so I'm keeping it
-        float scanlineY = (animationTime * 50) % windowHeight;
+        // Optional: Add subtle scanline effect for retro CRT feel
+        float scanlineY = (animationTime * 30) % windowHeight;
         renderer.drawRect(0, scanlineY, windowWidth, 2,
-            0.98f, 0.26f, 0.63f, 0.15f);  // Pink scanline
+            0.0f, 0.95f, 0.95f, 0.08f);  // Subtle cyan scanline
         
-        // Draw all UI components
+        // Render all UI components (buttons, labels, etc.)
         super.render(renderer, fontRenderer);
+    }
+    
+    /**
+     * Cleanup resources when screen is destroyed.
+     */
+    public void cleanup() {
+        if (background != null) {
+            background.cleanup();
+        }
     }
 }

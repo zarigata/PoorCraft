@@ -1,15 +1,17 @@
 package com.poorcraft.ui;
 
 /**
- * In-game pause menu screen with VAPORWAVE vibes.
+ * In-game pause menu screen with ROBUST design.
  * 
  * Shown when ESC is pressed during gameplay.
- * The game world is still visible but dimmed with a sick overlay.
+ * Uses the same bulletproof button system as the main menu.
  * 
- * This is where you go when you need a break, want to rage quit,
- * or just wanna admire the aesthetic pause menu. No judgment here.
+ * Features:
+ * - Semi-transparent overlay that doesn't hide the game world
+ * - Clear rectangular buttons that WORK
+ * - Responsive layout that handles any window size
  * 
- * Fun fact: I added a pulsing glow effect to the title. You're welcome.
+ * This pause menu WILL work. No ifs, ands, or buts about it.
  */
 public class PauseScreen extends UIScreen {
     
@@ -35,57 +37,61 @@ public class PauseScreen extends UIScreen {
         float centerX = windowWidth / 2.0f;
         float centerY = windowHeight / 2.0f;
         
-        // Responsive button sizing (similar to main menu)
-        float buttonWidth = clamp(windowWidth * 0.25f, 240f, 400f);
-        float buttonHeight = clamp(windowHeight * 0.07f, 50f, 70f);
-        float buttonSpacing = Math.max(buttonHeight * 0.28f, 14f);
+        // Button sizing - scales with window
+        float buttonWidth = clamp(windowWidth * 0.25f, 220f, 380f);
+        float buttonHeight = clamp(windowHeight * 0.065f, 48f, 68f);
+        float buttonSpacing = clamp(buttonHeight * 0.25f, 12f, 18f);
         
-        // Title positioning
-        float titleY = centerY - Math.max(buttonHeight * 2.2f, 120f);
-        
-        // Title with cyan glow
-        Label titleLabel = new Label(centerX, titleY, "GAME PAUSED", 
-            0.0f, 0.95f, 0.95f, 1.0f);  // Electric cyan
+        // Title above buttons
+        float titleY = centerY - Math.max(buttonHeight * 2.0f, 100f);
+        Label titleLabel = new Label(centerX, titleY, "GAME PAUSED",
+            0.0f, 0.95f, 0.95f, 1.0f);  // Cyan
         titleLabel.setCentered(true);
         addComponent(titleLabel);
         
+        // Button positions
         float buttonX = centerX - buttonWidth / 2;
-        float startY = centerY - buttonHeight - buttonSpacing / 2;
+        float firstButtonY = centerY - buttonHeight - buttonSpacing / 2;
         
         // Resume button
-        VaporwaveButton resumeButton = new VaporwaveButton(
-            buttonX, startY, buttonWidth, buttonHeight,
+        MenuButton resumeButton = new MenuButton(
+            buttonX, firstButtonY, 
+            buttonWidth, buttonHeight,
             "RESUME",
             () -> uiManager.setState(GameState.IN_GAME)
         );
         addComponent(resumeButton);
         
         // Settings button
-        VaporwaveButton settingsButton = new VaporwaveButton(
-            buttonX, startY + buttonHeight + buttonSpacing, buttonWidth, buttonHeight,
+        MenuButton settingsButton = new MenuButton(
+            buttonX, firstButtonY + buttonHeight + buttonSpacing, 
+            buttonWidth, buttonHeight,
             "SETTINGS",
             () -> uiManager.setState(GameState.SETTINGS_MENU)
         );
         addComponent(settingsButton);
         
-        // Save and Quit button
-        VaporwaveButton quitButton = new VaporwaveButton(
-            buttonX, startY + (buttonHeight + buttonSpacing) * 2, buttonWidth, buttonHeight,
+        // Save & Quit button
+        MenuButton quitButton = new MenuButton(
+            buttonX, firstButtonY + (buttonHeight + buttonSpacing) * 2, 
+            buttonWidth, buttonHeight,
             "SAVE & QUIT",
             () -> {
-                // TODO: Actually save the world instead of just pretending
+                // TODO: Save the world here when world saving is implemented
                 uiManager.setState(GameState.MAIN_MENU);
             }
         );
         addComponent(quitButton);
         
-        // Add a helpful hint at the bottom
-        float hintY = centerY + Math.max(buttonHeight * 2.5f, 140f);
+        // Hint label
+        float hintY = centerY + Math.max(buttonHeight * 2.2f, 120f);
         Label hintLabel = new Label(centerX, hintY,
             "Press ESC to resume",
-            0.7f, 0.5f, 0.9f, 0.6f);  // Subtle purple
+            0.7f, 0.5f, 0.9f, 0.7f);
         hintLabel.setCentered(true);
         addComponent(hintLabel);
+        
+        System.out.println("[PauseScreen] Layout initialized for " + windowWidth + "x" + windowHeight);
     }
     
     /**
@@ -97,9 +103,16 @@ public class PauseScreen extends UIScreen {
     
     @Override
     public void onResize(int width, int height) {
+        System.out.println("[PauseScreen] Resize detected: " + width + "x" + height);
+        
+        // Update dimensions
         this.windowWidth = width;
         this.windowHeight = height;
+        
+        // Rebuild layout
         init();
+        
+        System.out.println("[PauseScreen] Resize complete, components rebuilt");
     }
     
     @Override
@@ -110,29 +123,17 @@ public class PauseScreen extends UIScreen {
     
     @Override
     public void render(UIRenderer renderer, FontRenderer fontRenderer) {
-        // Draw vaporwave-themed semi-transparent overlay
-        // Gradient from purple to dark blue
-        int gradientSteps = 30;
-        float stepHeight = windowHeight / (float) gradientSteps;
+        // Draw semi-transparent dark overlay
+        // This dims the game world without hiding it completely
+        renderer.drawRect(0, 0, windowWidth, windowHeight,
+            0.05f, 0.02f, 0.10f, 0.80f);  // Dark blue-purple, 80% opacity
         
-        for (int i = 0; i < gradientSteps; i++) {
-            float t = i / (float) gradientSteps;
-            // Purple to blue gradient with transparency
-            float r = 0.15f + (0.05f - 0.15f) * t;
-            float g = 0.05f + (0.1f - 0.05f) * t;
-            float b = 0.25f + (0.3f - 0.25f) * t;
-            
-            renderer.drawRect(0, i * stepHeight, windowWidth, stepHeight + 1,
-                r, g, b, 0.75f);  // Semi-transparent
-        }
+        // Optional: Subtle scanline for retro effect
+        float scanlineY = (animationTime * 20) % windowHeight;
+        renderer.drawRect(0, scanlineY, windowWidth, 2,
+            0.0f, 0.95f, 0.95f, 0.05f);  // Very subtle cyan
         
-        // Add subtle pulsing scanline effect
-        float pulse = (float) Math.sin(animationTime * 2.0) * 0.5f + 0.5f;
-        float scanlineY = (animationTime * 30) % windowHeight;
-        renderer.drawRect(0, scanlineY, windowWidth, 3,
-            0.0f, 0.95f, 0.95f, 0.1f * pulse);  // Cyan scanline
-        
-        // Draw all UI components
+        // Render all UI components (buttons, labels)
         super.render(renderer, fontRenderer);
     }
 }
