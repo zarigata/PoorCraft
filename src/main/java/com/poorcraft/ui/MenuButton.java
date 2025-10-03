@@ -70,6 +70,11 @@ public class MenuButton extends UIComponent {
             textColor = TEXT_COLOR;
         }
         
+        // DEBUG: Print when rendering (only once per second to avoid spam)
+        if (Math.random() < 0.016) {  // ~1/60 chance = once per second at 60fps
+            System.out.println("[MenuButton] Rendering '" + text + "' at " + x + "," + y + " size " + width + "x" + height);
+        }
+        
         // Draw background rectangle - THIS WILL DEFINITELY SHOW UP
         renderer.drawRect(x, y, width, height, 
             bgColor[0], bgColor[1], bgColor[2], bgColor[3]);
