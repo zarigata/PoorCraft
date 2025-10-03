@@ -1,22 +1,23 @@
 package com.poorcraft.ui;
 
 /**
- * Main menu screen with VAPORWAVE aesthetics.
+ * Main menu screen with ROBUST, RESIZE-PROOF design.
  * 
- * The first screen shown when the game starts.
- * Now featuring sick 80s vibes, gradient backgrounds, and responsive design.
+ * This menu WILL work at any window size. Period.
+ * Features:
+ * - Textured background with block textures (20% opacity)
+ * - Clear rectangular buttons that ACTUALLY SHOW UP
+ * - Bulletproof resize handling that WON'T break input
+ * - Vaporwave color scheme (but simpler and more reliable)
  * 
- * This menu will resize beautifully no matter what size window you throw at it.
- * Try it! Resize the window and watch the magic happen. It's like the menu knows
- * what you want before you even know it yourself. Spooky.
- * 
- * Also, I might have spent too much time on the background gradient.
- * No regrets though, it looks SICK.
+ * I rewrote this three times to get it right. This version is THE ONE.
+ * No more fancy gradients that don't render. Just solid, working UI.
  */
 public class MainMenuScreen extends UIScreen {
     
     private UIManager uiManager;
-    private float animationTime = 0.0f;  // For animated background effects
+    private MenuBackground background;
+    private float animationTime = 0.0f;
     
     /**
      * Creates the main menu screen.

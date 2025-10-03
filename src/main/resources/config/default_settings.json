@@ -7,9 +7,9 @@
     "fullscreen": false
   },
   "graphics": {
-    "fov": 70.0,
+    "fov": 100.0,
     "renderDistance": 8,
-    "maxFps": 144
+    "maxFps": 255
   },
   "audio": {
     "masterVolume": 1.0,
