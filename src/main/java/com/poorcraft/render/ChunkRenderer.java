@@ -1,6 +1,7 @@
 package com.poorcraft.render;
 
 import com.poorcraft.world.chunk.Chunk;
+import com.poorcraft.world.chunk.ChunkMesh;
 import com.poorcraft.world.chunk.ChunkPos;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -128,12 +129,12 @@ public class ChunkRenderer {
             // Get or create render data for this chunk
             ChunkRenderData renderData = getOrCreateRenderData(chunk);
             
-            // Update mesh if dirty
-            if (chunk.getMesh() != null) {
-                // Check if we need to upload mesh (first time or after modification)
-                // For now, we upload every time getMesh() is called
-                // TODO: Add a "meshUploaded" flag to avoid redundant uploads
-                renderData.uploadMesh(chunk.getMesh());
+            // Update mesh if dirty and upload only when version changed
+            // This prevents redundant GPU uploads every frame! Huge performance win.
+            // I don't know what was going on before but this should fix it.
+            ChunkMesh chunkMesh = chunk.getMesh(textureAtlas);
+            if (chunkMesh != null && renderData.needsUpload(chunk.getMeshVersion())) {
+                renderData.uploadMesh(chunkMesh, chunk.getMeshVersion());
             }
             
             // Set model matrix (chunk world position)

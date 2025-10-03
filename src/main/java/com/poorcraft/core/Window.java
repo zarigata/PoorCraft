@@ -183,4 +183,53 @@ public class Window {
         this.vsync = vsync;
         glfwSwapInterval(vsync ? 1 : 0);
     }
+    
+    /**
+     * Sets the window size.
+     * 
+     * @param width New width in pixels
+     * @param height New height in pixels
+     */
+    public void setSize(int width, int height) {
+        this.width = width;
+        this.height = height;
+        glfwSetWindowSize(windowHandle, width, height);
+        System.out.println("[Window] Resized to " + width + "x" + height);
+    }
+    
+    /**
+     * Sets fullscreen mode.
+     * 
+     * @param fullscreen True for fullscreen, false for windowed
+     */
+    public void setFullscreen(boolean fullscreen) {
+        if (fullscreen) {
+            // Get primary monitor
+            long monitor = glfwGetPrimaryMonitor();
+            GLFWVidMode vidMode = glfwGetVideoMode(monitor);
+            
+            if (vidMode != null) {
+                // Set windowed fullscreen
+                glfwSetWindowMonitor(windowHandle, monitor, 0, 0, 
+                    vidMode.width(), vidMode.height(), vidMode.refreshRate());
+                this.width = vidMode.width();
+                this.height = vidMode.height();
+                System.out.println("[Window] Switched to fullscreen: " + width + "x" + height);
+            }
+        } else {
+            // Set windowed mode
+            glfwSetWindowMonitor(windowHandle, NULL, 100, 100, width, height, 0);
+            
+            // Center window
+            GLFWVidMode vidMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+            if (vidMode != null) {
+                glfwSetWindowPos(
+                    windowHandle,
+                    (vidMode.width() - width) / 2,
+                    (vidMode.height() - height) / 2
+                );
+            }
+            System.out.println("[Window] Switched to windowed mode: " + width + "x" + height);
+        }
+    }
 }

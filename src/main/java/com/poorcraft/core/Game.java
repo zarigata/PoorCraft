@@ -1,9 +1,12 @@
 package com.poorcraft.core;
 
 import com.poorcraft.camera.Camera;
+import com.poorcraft.config.ConfigManager;
 import com.poorcraft.config.Settings;
 import com.poorcraft.input.InputHandler;
 import com.poorcraft.render.ChunkRenderer;
+import com.poorcraft.ui.GameState;
+import com.poorcraft.ui.UIManager;
 import com.poorcraft.world.ChunkManager;
 import com.poorcraft.world.World;
 import com.poorcraft.world.chunk.Chunk;
@@ -28,12 +31,14 @@ public class Game {
     private InputHandler inputHandler;
     private Camera camera;
     private Settings settings;
+    private ConfigManager configManager;
+    private UIManager uiManager;
     private World world;
     private ChunkManager chunkManager;
     private ChunkRenderer chunkRenderer;
     
     private boolean running;
-    private boolean escapePressed;  // Track ESC key state for toggle
+    private boolean worldLoaded;  // Track if world is loaded
     
     private static final float FIXED_TIME_STEP = 1.0f / 60.0f;  // 60 updates per second
     
@@ -41,11 +46,13 @@ public class Game {
      * Creates a new game instance with the given settings.
      * 
      * @param settings Game settings
+     * @param configManager Configuration manager
      */
-    public Game(Settings settings) {
+    public Game(Settings settings, ConfigManager configManager) {
         this.settings = settings;
+        this.configManager = configManager;
         this.running = false;
-        this.escapePressed = false;
+        this.worldLoaded = false;
     }
     
     /**
@@ -78,30 +85,28 @@ public class Game {
             settings.controls.mouseSensitivity
         );
         
-        // Initialize world system
-        world = new World(settings.world.seed, settings.world.generateStructures);
-        chunkManager = new ChunkManager(
-            world,
-            settings.world.chunkLoadDistance,
-            settings.world.chunkUnloadDistance
-        );
+        // Initialize UI manager
+        uiManager = new UIManager(this, settings, configManager);
+        uiManager.init(window.getWidth(), window.getHeight());
+        System.out.println("[Game] UI Manager initialized");
         
-        // Initial chunk load around spawn
-        chunkManager.update(camera.getPosition());
-        System.out.println("[Game] World initialized with seed: " + world.getSeed());
+        // Set up input callbacks for UI
+        inputHandler.setKeyPressCallback(key -> uiManager.onKeyPress(key, 0));
+        inputHandler.setCharInputCallback(character -> uiManager.onCharInput(character));
+        inputHandler.setMouseClickCallback(button -> {
+            uiManager.onMouseClick((float)inputHandler.getMouseX(), (float)inputHandler.getMouseY(), button);
+        });
+        inputHandler.setMouseReleaseCallback(button -> {
+            uiManager.onMouseRelease((float)inputHandler.getMouseX(), (float)inputHandler.getMouseY(), button);
+        });
         
-        // Initialize chunk renderer
-        chunkRenderer = new ChunkRenderer();
-        chunkRenderer.init();
-        System.out.println("[Game] Chunk renderer initialized");
-        
-        // Set up chunk unload callback
-        world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
+        // Don't create world yet - wait for player to click "Create World" in UI
+        // World creation moved to createWorld() method
         
         running = true;
         
         System.out.println("[Game] Initialization complete!");
-        System.out.println("[Game] Controls: WASD to move, Mouse to look, ESC to toggle cursor");
+        System.out.println("[Game] Starting in main menu. Use UI to create a world.");
     }
     
     /**
@@ -122,19 +127,8 @@ public class Game {
             // Update input
             inputHandler.update();
             
-            // Handle ESC key for cursor toggle (with debounce)
-            if (inputHandler.isKeyPressed(GLFW_KEY_ESCAPE)) {
-                if (!escapePressed) {
-                    // Toggle cursor grabbed state
-                    inputHandler.setCursorGrabbed(
-                        window.getHandle(),
-                        !inputHandler.isCursorGrabbed()
-                    );
-                    escapePressed = true;
-                }
-            } else {
-                escapePressed = false;
-            }
+            // Forward mouse movement to UI manager
+            uiManager.onMouseMove((float)inputHandler.getMouseX(), (float)inputHandler.getMouseY());
             
             // Update game state
             update(deltaTime);
@@ -156,6 +150,14 @@ public class Game {
      * @param deltaTime Time since last frame in seconds
      */
     private void update(float deltaTime) {
+        // Update UI
+        uiManager.update(deltaTime);
+        
+        // Only update gameplay if in IN_GAME state
+        if (uiManager.getCurrentState() != GameState.IN_GAME) {
+            return;
+        }
+        
         float speedMultiplier = getCurrentSpeedMultiplier();
         float adjustedDelta = deltaTime * speedMultiplier;
         
@@ -181,17 +183,17 @@ public class Game {
             camera.processKeyboard(Camera.DOWN, adjustedDelta);
         }
         
-        // Process mouse movement if cursor is grabbed
-        if (inputHandler.isCursorGrabbed()) {
-            camera.processMouseMovement(
-                (float) inputHandler.getMouseDeltaX(),
-                (float) inputHandler.getMouseDeltaY()
-            );
-        }
+        // Process mouse movement (always in IN_GAME state)
+        camera.processMouseMovement(
+            (float) inputHandler.getMouseDeltaX(),
+            (float) inputHandler.getMouseDeltaY()
+        );
         
         // Update chunk manager with camera position
         // This handles dynamic chunk loading/unloading as player moves
-        chunkManager.update(camera.getPosition());
+        if (worldLoaded) {
+            chunkManager.update(camera.getPosition());
+        }
     }
     
     /**
@@ -223,18 +225,25 @@ public class Game {
         // Clear color and depth buffers
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
-        // Get matrices from camera
-        Matrix4f view = camera.getViewMatrix();
-        Matrix4f projection = camera.getProjectionMatrix(
-            settings.graphics.fov,
-            (float) window.getWidth() / window.getHeight(),
-            0.1f,   // Near plane
-            1000.0f // Far plane
-        );
+        // Render world if loaded and in appropriate state
+        if (worldLoaded && (uiManager.getCurrentState() == GameState.IN_GAME || 
+                           uiManager.getCurrentState() == GameState.PAUSED)) {
+            // Get matrices from camera
+            Matrix4f view = camera.getViewMatrix();
+            Matrix4f projection = camera.getProjectionMatrix(
+                settings.graphics.fov,
+                (float) window.getWidth() / window.getHeight(),
+                0.1f,   // Near plane
+                1000.0f // Far plane
+            );
+            
+            // Render all loaded chunks
+            Collection<Chunk> loadedChunks = world.getLoadedChunks();
+            chunkRenderer.render(loadedChunks, view, projection);
+        }
         
-        // Render all loaded chunks
-        Collection<Chunk> loadedChunks = world.getLoadedChunks();
-        chunkRenderer.render(loadedChunks, view, projection);
+        // Render UI on top
+        uiManager.render();
     }
     
     /**
@@ -243,13 +252,22 @@ public class Game {
     private void cleanup() {
         System.out.println("[Game] Cleaning up...");
         
+        // Cleanup UI
+        if (uiManager != null) {
+            uiManager.cleanup();
+        }
+        
         // Cleanup chunk renderer
-        chunkRenderer.cleanup();
-        System.out.println("[Game] Chunk renderer cleaned up");
+        if (chunkRenderer != null) {
+            chunkRenderer.cleanup();
+            System.out.println("[Game] Chunk renderer cleaned up");
+        }
         
         // Shutdown world system
-        chunkManager.shutdown();
-        System.out.println("[Game] World cleaned up");
+        if (chunkManager != null) {
+            chunkManager.shutdown();
+            System.out.println("[Game] World cleaned up");
+        }
         
         window.destroy();
         System.out.println("[Game] Cleanup complete");
@@ -291,5 +309,57 @@ public class Game {
      */
     public ChunkRenderer getChunkRenderer() {
         return chunkRenderer;
+    }
+    
+    /**
+     * Creates a new world with the specified parameters.
+     * Called from the UI when player clicks "Create World".
+     * 
+     * @param seed World seed (0 for random)
+     * @param generateStructures Whether to generate structures
+     */
+    public void createWorld(long seed, boolean generateStructures) {
+        System.out.println("[Game] Creating world with seed: " + seed);
+        
+        // Initialize world
+        world = new World(seed, generateStructures);
+        
+        // Initialize chunk manager
+        chunkManager = new ChunkManager(
+            world,
+            settings.world.chunkLoadDistance,
+            settings.world.chunkUnloadDistance
+        );
+        
+        // Initial chunk load around spawn
+        chunkManager.update(camera.getPosition());
+        System.out.println("[Game] World initialized with seed: " + world.getSeed());
+        
+        // Initialize chunk renderer if not already initialized
+        if (chunkRenderer == null) {
+            chunkRenderer = new ChunkRenderer();
+            chunkRenderer.init();
+            System.out.println("[Game] Chunk renderer initialized");
+        }
+        
+        // Set up chunk unload callback
+        world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
+        
+        // Mark world as loaded
+        worldLoaded = true;
+        
+        // Grab cursor for in-game controls
+        inputHandler.setCursorGrabbed(window.getHandle(), true);
+        
+        System.out.println("[Game] World creation complete!");
+    }
+    
+    /**
+     * Gets the camera instance.
+     * 
+     * @return The camera
+     */
+    public Camera getCamera() {
+        return camera;
     }
 }

@@ -28,14 +28,17 @@ import java.util.List;
 public class GreedyMeshGenerator {
     
     private final Chunk chunk;
+    private final TextureAtlas textureAtlas;
     
     /**
      * Creates a greedy mesh generator for the specified chunk.
      * 
      * @param chunk Chunk to generate mesh for
+     * @param textureAtlas Texture atlas for UV coordinates
      */
-    public GreedyMeshGenerator(Chunk chunk) {
+    public GreedyMeshGenerator(Chunk chunk, TextureAtlas textureAtlas) {
         this.chunk = chunk;
+        this.textureAtlas = textureAtlas;
     }
     
     /**
@@ -209,6 +212,8 @@ public class GreedyMeshGenerator {
     
     /**
      * Gets a block safely, returning AIR if out of bounds.
+     * Now with proper neighbor chunk checking! No more weird border faces.
+     * Well, hopefully. I think this works. It should work. Right?
      * 
      * @param x X coordinate
      * @param y Y coordinate
@@ -216,19 +221,9 @@ public class GreedyMeshGenerator {
      * @return Block type, or AIR if out of bounds
      */
     private BlockType getBlockSafe(int x, int y, int z) {
-        // Check Y bounds first (no vertical neighbors)
-        if (y < 0 || y >= Chunk.CHUNK_HEIGHT) {
-            return BlockType.AIR;
-        }
-        
-        // Check if within this chunk
-        if (x >= 0 && x < Chunk.CHUNK_SIZE && z >= 0 && z < Chunk.CHUNK_SIZE) {
-            return chunk.getBlock(x, y, z);
-        }
-        
-        // Out of bounds - assume air
-        // TODO: Check neighbors for proper cross-chunk face culling
-        return BlockType.AIR;
+        // Delegate to chunk's neighbor-aware accessor
+        // This handles checking neighboring chunks for proper border face culling
+        return chunk.getBlockOrNeighbor(x, y, z);
     }
     
     /**
@@ -292,10 +287,21 @@ public class GreedyMeshGenerator {
             }
         }
         
+        // Get proper UV coordinates from texture atlas
+        // No more hardcoded values! Each face gets its own texture rectangle.
+        // This was the bug causing all textures to look wrong. Classic mistake.
+        float[] uvBounds = textureAtlas.getUVsForFace(blockType, direction);
+        float atlasU0 = uvBounds[0];
+        float atlasV0 = uvBounds[1];
+        float atlasU1 = uvBounds[2];
+        float atlasV1 = uvBounds[3];
+        
         // Tile texture coordinates based on quad size
         // This makes the texture repeat across the merged quad
-        float u0 = 0.0f, v0 = 0.0f;
-        float u1 = quadWidth, v1 = quadHeight;
+        float u0 = atlasU0;
+        float v0 = atlasV0;
+        float u1 = atlasU0 + (atlasU1 - atlasU0) * quadWidth;
+        float v1 = atlasV0 + (atlasV1 - atlasV0) * quadHeight;
         
         // Add 4 vertices for the quad
         // Vertex order depends on direction to ensure correct winding

@@ -31,6 +31,7 @@ public class ChunkRenderData {
     private int ebo;
     private int indexCount;
     private boolean initialized;
+    private int uploadedMeshVersion; // Tracks which mesh version is currently uploaded
     
     /**
      * Creates uninitialized chunk render data.
@@ -42,6 +43,7 @@ public class ChunkRenderData {
         this.ebo = 0;
         this.indexCount = 0;
         this.initialized = false;
+        this.uploadedMeshVersion = -1; // -1 means no mesh uploaded yet
     }
     
     /**
@@ -49,8 +51,9 @@ public class ChunkRenderData {
      * Creates OpenGL resources if they don't exist yet.
      * 
      * @param mesh Chunk mesh data to upload
+     * @param meshVersion Version of the mesh being uploaded
      */
-    public void uploadMesh(ChunkMesh mesh) {
+    public void uploadMesh(ChunkMesh mesh, int meshVersion) {
         // If mesh is empty, cleanup and return
         if (mesh == null || mesh.getVertexCount() == 0) {
             cleanup();
@@ -102,6 +105,9 @@ public class ChunkRenderData {
         
         // Store index count for rendering
         indexCount = mesh.getIndexCount();
+        
+        // Update uploaded mesh version
+        uploadedMeshVersion = meshVersion;
     }
     
     /**
@@ -133,6 +139,7 @@ public class ChunkRenderData {
             ebo = 0;
             indexCount = 0;
             initialized = false;
+            uploadedMeshVersion = -1;
         }
     }
     
@@ -152,5 +159,15 @@ public class ChunkRenderData {
      */
     public int getIndexCount() {
         return indexCount;
+    }
+    
+    /**
+     * Checks if the mesh needs to be uploaded based on version.
+     * 
+     * @param currentMeshVersion Current mesh version from chunk
+     * @return true if upload is needed
+     */
+    public boolean needsUpload(int currentMeshVersion) {
+        return uploadedMeshVersion != currentMeshVersion;
     }
 }

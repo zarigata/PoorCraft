@@ -22,7 +22,7 @@ public class Main {
             System.out.println("Settings loaded successfully");
             
             // Create and run game
-            Game game = new Game(settings);
+            Game game = new Game(settings, configManager);
             game.run();
             
         } catch (Exception e) {

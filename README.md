@@ -12,6 +12,8 @@ A simple yet functional Minecraft clone with AI NPCs and procedural texture gene
 - **Frustum Culling**: Only renders chunks visible in camera view ✅ **IMPLEMENTED**
 - **Lighting System**: Ambient + directional lighting with normal-based shading ✅ **IMPLEMENTED**
 - **Texture Atlas**: 16x16 block textures combined into efficient atlas ✅ **IMPLEMENTED**
+- **UI System**: Main menu, settings, world creation, in-game HUD ✅ **IMPLEMENTED**
+- **Configuration**: JSON-based settings with in-game editor ✅ **IMPLEMENTED**
 - **Procedural Textures**: Up to 256 unique block skin variations ⏳ **COMING SOON** (Skin Generator mod)
 - **AI NPCs**: Conversational NPCs powered by LLMs ⏳ **COMING SOON**
 - **Multiplayer**: Client-server architecture ⏳ **COMING SOON**
@@ -93,15 +95,63 @@ PoorCraft uses a modern OpenGL 3.3+ rendering pipeline:
 - Mesh regeneration only when blocks change (dirty flag system)
 - GPU resources freed immediately when chunks unload
 
+## User Interface
+
+PoorCraft features a complete UI system built on a custom lightweight LWJGL framework:
+
+**Main Menu:**
+- Singleplayer: Create and play worlds
+- Multiplayer: Coming soon (grayed out)
+- Settings: Configure all game options
+- Quit: Exit game
+
+**Settings Menu:**
+- **Graphics Tab**: Resolution, VSync, FOV, render distance, max FPS
+- **Audio Tab**: Master, music, and SFX volume controls
+- **Controls Tab**: Mouse sensitivity, invert Y, keybind customization
+- **AI Tab**: Enable AI NPCs, select provider (Ollama/Gemini/OpenRouter/OpenAI)
+- Changes preview in real-time, apply or cancel
+
+**World Creation:**
+- World name input
+- Seed specification (or random generation)
+- Game mode selection (Creative/Survival)
+- Structure generation toggle
+
+**In-Game HUD:**
+- Crosshair (center screen)
+- Hotbar (9 slots, bottom center)
+- F3 Debug overlay:
+  - FPS counter
+  - Player position and chunk coordinates
+  - Current biome
+  - Loaded/rendered chunk counts
+  - Facing direction
+
+**Pause Menu (ESC):**
+- Resume game
+- Access settings
+- Save and quit to main menu
+
+**Technical Details:**
+- Custom immediate-mode UI renderer with orthographic projection
+- STB TrueType font rendering with bitmap atlas
+- Component-based architecture (buttons, labels, text fields, sliders, checkboxes, dropdowns)
+- State machine for screen management
+- Input event system with callbacks
+
 ## Project Structure
 
 - **src/main/java/** - Java game engine (LWJGL3, OpenGL rendering, core game logic)
   - **src/main/java/com/poorcraft/world/** - World system (chunks, blocks, generation)
   - **src/main/java/com/poorcraft/render/** - Rendering system (shaders, textures, chunk rendering)
-  - **src/main/java/com/poorcraft/config/** - Configuration management
+  - **src/main/java/com/poorcraft/config/** - Configuration management (Settings, ConfigManager)
+  - **src/main/java/com/poorcraft/ui/** - UI system (screens, components, rendering)
 - **src/main/resources/** - Game assets (textures, shaders, configs)
-  - **src/main/resources/shaders/** - GLSL vertex and fragment shaders
+  - **src/main/resources/shaders/** - GLSL vertex and fragment shaders (including UI shaders)
   - **src/main/resources/textures/blocks/** - 16×16 block textures
+  - **src/main/resources/fonts/** - TrueType fonts for UI text
+  - **src/main/resources/config/** - Default configuration files
 - **python/** - Python modding framework and API
 - **mods/** - Official and user-created mods
   - **mods/skin_generator/** - Procedural texture generation mod

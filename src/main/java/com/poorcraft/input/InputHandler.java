@@ -1,5 +1,7 @@
 package com.poorcraft.input;
 
+import java.util.function.Consumer;
+
 import static org.lwjgl.glfw.GLFW.*;
 
 /**
@@ -13,6 +15,7 @@ import static org.lwjgl.glfw.GLFW.*;
 public class InputHandler {
     
     private final boolean[] keys;
+    private final boolean[] mouseButtons;
     private double mouseX;
     private double mouseY;
     private double lastMouseX;
@@ -22,12 +25,19 @@ public class InputHandler {
     private boolean firstMouse;
     private boolean cursorGrabbed;
     
+    // Callbacks for UI integration
+    private Consumer<Integer> keyPressCallback;
+    private Consumer<Character> charInputCallback;
+    private Consumer<Integer> mouseClickCallback;
+    private Consumer<Integer> mouseReleaseCallback;
+    
     /**
      * Creates a new input handler.
      * Call init() after this to register callbacks.
      */
     public InputHandler() {
         this.keys = new boolean[512];  // GLFW key codes go up to ~350, 512 is safe
+        this.mouseButtons = new boolean[8];  // Support 8 mouse buttons
         this.firstMouse = true;
         this.cursorGrabbed = false;
     }
@@ -43,6 +53,32 @@ public class InputHandler {
         glfwSetKeyCallback(windowHandle, (window, key, scancode, action, mods) -> {
             if (key >= 0 && key < keys.length) {
                 keys[key] = (action != GLFW_RELEASE);
+                
+                // Fire key press callback
+                if (action == GLFW_PRESS && keyPressCallback != null) {
+                    keyPressCallback.accept(key);
+                }
+            }
+        });
+        
+        // Character input callback - for text input
+        glfwSetCharCallback(windowHandle, (window, codepoint) -> {
+            if (charInputCallback != null) {
+                charInputCallback.accept((char) codepoint);
+            }
+        });
+        
+        // Mouse button callback
+        glfwSetMouseButtonCallback(windowHandle, (window, button, action, mods) -> {
+            if (button >= 0 && button < mouseButtons.length) {
+                mouseButtons[button] = (action != GLFW_RELEASE);
+                
+                if (action == GLFW_PRESS && mouseClickCallback != null) {
+                    mouseClickCallback.accept(button);
+                }
+                if (action == GLFW_RELEASE && mouseReleaseCallback != null) {
+                    mouseReleaseCallback.accept(button);
+                }
             }
         });
         
@@ -152,5 +188,72 @@ public class InputHandler {
     public void resetMouseDeltas() {
         mouseDeltaX = 0.0;
         mouseDeltaY = 0.0;
+    }
+    
+    /**
+     * Gets current mouse X position.
+     * 
+     * @return Mouse X position
+     */
+    public double getMouseX() {
+        return mouseX;
+    }
+    
+    /**
+     * Gets current mouse Y position.
+     * 
+     * @return Mouse Y position
+     */
+    public double getMouseY() {
+        return mouseY;
+    }
+    
+    /**
+     * Checks if a mouse button is pressed.
+     * 
+     * @param button Mouse button (0=left, 1=right, 2=middle)
+     * @return True if button is pressed
+     */
+    public boolean isMouseButtonPressed(int button) {
+        if (button >= 0 && button < mouseButtons.length) {
+            return mouseButtons[button];
+        }
+        return false;
+    }
+    
+    /**
+     * Sets the key press callback.
+     * 
+     * @param callback Callback to invoke when a key is pressed
+     */
+    public void setKeyPressCallback(Consumer<Integer> callback) {
+        this.keyPressCallback = callback;
+    }
+    
+    /**
+     * Sets the character input callback.
+     * 
+     * @param callback Callback to invoke when a character is typed
+     */
+    public void setCharInputCallback(Consumer<Character> callback) {
+        this.charInputCallback = callback;
+    }
+    
+    /**
+     * Sets the mouse click callback.
+     * 
+     * @param callback Callback to invoke when a mouse button is clicked
+     */
+    public void setMouseClickCallback(Consumer<Integer> callback) {
+        this.mouseClickCallback = callback;
+    }
+    
+    /**
+     * Sets the mouse release callback.
+     * 
+     * @param callback Callback to invoke when a mouse button is released
+     */
+    public void setMouseReleaseCallback(Consumer<Integer> callback) {
+        this.mouseReleaseCallback = callback;
     }
 }

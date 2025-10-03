@@ -25,6 +25,7 @@ public class Chunk {
     private final BlockType[] blocks;
     private ChunkMesh mesh;
     private boolean meshDirty;
+    private int meshVersion; // Incremented each time mesh is regenerated
     
     // Neighbor references for face culling across chunk boundaries
     private Chunk northNeighbor;  // -Z
@@ -42,6 +43,7 @@ public class Chunk {
         this.position = position;
         this.blocks = new BlockType[CHUNK_VOLUME];
         this.meshDirty = true;
+        this.meshVersion = 0;
         
         // Initialize all blocks to AIR
         // Because uninitialized memory is scary
@@ -132,7 +134,7 @@ public class Chunk {
      * @param z Local Z coordinate (can be outside 0-15)
      * @return Block type at that position, or AIR if unavailable
      */
-    private BlockType getBlockOrNeighbor(int x, int y, int z) {
+    public BlockType getBlockOrNeighbor(int x, int y, int z) {
         // Check Y bounds first (no vertical neighbors)
         if (y < 0 || y >= CHUNK_HEIGHT) {
             return BlockType.AIR;
@@ -164,12 +166,14 @@ public class Chunk {
     /**
      * Generates mesh data for this chunk using greedy meshing algorithm.
      * 
+     * @param textureAtlas Texture atlas for UV coordinates
      * @return Generated chunk mesh
      */
-    public ChunkMesh generateMesh() {
-        GreedyMeshGenerator generator = new GreedyMeshGenerator(this);
+    public ChunkMesh generateMesh(com.poorcraft.render.TextureAtlas textureAtlas) {
+        com.poorcraft.render.GreedyMeshGenerator generator = new com.poorcraft.render.GreedyMeshGenerator(this, textureAtlas);
         mesh = generator.generateMesh();
         meshDirty = false;
+        meshVersion++; // Increment version when mesh is regenerated
         return mesh;
     }
     
@@ -177,11 +181,12 @@ public class Chunk {
     /**
      * Gets the cached mesh, generating it if dirty.
      * 
+     * @param textureAtlas Texture atlas for UV coordinates
      * @return Chunk mesh
      */
-    public ChunkMesh getMesh() {
+    public ChunkMesh getMesh(com.poorcraft.render.TextureAtlas textureAtlas) {
         if (meshDirty || mesh == null) {
-            return generateMesh();
+            return generateMesh(textureAtlas);
         }
         return mesh;
     }
@@ -191,6 +196,16 @@ public class Chunk {
      */
     public void markMeshDirty() {
         meshDirty = true;
+    }
+    
+    /**
+     * Gets the current mesh version.
+     * This increments each time the mesh is regenerated.
+     * 
+     * @return Mesh version number
+     */
+    public int getMeshVersion() {
+        return meshVersion;
     }
     
     /**
