@@ -21,6 +21,7 @@ public class Window {
     private int height;
     private String title;
     private boolean vsync;
+    private ResizeCallback resizeCallback;
     
     /**
      * Creates a new window configuration.
@@ -71,9 +72,15 @@ public class Window {
         // Set up framebuffer size callback for window resizing
         // This ensures the viewport matches the window size when resized
         glfwSetFramebufferSizeCallback(windowHandle, (window, w, h) -> {
+            System.out.println("[Window] Framebuffer resize: " + w + "x" + h);
             this.width = w;
             this.height = h;
             glViewport(0, 0, w, h);
+            
+            // Notify resize callback if set
+            if (resizeCallback != null) {
+                resizeCallback.onResize(w, h);
+            }
         });
         
         // Center window on primary monitor
@@ -168,14 +175,34 @@ public class Window {
      * Returns current window height.
      * Updated automatically on resize.
      * 
-     * @return Height in pixels
      */
     public int getHeight() {
         return height;
     }
     
+    public String getTitle() {
+        return title;
+    }
+    
     /**
-     * Enables or disables vertical sync.
+     * Sets the resize callback.
+     * This will be called whenever the window is resized.
+     * 
+     * @param callback Resize callback
+     */
+    public void setResizeCallback(ResizeCallback callback) {
+        this.resizeCallback = callback;
+    }
+    
+    /**
+     * Callback interface for window resize events.
+     */
+    public interface ResizeCallback {
+        void onResize(int width, int height);
+    }
+    
+    /**
+     * Disables vertical sync.
      * 
      * @param vsync true to enable vsync, false to disable
      */

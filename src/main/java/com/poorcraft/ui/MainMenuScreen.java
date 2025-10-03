@@ -37,13 +37,15 @@ public class MainMenuScreen extends UIScreen {
         // Clear old components to start fresh
         clearComponents();
         
-        // Layout calculations - adaptive but with sensible constraints
+        // Layout calculations - MINECRAFT-STYLE BIG BUTTONS
         float centerX = windowWidth / 2.0f;
         
-        // Button dimensions that scale nicely
-        float buttonWidth = clamp(windowWidth * 0.28f, 250f, 450f);
-        float buttonHeight = clamp(windowHeight * 0.07f, 50f, 75f);
-        float buttonSpacing = clamp(buttonHeight * 0.25f, 12f, 20f);
+        // Button dimensions - BIG like Minecraft!
+        // Width: 40% of screen (min 400px, max 600px)
+        // Height: 40px fixed (Minecraft standard)
+        float buttonWidth = clamp(windowWidth * 0.40f, 400f, 600f);
+        float buttonHeight = 40f;  // Fixed height like Minecraft
+        float buttonSpacing = 10f;  // Standard spacing
         
         // Calculate vertical centering
         float totalMenuHeight = (buttonHeight * 4) + (buttonSpacing * 3);

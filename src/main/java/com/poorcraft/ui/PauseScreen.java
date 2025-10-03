@@ -37,10 +37,10 @@ public class PauseScreen extends UIScreen {
         float centerX = windowWidth / 2.0f;
         float centerY = windowHeight / 2.0f;
         
-        // Button sizing - scales with window
-        float buttonWidth = clamp(windowWidth * 0.25f, 220f, 380f);
-        float buttonHeight = clamp(windowHeight * 0.065f, 48f, 68f);
-        float buttonSpacing = clamp(buttonHeight * 0.25f, 12f, 18f);
+        // Button sizing - MINECRAFT-STYLE BIG BUTTONS
+        float buttonWidth = clamp(windowWidth * 0.35f, 350f, 550f);
+        float buttonHeight = 40f;  // Fixed height like Minecraft
+        float buttonSpacing = 10f;  // Standard spacing
         
         // Title above buttons
         float titleY = centerY - Math.max(buttonHeight * 2.0f, 100f);

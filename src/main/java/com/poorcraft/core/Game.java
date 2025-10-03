@@ -102,6 +102,12 @@ public class Game {
         // Connect input handler to UI manager for cursor management
         uiManager.setInputHandler(inputHandler, window.getHandle());
         
+        // Connect window resize events to UI manager
+        window.setResizeCallback((width, height) -> {
+            System.out.println("[Game] Window resized to: " + width + "x" + height);
+            uiManager.onResize(width, height);
+        });
+        
         System.out.println("[Game] UI Manager initialized");
         
         // Initialize mod loader to enable Python mods
