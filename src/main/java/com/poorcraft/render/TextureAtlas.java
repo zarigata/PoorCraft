@@ -320,30 +320,28 @@ public class TextureAtlas {
         // Add a missing texture placeholder first (index 0)
         atlas.addMissingTexture();
         
-        // Add all block textures
-        // If textures don't exist yet, they'll fall back to the missing texture
+        // Add all block textures with fallbacks for missing files
         try {
-            atlas.addTexture("dirt", "/textures/blocks/dirt.png");
-            atlas.addTexture("stone", "/textures/blocks/stone.png");
-            atlas.addTexture("bedrock", "/textures/blocks/bedrock.png");
-            atlas.addTexture("grass_top", "/textures/blocks/grass_top.png");
-            atlas.addTexture("grass_side", "/textures/blocks/grass_side.png");
-            atlas.addTexture("sand", "/textures/blocks/sand.png");
-            atlas.addTexture("sandstone", "/textures/blocks/sandstone.png");
-            atlas.addTexture("cactus_top", "/textures/blocks/cactus_top.png");
-            atlas.addTexture("cactus_side", "/textures/blocks/cactus_side.png");
-            atlas.addTexture("snow_block", "/textures/blocks/snow_block.png");
-            atlas.addTexture("ice", "/textures/blocks/ice.png");
-            atlas.addTexture("snow_layer", "/textures/blocks/snow_layer.png");
-            atlas.addTexture("jungle_grass_top", "/textures/blocks/jungle_grass_top.png");
-            atlas.addTexture("jungle_grass_side", "/textures/blocks/jungle_grass_side.png");
-            atlas.addTexture("jungle_dirt", "/textures/blocks/jungle_dirt.png");
-            atlas.addTexture("wood_top", "/textures/blocks/wood_top.png");
-            atlas.addTexture("wood_side", "/textures/blocks/wood_side.png");
-            atlas.addTexture("leaves", "/textures/blocks/leaves.png");
+            atlas.addTextureOrFallback("dirt", "/textures/blocks/dirt.png");
+            atlas.addTextureOrFallback("stone", "/textures/blocks/stone.png");
+            atlas.addTextureOrFallback("bedrock", "/textures/blocks/bedrock.png");
+            atlas.addTextureOrFallback("grass_top", "/textures/blocks/grass_top.png");
+            atlas.addTextureOrFallback("grass_side", "/textures/blocks/grass_side.png");
+            atlas.addTextureOrFallback("sand", "/textures/blocks/sand.png");
+            atlas.addTextureOrFallback("sandstone", "/textures/blocks/sandstone.png");
+            atlas.addTextureOrFallback("cactus_top", "/textures/blocks/cactus_top.png");
+            atlas.addTextureOrFallback("cactus_side", "/textures/blocks/cactus_side.png");
+            atlas.addTextureOrFallback("snow_block", "/textures/blocks/snow_block.png");
+            atlas.addTextureOrFallback("ice", "/textures/blocks/ice.png");
+            atlas.addTextureOrFallback("snow_layer", "/textures/blocks/snow_layer.png");
+            atlas.addTextureOrFallback("jungle_grass_top", "/textures/blocks/jungle_grass_top.png");
+            atlas.addTextureOrFallback("jungle_grass_side", "/textures/blocks/jungle_grass_side.png");
+            atlas.addTextureOrFallback("jungle_dirt", "/textures/blocks/jungle_dirt.png");
+            atlas.addTextureOrFallback("wood_top", "/textures/blocks/wood_top.png");
+            atlas.addTextureOrFallback("wood_side", "/textures/blocks/wood_side.png");
+            atlas.addTextureOrFallback("leaves", "/textures/blocks/leaves.png");
         } catch (Exception e) {
-            System.err.println("[TextureAtlas] Warning: Some textures failed to load, using placeholders");
-            System.err.println("[TextureAtlas] Error: " + e.getMessage());
+            System.err.println("[TextureAtlas] Unexpected error while loading default textures: " + e.getMessage());
         }
         
         atlas.build();
@@ -356,12 +354,12 @@ public class TextureAtlas {
      */
     private void addMissingTexture() {
         ByteBuffer missingTexture = BufferUtils.createByteBuffer(TEXTURE_SIZE * TEXTURE_SIZE * 4);
-        
+
         for (int y = 0; y < TEXTURE_SIZE; y++) {
             for (int x = 0; x < TEXTURE_SIZE; x++) {
                 // Checkerboard pattern: alternate between magenta and black
                 boolean isMagenta = ((x / 4) + (y / 4)) % 2 == 0;
-                
+
                 if (isMagenta) {
                     missingTexture.put((byte) 255); // R
                     missingTexture.put((byte) 0);   // G
@@ -375,8 +373,43 @@ public class TextureAtlas {
                 }
             }
         }
-        
+
         missingTexture.flip();
         addTexture("missing", missingTexture, TEXTURE_SIZE, TEXTURE_SIZE);
+    }
+
+    private void addTextureOrFallback(String name, String resourcePath) {
+        try {
+            addTexture(name, resourcePath);
+        } catch (Exception e) {
+            System.err.println("[TextureAtlas] Failed to load " + name + ", using placeholder: " + e.getMessage());
+            createPlaceholderTexture(name);
+        }
+    }
+
+    private void createPlaceholderTexture(String name) {
+        ByteBuffer buffer = BufferUtils.createByteBuffer(TEXTURE_SIZE * TEXTURE_SIZE * 4);
+
+        byte r = (byte) 128;
+        byte g = (byte) 128;
+        byte b = (byte) 128;
+
+        if (name.contains("dirt")) { r = (byte) 139; g = (byte) 90; b = (byte) 43; }
+        else if (name.contains("stone")) { r = (byte) 128; g = (byte) 128; b = (byte) 128; }
+        else if (name.contains("grass")) { r = (byte) 34; g = (byte) 139; b = (byte) 34; }
+        else if (name.contains("sand")) { r = (byte) 237; g = (byte) 201; b = (byte) 175; }
+        else if (name.contains("snow")) { r = (byte) 255; g = (byte) 250; b = (byte) 250; }
+        else if (name.contains("wood")) { r = (byte) 139; g = (byte) 90; b = (byte) 43; }
+        else if (name.contains("leaves")) { r = (byte) 34; g = (byte) 139; b = (byte) 34; }
+
+        for (int i = 0; i < TEXTURE_SIZE * TEXTURE_SIZE; i++) {
+            buffer.put(r);
+            buffer.put(g);
+            buffer.put(b);
+            buffer.put((byte) 255);
+        }
+
+        buffer.flip();
+        addTexture(name, buffer, TEXTURE_SIZE, TEXTURE_SIZE);
     }
 }

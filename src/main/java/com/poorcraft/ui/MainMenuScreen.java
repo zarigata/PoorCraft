@@ -29,26 +29,30 @@ public class MainMenuScreen extends UIScreen {
     public void init() {
         clearComponents();
         
-        // Calculate centered layout
+        // Calculate centered layout with responsive sizing
         float centerX = windowWidth / 2.0f;
-        float centerY = windowHeight * 0.4f;
-        
-        // Title label
-        Label titleLabel = new Label(centerX, windowHeight * 0.15f, "PoorCraft", 
+        float usableHeight = windowHeight * 0.65f;
+        float topOffset = windowHeight * 0.18f;
+
+        // Button sizing scales with window size while clamping to sensible bounds
+        float buttonWidth = clamp(windowWidth * 0.32f, 260f, Math.max(320f, windowWidth * 0.55f));
+        float buttonHeight = clamp(windowHeight * 0.065f, 48f, 72f);
+        float buttonSpacing = Math.max(buttonHeight * 0.35f, 18f);
+        float menuHeight = buttonHeight * 4 + buttonSpacing * 3;
+        float centerY = topOffset + (usableHeight - menuHeight) / 2.0f;
+
+        // Title label (responsive position)
+        Label titleLabel = new Label(centerX, topOffset * 0.6f, "PoorCraft",
             1.0f, 1.0f, 1.0f, 1.0f);
         titleLabel.setCentered(true);
         addComponent(titleLabel);
         
         // Version label
-        Label versionLabel = new Label(centerX, windowHeight * 0.15f + 30, "v0.1.0-SNAPSHOT", 
+        Label versionLabel = new Label(centerX, topOffset * 0.6f + Math.max(28f, buttonHeight * 0.5f), "v0.1.0-SNAPSHOT",
             0.7f, 0.7f, 0.7f, 1.0f);
         versionLabel.setCentered(true);
         addComponent(versionLabel);
         
-        // Button dimensions
-        float buttonWidth = 200;
-        float buttonHeight = 40;
-        float buttonSpacing = 10;
         float buttonX = centerX - buttonWidth / 2;
         
         // Singleplayer button
@@ -89,6 +93,10 @@ public class MainMenuScreen extends UIScreen {
             0.5f, 0.5f, 0.5f, 0.8f);
         footerLabel.setCentered(true);
         addComponent(footerLabel);
+    }
+
+    private float clamp(float value, float min, float max) {
+        return Math.max(min, Math.min(max, value));
     }
     
     @Override

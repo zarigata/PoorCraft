@@ -1,0 +1,56 @@
+{
+  "window": {
+    "width": 1280,
+    "height": 720,
+    "title": "PoorCraft",
+    "vsync": true,
+    "fullscreen": false
+  },
+  "graphics": {
+    "fov": 70.0,
+    "renderDistance": 8,
+    "maxFps": 144
+  },
+  "audio": {
+    "masterVolume": 1.0,
+    "musicVolume": 0.7,
+    "sfxVolume": 0.8
+  },
+  "controls": {
+    "mouseSensitivity": 0.1,
+    "invertY": false,
+    "keybinds": {
+      "forward": 87,
+      "backward": 83,
+      "left": 65,
+      "right": 68,
+      "jump": 32,
+      "sneak": 340,
+      "sprint": 341,
+      "inventory": 69,
+      "debug": 290
+    }
+  },
+  "camera": {
+    "moveSpeed": 4.317,
+    "sprintMultiplier": 1.3,
+    "sneakMultiplier": 0.3
+  },
+  "ai": {
+    "aiEnabled": false,
+    "aiProvider": "ollama"
+  },
+  "world": {
+    "seed": 0,
+    "chunkLoadDistance": 8,
+    "chunkUnloadDistance": 10,
+    "generateStructures": true
+  },
+  "multiplayer": {
+    "username": "Player",
+    "lastServer": "localhost:25565",
+    "serverPort": 25565,
+    "autoConnect": false,
+    "maxPlayers": 10
+  }
+}

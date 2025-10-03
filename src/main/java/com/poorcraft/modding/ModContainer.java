@@ -95,7 +95,7 @@ public class ModContainer {
      * 
      * @throws Exception if initialization fails
      */
-    public void init() {
+    public void init() throws Exception {
         try {
             System.out.println("[ModContainer] Initializing mod: " + name);
             

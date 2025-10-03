@@ -8,9 +8,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
@@ -40,6 +41,7 @@ public class FontRenderer {
     private int fontSize;
     private STBTTBakedChar.Buffer charData;
     private float lineHeight;
+    private boolean useFallback = false;
     
     /**
      * Creates a new font renderer.
@@ -58,71 +60,71 @@ public class FontRenderer {
      * @param fontPath Path to TTF font file (can be resource path or filesystem path)
      */
     public void init(String fontPath) {
+        useFallback = false;
+        STBTTBakedChar.Buffer bakedChars = null;
+        int createdTexture = 0;
         try {
-            // Load TTF font file
-            ByteBuffer fontBuffer;
-            try {
-                // Try loading from filesystem first
-                byte[] fontBytes = Files.readAllBytes(Paths.get(fontPath));
-                fontBuffer = BufferUtils.createByteBuffer(fontBytes.length);
-                fontBuffer.put(fontBytes);
-                fontBuffer.flip();
-                System.out.println("[FontRenderer] Loaded font from filesystem: " + fontPath);
-            } catch (IOException e) {
-                // Try loading from resources
-                var stream = getClass().getResourceAsStream(fontPath);
-                if (stream == null) {
-                    throw new RuntimeException("Font file not found: " + fontPath);
-                }
-                byte[] fontBytes = stream.readAllBytes();
-                fontBuffer = BufferUtils.createByteBuffer(fontBytes.length);
-                fontBuffer.put(fontBytes);
-                fontBuffer.flip();
-                System.out.println("[FontRenderer] Loaded font from resources: " + fontPath);
+            FontLoadResult fontResult = loadFontData(fontPath);
+            if (fontResult == null) {
+                throw new RuntimeException("Font file not found: " + fontPath);
             }
-            
+
+            ByteBuffer fontBuffer = fontResult.buffer();
+
             // Create bitmap for font atlas
             ByteBuffer bitmap = BufferUtils.createByteBuffer(ATLAS_WIDTH * ATLAS_HEIGHT);
-            
+
             // Allocate character data buffer
-            charData = STBTTBakedChar.malloc(CHAR_COUNT);
-            
+            bakedChars = STBTTBakedChar.malloc(CHAR_COUNT);
+
             // Bake font bitmap
             // This rasterizes all characters into the bitmap and fills charData with metrics
-            int result = stbtt_BakeFontBitmap(fontBuffer, fontSize, bitmap, 
-                ATLAS_WIDTH, ATLAS_HEIGHT, FIRST_CHAR, charData);
-            
+            int result = stbtt_BakeFontBitmap(fontBuffer, fontSize, bitmap,
+                ATLAS_WIDTH, ATLAS_HEIGHT, FIRST_CHAR, bakedChars);
+
             if (result <= 0) {
                 throw new RuntimeException("Failed to bake font bitmap");
             }
-            
+
             // Create OpenGL texture from bitmap
-            fontAtlasTexture = glGenTextures();
-            glBindTexture(GL_TEXTURE_2D, fontAtlasTexture);
-            
+            createdTexture = glGenTextures();
+            glBindTexture(GL_TEXTURE_2D, createdTexture);
+
             // Upload bitmap (single channel, using GL_RED for OpenGL 3.3 core compatibility)
             // GL_ALPHA is deprecated in core profile, GL_RED works the same for grayscale
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, ATLAS_WIDTH, ATLAS_HEIGHT, 
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, ATLAS_WIDTH, ATLAS_HEIGHT,
                 0, GL_RED, GL_UNSIGNED_BYTE, bitmap);
-            
+
             // Set texture parameters
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            
+
             glBindTexture(GL_TEXTURE_2D, 0);
-            
+
             // Calculate line height (approximate)
             lineHeight = fontSize * 1.2f;
-            
-            System.out.println("[FontRenderer] Font atlas created: " + ATLAS_WIDTH + "x" + ATLAS_HEIGHT + 
-                ", " + CHAR_COUNT + " characters at " + fontSize + "px");
-            
+
+            charData = bakedChars;
+            fontAtlasTexture = createdTexture;
+
+            System.out.println("[FontRenderer] Font atlas created from " + fontResult.source() + 
+                ": " + ATLAS_WIDTH + "x" + ATLAS_HEIGHT + ", " + CHAR_COUNT + " characters at " + fontSize + "px");
+
         } catch (Exception e) {
             System.err.println("[FontRenderer] Failed to initialize font: " + e.getMessage());
-            e.printStackTrace();
-            throw new RuntimeException("Font initialization failed", e);
+            System.err.println("[FontRenderer] Using fallback rendering (no font atlas)");
+            if (bakedChars != null) {
+                bakedChars.free();
+            }
+            if (createdTexture != 0) {
+                glDeleteTextures(createdTexture);
+            }
+            useFallback = true;
+            charData = null;
+            fontAtlasTexture = 0;
+            lineHeight = fontSize;
         }
     }
     
@@ -139,6 +141,10 @@ public class FontRenderer {
      * @param a Alpha component (0.0 to 1.0)
      */
     public void drawText(String text, float x, float y, float r, float g, float b, float a) {
+        if (useFallback) {
+            return;
+        }
+
         if (text == null || text.isEmpty()) {
             return;
         }
@@ -237,7 +243,7 @@ public class FontRenderer {
      * @return Width in pixels
      */
     public float getTextWidth(String text) {
-        if (text == null || text.isEmpty()) {
+        if (useFallback || text == null || text.isEmpty()) {
             return 0;
         }
         
@@ -262,7 +268,7 @@ public class FontRenderer {
      * @return Line height in pixels
      */
     public float getTextHeight() {
-        return lineHeight;
+        return useFallback ? fontSize : lineHeight;
     }
     
     /**
@@ -278,12 +284,108 @@ public class FontRenderer {
      * Cleans up OpenGL resources.
      */
     public void cleanup() {
-        if (fontAtlasTexture != 0) {
+        if (!useFallback && fontAtlasTexture != 0) {
             glDeleteTextures(fontAtlasTexture);
         }
-        if (charData != null) {
+        if (!useFallback && charData != null) {
             charData.free();
         }
         System.out.println("[FontRenderer] Cleaned up");
+    }
+
+    private FontLoadResult loadFontData(String fontPath) {
+        ByteBuffer buffer = tryLoadFont(fontPath);
+        if (buffer != null) {
+            return new FontLoadResult(buffer, fontPath);
+        }
+
+        FontLoadResult fallback = tryLoadFallbackSystemFont();
+        if (fallback != null) {
+            return fallback;
+        }
+
+        return null;
+    }
+
+    private ByteBuffer tryLoadFont(String fontPath) {
+        if (fontPath == null || fontPath.isEmpty()) {
+            return null;
+        }
+
+        try {
+            var path = Paths.get(fontPath);
+            if (Files.exists(path) && !Files.isDirectory(path)) {
+                byte[] fontBytes = Files.readAllBytes(path);
+                return toByteBuffer(fontBytes);
+            }
+        } catch (IOException | InvalidPathException ignored) {
+            // Ignore and try resource lookup
+        }
+
+        try (var stream = getClass().getResourceAsStream(fontPath)) {
+            if (stream != null) {
+                byte[] fontBytes = stream.readAllBytes();
+                return toByteBuffer(fontBytes);
+            }
+        } catch (IOException ignored) {
+            // Ignore and let caller handle failure
+        }
+
+        return null;
+    }
+
+    private FontLoadResult tryLoadFallbackSystemFont() {
+        List<String> candidates = new ArrayList<>();
+
+        // Development resources
+        candidates.add("src/main/resources/fonts/default.ttf");
+        candidates.add("fonts/default.ttf");
+
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        if (osName.contains("win")) {
+            candidates.add("C:\\Windows\\Fonts\\segoeui.ttf");
+            candidates.add("C:\\Windows\\Fonts\\arial.ttf");
+        } else if (osName.contains("mac")) {
+            candidates.add("/System/Library/Fonts/SFNS.ttf");
+            candidates.add("/Library/Fonts/Arial.ttf");
+        } else {
+            candidates.add("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+            candidates.add("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf");
+        }
+
+        for (String candidate : candidates) {
+            ByteBuffer buffer = tryLoadFont(candidate);
+            if (buffer != null) {
+                System.out.println("[FontRenderer] Loaded fallback font: " + candidate);
+                return new FontLoadResult(buffer, candidate);
+            }
+        }
+
+        return null;
+    }
+
+    private ByteBuffer toByteBuffer(byte[] fontBytes) {
+        ByteBuffer buffer = BufferUtils.createByteBuffer(fontBytes.length);
+        buffer.put(fontBytes);
+        buffer.flip();
+        return buffer;
+    }
+
+    private static class FontLoadResult {
+        private final ByteBuffer buffer;
+        private final String source;
+
+        private FontLoadResult(ByteBuffer buffer, String source) {
+            this.buffer = buffer;
+            this.source = source;
+        }
+
+        public ByteBuffer buffer() {
+            return buffer;
+        }
+
+        public String source() {
+            return source;
+        }
     }
 }

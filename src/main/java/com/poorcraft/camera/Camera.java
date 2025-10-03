@@ -175,13 +175,33 @@ public class Camera {
     
     /**
      * Returns camera position (copy to prevent external modification).
-     * 
      * @return Camera position
      */
     public Vector3f getPosition() {
         return new Vector3f(position);
     }
-    
+
+    /**
+     * Sets the camera position directly.
+     *
+     * @param x X coordinate
+     * @param y Y coordinate
+     * @param z Z coordinate
+     */
+    public void setPosition(float x, float y, float z) {
+        this.position.set(x, y, z);
+        this.viewMatrixDirty = true;
+    }
+
+    /**
+     * Sets the camera position directly from a vector.
+     *
+     * @param position New position
+     */
+    public void setPosition(Vector3f position) {
+        setPosition(position.x, position.y, position.z);
+    }
+
     /**
      * Returns camera front vector (copy to prevent external modification).
      * 
@@ -190,27 +210,26 @@ public class Camera {
     public Vector3f getFront() {
         return new Vector3f(front);
     }
-    
+
     /**
-     * Sets camera movement speed.
-     * 
-     * @param moveSpeed New movement speed in units per second
+     * Returns the camera right vector (copy to prevent external modification).
+     *
+     * @return Right direction vector
      */
-    public void setMoveSpeed(float moveSpeed) {
-        this.moveSpeed = moveSpeed;
+    public Vector3f getRight() {
+        return new Vector3f(right);
     }
-    
+
     /**
-     * Sets mouse sensitivity.
-     * 
+     * Sets mouse sensitivity multiplier.
+     *
      * @param mouseSensitivity New mouse sensitivity multiplier
      */
     public void setMouseSensitivity(float mouseSensitivity) {
         this.mouseSensitivity = mouseSensitivity;
     }
-    
+
     /**
-     * Gets camera yaw rotation.
      * 
      * @return Yaw in degrees
      */

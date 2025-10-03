@@ -31,6 +31,7 @@ public class Game {
     private Timer timer;
     private InputHandler inputHandler;
     private Camera camera;
+    private PlayerController playerController;
     private Settings settings;
     private ConfigManager configManager;
     private UIManager uiManager;
@@ -83,11 +84,14 @@ public class Game {
         inputHandler.init(window.getHandle());
         
         // Initialize camera at spawn height (Y=70, typical ground level)
+        Vector3f initialPosition = new Vector3f(0.5f, 70.0f, 0.5f);
         camera = new Camera(
-            new Vector3f(0, 70, 0),
+            new Vector3f(initialPosition),
             settings.camera.moveSpeed,
             settings.controls.mouseSensitivity
         );
+        playerController = new PlayerController(initialPosition);
+        camera.setPosition(playerController.getEyePosition());
         
         // Initialize UI manager
         uiManager = new UIManager(this, settings, configManager);
@@ -171,64 +175,26 @@ public class Game {
             return;
         }
         
-        float speedMultiplier = getCurrentSpeedMultiplier();
-        float adjustedDelta = deltaTime * speedMultiplier;
-        
-        // Process camera movement based on keybinds
-        // Using safe getKeybind() to avoid NPE when config is missing keys
-        // Because crashing on a missing keybind is so 2009
-        if (inputHandler.isKeyPressed(settings.controls.getKeybind("forward", 87))) {  // W
-            camera.processKeyboard(Camera.FORWARD, adjustedDelta);
-        }
-        if (inputHandler.isKeyPressed(settings.controls.getKeybind("backward", 83))) {  // S
-            camera.processKeyboard(Camera.BACKWARD, adjustedDelta);
-        }
-        if (inputHandler.isKeyPressed(settings.controls.getKeybind("left", 65))) {  // A
-            camera.processKeyboard(Camera.LEFT, adjustedDelta);
-        }
-        if (inputHandler.isKeyPressed(settings.controls.getKeybind("right", 68))) {  // D
-            camera.processKeyboard(Camera.RIGHT, adjustedDelta);
-        }
-        if (inputHandler.isKeyPressed(settings.controls.getKeybind("jump", 32))) {  // Space
-            camera.processKeyboard(Camera.UP, adjustedDelta);
-        }
-        if (inputHandler.isKeyPressed(settings.controls.getKeybind("sneak", 340))) {  // Left Shift
-            camera.processKeyboard(Camera.DOWN, adjustedDelta);
-        }
-        
         // Process mouse movement (always in IN_GAME state)
         camera.processMouseMovement(
             (float) inputHandler.getMouseDeltaX(),
             (float) inputHandler.getMouseDeltaY()
         );
+
+        if (playerController != null) {
+            playerController.update(world, inputHandler, settings, camera, deltaTime);
+            camera.setPosition(playerController.getEyePosition());
+        }
         
         // Update chunk manager with camera position
         // This handles dynamic chunk loading/unloading as player moves
         // In multiplayer mode, chunk loading is handled by network client, not ChunkManager
         if (worldLoaded && !multiplayerMode && chunkManager != null) {
-            chunkManager.update(camera.getPosition());
+            Vector3f trackingPosition = playerController != null
+                ? playerController.getPosition()
+                : camera.getPosition();
+            chunkManager.update(trackingPosition);
         }
-    }
-    
-    /**
-     * Returns current movement speed multiplier based on input.
-     * Sprint = faster, sneak = slower, normal = 1.0x
-     * 
-     * @return Speed multiplier
-     */
-    private float getCurrentSpeedMultiplier() {
-        // Check sprint first (higher priority)
-        if (inputHandler.isKeyPressed(settings.controls.getKeybind("sprint", 341))) {  // Left Control
-            return settings.camera.sprintMultiplier;
-        }
-        
-        // Check sneak
-        if (inputHandler.isKeyPressed(settings.controls.getKeybind("sneak", 340))) {  // Left Shift
-            return settings.camera.sneakMultiplier;
-        }
-        
-        // Normal speed
-        return 1.0f;
     }
     
     /**
@@ -383,6 +349,12 @@ public class Game {
 
         // Mark world as loaded
         worldLoaded = true;
+        
+        // Spawn player at terrain height and sync camera
+        if (playerController != null) {
+            playerController.respawn(world);
+            camera.setPosition(playerController.getEyePosition());
+        }
         
         // Cursor grabbing is now handled by UIManager.setState() when transitioning to IN_GAME
         // No need to manually grab here anymore. One less thing to worry about!
