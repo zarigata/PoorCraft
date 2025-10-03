@@ -82,24 +82,34 @@ public class ChunkRenderer {
         blockShader = Shader.loadFromResources("/shaders/block.vert", "/shaders/block.frag");
         System.out.println("[ChunkRenderer] Shaders compiled successfully");
         
-        // Create texture atlas (mods can replace the default one before chunks render)
-        if (modLoader != null && modLoader.getModAPI() != null && modLoader.getModAPI().hasProceduralTextures()) {
-            textureAtlas = new TextureAtlas();
-            addMissingTexturePlaceholder(textureAtlas);
+        Map<String, ByteBuffer> generatedTextures = TextureGenerator.ensureDefaultBlockTextures();
+        TextureGenerator.ensureAuxiliaryTextures();
 
-            Map<String, ByteBuffer> textures = modLoader.getModAPI().getProceduralTextures();
-            int count = 0;
-            for (Map.Entry<String, ByteBuffer> entry : textures.entrySet()) {
-                textureAtlas.addTexture(entry.getKey(), entry.getValue(), TextureAtlas.TEXTURE_SIZE, TextureAtlas.TEXTURE_SIZE);
-                count++;
+        textureAtlas = new TextureAtlas();
+        addMissingTexturePlaceholder(textureAtlas);
+
+        int bakedCount = 0;
+        if (generatedTextures != null) {
+            for (Map.Entry<String, ByteBuffer> entry : generatedTextures.entrySet()) {
+                if (entry.getValue() != null) {
+                    textureAtlas.addTexture(entry.getKey(), entry.getValue(), TextureAtlas.TEXTURE_SIZE, TextureAtlas.TEXTURE_SIZE);
+                    bakedCount++;
+                }
             }
-
-            textureAtlas.build();
-            System.out.println("[ChunkRenderer] Built texture atlas with " + count + " procedural textures");
-        } else {
-            textureAtlas = TextureAtlas.createDefault();
-            System.out.println("[ChunkRenderer] Using default texture atlas (no procedural textures)");
         }
+
+        Map<String, ByteBuffer> modTextures = modLoader != null && modLoader.getModAPI() != null
+            ? modLoader.getModAPI().getProceduralTextures()
+            : Map.of();
+
+        int modCount = 0;
+        for (Map.Entry<String, ByteBuffer> entry : modTextures.entrySet()) {
+            textureAtlas.addTexture(entry.getKey(), entry.getValue(), TextureAtlas.TEXTURE_SIZE, TextureAtlas.TEXTURE_SIZE);
+            modCount++;
+        }
+
+        textureAtlas.build();
+        System.out.println("[ChunkRenderer] Built texture atlas with " + bakedCount + " generated textures and " + modCount + " mod textures");
         
         // Create frustum
         frustum = new Frustum();

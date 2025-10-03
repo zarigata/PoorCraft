@@ -13,7 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
@@ -29,12 +29,16 @@ public final class TextureGenerator {
 
     public static final int TEXTURE_SIZE = 16;
 
-    private static final Path WORKSPACE_BLOCK_DIR = Path.of("textures", "blocks");
+    private static final Path RESOURCE_ROOT = Path.of("src", "main", "resources");
+    private static final Path WORKSPACE_BLOCK_DIR = RESOURCE_ROOT.resolve(Path.of("textures", "blocks"));
+    private static final Path WORKSPACE_SKIN_DIR = RESOURCE_ROOT.resolve(Path.of("textures", "skins"));
     private static final Path OUTPUT_BLOCK_DIR = Path.of("generated", "textures", "blocks");
     private static final Path OUTPUT_SKIN_DIR = Path.of("generated", "textures", "skins");
-    private static final Map<String, TextureFactory> BLOCK_FACTORIES = new HashMap<>();
-    private static final Map<String, TextureFactory> FLORA_FACTORIES = new HashMap<>();
-    private static final Map<String, TextureFactory> SKIN_FACTORIES = new HashMap<>();
+    private static final String CLASSPATH_BLOCK_DIR = "/textures/blocks/";
+    private static final String CLASSPATH_SKIN_DIR = "/textures/skins/";
+    private static final Map<String, TextureFactory> BLOCK_FACTORIES = new LinkedHashMap<>();
+    private static final Map<String, TextureFactory> FLORA_FACTORIES = new LinkedHashMap<>();
+    private static final Map<String, TextureFactory> SKIN_FACTORIES = new LinkedHashMap<>();
 
     static {
         registerBlockFactories();
@@ -50,9 +54,9 @@ public final class TextureGenerator {
      * The resulting RGBA buffers are returned for immediate atlas construction.
      */
     public static Map<String, ByteBuffer> ensureDefaultBlockTextures() {
-        Map<String, ByteBuffer> textures = new HashMap<>();
+        Map<String, ByteBuffer> textures = new LinkedHashMap<>();
         for (Map.Entry<String, TextureFactory> entry : BLOCK_FACTORIES.entrySet()) {
-            textures.put(entry.getKey(), loadOrGenerate(entry.getKey(), entry.getValue(), WORKSPACE_BLOCK_DIR, OUTPUT_BLOCK_DIR));
+            textures.put(entry.getKey(), loadOrGenerate(entry.getKey(), entry.getValue(), WORKSPACE_BLOCK_DIR, OUTPUT_BLOCK_DIR, CLASSPATH_BLOCK_DIR));
         }
         return textures;
     }
@@ -64,18 +68,19 @@ public final class TextureGenerator {
      */
     public static void ensureAuxiliaryTextures() {
         for (Map.Entry<String, TextureFactory> entry : FLORA_FACTORIES.entrySet()) {
-            loadOrGenerate(entry.getKey(), entry.getValue(), WORKSPACE_BLOCK_DIR, OUTPUT_BLOCK_DIR);
+            loadOrGenerate(entry.getKey(), entry.getValue(), WORKSPACE_BLOCK_DIR, OUTPUT_BLOCK_DIR, CLASSPATH_BLOCK_DIR);
         }
         for (Map.Entry<String, TextureFactory> entry : SKIN_FACTORIES.entrySet()) {
-            loadOrGenerate(entry.getKey(), entry.getValue(), Path.of("textures", "skins"), OUTPUT_SKIN_DIR);
+            loadOrGenerate(entry.getKey(), entry.getValue(), WORKSPACE_SKIN_DIR, OUTPUT_SKIN_DIR, CLASSPATH_SKIN_DIR);
         }
     }
 
     private static ByteBuffer loadOrGenerate(String name,
                                              TextureFactory factory,
                                              Path preferredDiskFolder,
-                                             Path generatedDiskFolder) {
-        BufferedImage existing = tryLoadFromClasspath(name);
+                                             Path generatedDiskFolder,
+                                             String classpathFolder) {
+        BufferedImage existing = tryLoadFromClasspath(classpathFolder, name);
         if (existing == null) {
             existing = tryLoadFromDisk(preferredDiskFolder, name);
         }
@@ -98,8 +103,11 @@ public final class TextureGenerator {
         return toByteBuffer(existing);
     }
 
-    private static BufferedImage tryLoadFromClasspath(String name) {
-        String resourcePath = "/textures/blocks/" + name + ".png";
+    private static BufferedImage tryLoadFromClasspath(String folder, String name) {
+        if (folder == null) {
+            return null;
+        }
+        String resourcePath = folder + name + ".png";
         try (InputStream stream = TextureGenerator.class.getResourceAsStream(resourcePath)) {
             if (stream != null) {
                 BufferedImage image = ImageIO.read(stream);
