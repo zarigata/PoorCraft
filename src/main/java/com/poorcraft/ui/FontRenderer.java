@@ -6,12 +6,15 @@ import org.lwjgl.stb.STBTruetype;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL15.*;
+import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.stb.STBTruetype.*;
 
 /**
@@ -97,9 +100,10 @@ public class FontRenderer {
             fontAtlasTexture = glGenTextures();
             glBindTexture(GL_TEXTURE_2D, fontAtlasTexture);
             
-            // Upload bitmap (single channel, alpha only)
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, ATLAS_WIDTH, ATLAS_HEIGHT, 
-                0, GL_ALPHA, GL_UNSIGNED_BYTE, bitmap);
+            // Upload bitmap (single channel, using GL_RED for OpenGL 3.3 core compatibility)
+            // GL_ALPHA is deprecated in core profile, GL_RED works the same for grayscale
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, ATLAS_WIDTH, ATLAS_HEIGHT, 
+                0, GL_RED, GL_UNSIGNED_BYTE, bitmap);
             
             // Set texture parameters
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -124,6 +128,7 @@ public class FontRenderer {
     
     /**
      * Draws text at the specified position.
+     * Now uses VBOs via UIRenderer instead of deprecated immediate mode.
      * 
      * @param text Text to draw
      * @param x X position (pixels from left)
@@ -142,6 +147,12 @@ public class FontRenderer {
         
         float currentX = x;
         float currentY = y;
+        
+        // Batch all character quads into a single buffer
+        // This is way more efficient than drawing each character separately
+        // Old me would've just used glBegin/glEnd, but that's so 2005
+        FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(text.length() * 6 * 4);
+        int quadCount = 0;
         
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
@@ -173,44 +184,49 @@ public class FontRenderer {
             float u1 = charInfo.x1() / (float) ATLAS_WIDTH;
             float v1 = charInfo.y1() / (float) ATLAS_HEIGHT;
             
-            // Draw character quad
-            // Note: We need to draw with custom UVs, but UIRenderer doesn't support that yet
-            // For now, we'll use a simple approach with the textured rect method
-            // This is a bit hacky but works for our purposes
-            drawCharQuad(charX, charY, charW, charH, u0, v0, u1, v1, r, g, b, a);
+            // Add character quad to batch (6 vertices, 4 floats each: x, y, u, v)
+            // Triangle 1
+            vertexBuffer.put(charX).put(charY).put(u0).put(v0);
+            vertexBuffer.put(charX + charW).put(charY).put(u1).put(v0);
+            vertexBuffer.put(charX + charW).put(charY + charH).put(u1).put(v1);
+            
+            // Triangle 2
+            vertexBuffer.put(charX + charW).put(charY + charH).put(u1).put(v1);
+            vertexBuffer.put(charX).put(charY + charH).put(u0).put(v1);
+            vertexBuffer.put(charX).put(charY).put(u0).put(v0);
+            
+            quadCount++;
             
             // Advance cursor
             currentX += charInfo.xadvance();
         }
         
+        if (quadCount == 0) {
+            glBindTexture(GL_TEXTURE_2D, 0);
+            return;
+        }
+        
+        vertexBuffer.flip();
+        
+        // Upload vertex data to VBO and draw
+        // Using UIRenderer's VBO for efficiency (no need to create our own)
+        int vbo = uiRenderer.getVBO();
+        int vao = uiRenderer.getVAO();
+        
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, vertexBuffer, GL_DYNAMIC_DRAW);
+        
+        // Set shader uniforms
+        uiRenderer.getShader().setUniform("uModel", new org.joml.Matrix4f().identity());
+        uiRenderer.getShader().setUniform("uColor", r, g, b, a);
+        uiRenderer.getShader().setUniform("uUseTexture", true);
+        
+        // Draw all character quads in one call
+        glBindVertexArray(vao);
+        glDrawArrays(GL_TRIANGLES, 0, quadCount * 6);
+        glBindVertexArray(0);
+        
         glBindTexture(GL_TEXTURE_2D, 0);
-    }
-    
-    /**
-     * Draws a single character quad with custom UV coordinates.
-     * This is a helper method since UIRenderer doesn't support custom UVs.
-     */
-    private void drawCharQuad(float x, float y, float w, float h, 
-                             float u0, float v0, float u1, float v1,
-                             float r, float g, float b, float a) {
-        // For now, use a simple immediate mode approach
-        // In a production system, we'd batch these into a single draw call
-        glBegin(GL_QUADS);
-        glColor4f(r, g, b, a);
-        
-        glTexCoord2f(u0, v0);
-        glVertex2f(x, y);
-        
-        glTexCoord2f(u1, v0);
-        glVertex2f(x + w, y);
-        
-        glTexCoord2f(u1, v1);
-        glVertex2f(x + w, y + h);
-        
-        glTexCoord2f(u0, v1);
-        glVertex2f(x, y + h);
-        
-        glEnd();
     }
     
     /**

@@ -198,6 +198,36 @@ public class UIRenderer {
     }
     
     /**
+     * Gets the VAO for direct vertex data manipulation.
+     * Used by FontRenderer for batched text rendering with custom UVs.
+     * 
+     * @return VAO handle
+     */
+    public int getVAO() {
+        return vao;
+    }
+    
+    /**
+     * Gets the VBO for direct vertex data manipulation.
+     * Used by FontRenderer for batched text rendering with custom UVs.
+     * 
+     * @return VBO handle
+     */
+    public int getVBO() {
+        return vbo;
+    }
+    
+    /**
+     * Gets the UI shader.
+     * Used by FontRenderer to set uniforms for text rendering.
+     * 
+     * @return UI shader
+     */
+    public Shader getShader() {
+        return uiShader;
+    }
+    
+    /**
      * Ends UI rendering.
      * Call this after drawing all UI elements.
      * 

@@ -38,6 +38,10 @@ public class UIManager {
     private Settings settings;
     private ConfigManager configManager;
     
+    // Input handling for cursor management
+    private Object inputHandler;  // Will be set by Game
+    private long windowHandle;    // GLFW window handle
+    
     /**
      * Creates a new UI manager.
      * 
@@ -52,6 +56,20 @@ public class UIManager {
         this.screens = new HashMap<>();
         this.currentState = GameState.MAIN_MENU;
         this.previousState = null;
+        this.inputHandler = null;
+        this.windowHandle = 0;
+    }
+    
+    /**
+     * Sets the input handler and window handle for cursor management.
+     * This should be called by Game after creating the UIManager.
+     * 
+     * @param inputHandler InputHandler instance
+     * @param windowHandle GLFW window handle
+     */
+    public void setInputHandler(Object inputHandler, long windowHandle) {
+        this.inputHandler = inputHandler;
+        this.windowHandle = windowHandle;
     }
     
     /**
@@ -110,6 +128,7 @@ public class UIManager {
     
     /**
      * Sets the current game state and transitions to the appropriate screen.
+     * Also manages cursor grabbing based on the state.
      * 
      * @param newState New game state
      */
@@ -125,14 +144,26 @@ public class UIManager {
             screen.init();
         }
         
-        // Handle state-specific setup
-        if (newState.capturesMouse()) {
-            // Grab cursor for in-game state
-            // This will be implemented when we integrate with Game.java
-            System.out.println("[UIManager] Capturing mouse cursor");
-        } else {
-            // Release cursor for menu states
-            System.out.println("[UIManager] Releasing mouse cursor");
+        // Handle cursor grabbing based on state
+        // IN_GAME captures mouse, all menu states release it
+        if (inputHandler != null && windowHandle != 0) {
+            try {
+                var inputHandlerClass = inputHandler.getClass();
+                var method = inputHandlerClass.getMethod("setCursorGrabbed", long.class, boolean.class);
+                
+                if (newState.capturesMouse()) {
+                    // Grab cursor for in-game state
+                    method.invoke(inputHandler, windowHandle, true);
+                    System.out.println("[UIManager] Cursor grabbed for gameplay");
+                } else {
+                    // Release cursor for menu states
+                    method.invoke(inputHandler, windowHandle, false);
+                    System.out.println("[UIManager] Cursor released for menu");
+                }
+            } catch (Exception e) {
+                System.err.println("[UIManager] Failed to set cursor grabbed state: " + e.getMessage());
+                // Not fatal, just log it. The game can still run, just with wonky cursor behavior.
+            }
         }
     }
     

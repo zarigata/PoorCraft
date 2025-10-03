@@ -13,9 +13,16 @@ uniform bool uUseTexture;         // Whether to sample texture or use solid colo
 
 void main() {
     if (uUseTexture) {
-        // Sample texture and multiply by color tint
+        // Sample texture
+        // For font atlas (GL_RED format), use red channel as alpha
+        // For regular textures, use as-is
+        // This handles both cases gracefully - pretty neat if you ask me
         vec4 texColor = texture(uTexture, vTexCoord);
-        FragColor = texColor * uColor;
+        
+        // If texture is single-channel (font atlas), use red as alpha
+        // Otherwise use the full texture color
+        float alpha = texColor.r;
+        FragColor = vec4(uColor.rgb, uColor.a * alpha);
     } else {
         // Use solid color
         FragColor = uColor;

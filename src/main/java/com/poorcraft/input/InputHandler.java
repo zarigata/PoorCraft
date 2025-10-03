@@ -95,8 +95,8 @@ public class InputHandler {
         lastMouseX = width[0] / 2.0;
         lastMouseY = height[0] / 2.0;
         
-        // Grab cursor by default (FPS game style)
-        setCursorGrabbed(windowHandle, true);
+        // Don't grab cursor by default - let Game/UIManager handle it based on state
+        // This way menus can actually be used. Revolutionary concept, I know.
         
         System.out.println("[InputHandler] Initialized");
     }

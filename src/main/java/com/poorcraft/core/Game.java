@@ -88,6 +88,10 @@ public class Game {
         // Initialize UI manager
         uiManager = new UIManager(this, settings, configManager);
         uiManager.init(window.getWidth(), window.getHeight());
+        
+        // Connect input handler to UI manager for cursor management
+        uiManager.setInputHandler(inputHandler, window.getHandle());
+        
         System.out.println("[Game] UI Manager initialized");
         
         // Set up input callbacks for UI
@@ -348,8 +352,8 @@ public class Game {
         // Mark world as loaded
         worldLoaded = true;
         
-        // Grab cursor for in-game controls
-        inputHandler.setCursorGrabbed(window.getHandle(), true);
+        // Cursor grabbing is now handled by UIManager.setState() when transitioning to IN_GAME
+        // No need to manually grab here anymore. One less thing to worry about!
         
         System.out.println("[Game] World creation complete!");
     }
