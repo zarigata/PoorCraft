@@ -19,6 +19,7 @@ __pycache__/
 # IDE
 .idea/
 .vscode/
+.windsurf/
 *.iml
 .eclipse/
 *.swp
@@ -34,6 +35,10 @@ worlds/
 logs/
 config/settings.json
 screenshots/
+
+# Generated Runtime Files
+generated/
+*.generated.*
 
 # Sensitive
 *.key
