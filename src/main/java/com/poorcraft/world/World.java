@@ -1,5 +1,9 @@
 package com.poorcraft.world;
 
+import com.poorcraft.modding.EventBus;
+import com.poorcraft.modding.events.BlockBreakEvent;
+import com.poorcraft.modding.events.BlockPlaceEvent;
+import com.poorcraft.modding.events.WorldLoadEvent;
 import com.poorcraft.world.block.BlockType;
 import com.poorcraft.world.chunk.Chunk;
 import com.poorcraft.world.chunk.ChunkPos;
@@ -30,6 +34,7 @@ public class World {
     private final BiomeGenerator biomeGenerator;
     private final boolean generateStructures;
     private Consumer<ChunkPos> chunkUnloadCallback;
+    private EventBus eventBus;
     
     /**
      * Creates a new world with the given seed.
@@ -52,9 +57,15 @@ public class World {
         this.terrainGenerator = new TerrainGenerator(this.seed);
         this.featureGenerator = new FeatureGenerator(this.seed, biomeGenerator, terrainGenerator);
         this.chunkUnloadCallback = null;
+        this.eventBus = null;
         
         System.out.println("[World] Created world with seed: " + this.seed);
         System.out.println("[World] Structure generation: " + (generateStructures ? "enabled" : "disabled"));
+        
+        // Fire mod event for world load
+        if (eventBus != null) {
+            eventBus.fire(new WorldLoadEvent(this.seed, generateStructures));
+        }
     }
     
     /**
@@ -65,6 +76,19 @@ public class World {
      */
     public void setChunkUnloadCallback(Consumer<ChunkPos> callback) {
         this.chunkUnloadCallback = callback;
+    }
+    
+    /**
+     * Sets the event bus for firing mod events.
+     * 
+     * @param eventBus Event bus instance
+     */
+    public void setEventBus(EventBus eventBus) {
+        this.eventBus = eventBus;
+        // Also set on terrain generator
+        if (terrainGenerator != null) {
+            terrainGenerator.setEventBus(eventBus);
+        }
     }
     
     /**
@@ -269,6 +293,28 @@ public class World {
      * @param type Block type to set
      */
     public void setBlock(int worldX, int worldY, int worldZ, BlockType type) {
+        // Fire mod event for block change (cancellable)
+        if (eventBus != null) {
+            BlockType oldBlock = getBlock(worldX, worldY, worldZ);
+            
+            // Determine if placing or breaking
+            if (oldBlock == BlockType.AIR && type != BlockType.AIR) {
+                // Placing a block
+                BlockPlaceEvent event = new BlockPlaceEvent(worldX, worldY, worldZ, type.getId(), -1);
+                eventBus.fire(event);
+                if (event.isCancelled()) {
+                    return;  // Event cancelled, abort block placement
+                }
+            } else if (oldBlock != BlockType.AIR && type == BlockType.AIR) {
+                // Breaking a block
+                BlockBreakEvent event = new BlockBreakEvent(worldX, worldY, worldZ, oldBlock.getId(), -1);
+                eventBus.fire(event);
+                if (event.isCancelled()) {
+                    return;  // Event cancelled, abort block break
+                }
+            }
+        }
+        
         // Convert to chunk coordinates
         ChunkPos chunkPos = ChunkPos.fromWorldPos(worldX, worldZ);
         Chunk chunk = getOrCreateChunk(chunkPos);

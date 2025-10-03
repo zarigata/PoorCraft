@@ -4,6 +4,7 @@ import com.poorcraft.camera.Camera;
 import com.poorcraft.config.ConfigManager;
 import com.poorcraft.config.Settings;
 import com.poorcraft.input.InputHandler;
+import com.poorcraft.modding.ModLoader;
 import com.poorcraft.render.ChunkRenderer;
 import com.poorcraft.ui.GameState;
 import com.poorcraft.ui.UIManager;
@@ -36,6 +37,7 @@ public class Game {
     private World world;
     private ChunkManager chunkManager;
     private ChunkRenderer chunkRenderer;
+    private ModLoader modLoader;
     
     private boolean running;
     private boolean worldLoaded;  // Track if world is loaded
@@ -95,6 +97,11 @@ public class Game {
         uiManager.setInputHandler(inputHandler, window.getHandle());
         
         System.out.println("[Game] UI Manager initialized");
+        
+        // Initialize mod loader to enable Python mods
+        modLoader = new ModLoader(this);
+        modLoader.init();
+        System.out.println("[Game] Mod loader initialized");
         
         // Set up input callbacks for UI
         inputHandler.setKeyPressCallback(key -> uiManager.onKeyPress(key, 0));
@@ -259,6 +266,12 @@ public class Game {
     private void cleanup() {
         System.out.println("[Game] Cleaning up...");
         
+        // Shutdown mod loader
+        if (modLoader != null) {
+            modLoader.shutdown();
+            System.out.println("[Game] Mod loader shut down");
+        }
+        
         // Cleanup UI
         if (uiManager != null) {
             uiManager.cleanup();
@@ -412,5 +425,14 @@ public class Game {
      */
     public Camera getCamera() {
         return camera;
+    }
+    
+    /**
+     * Gets the mod loader instance.
+     * 
+     * @return The mod loader
+     */
+    public ModLoader getModLoader() {
+        return modLoader;
     }
 }

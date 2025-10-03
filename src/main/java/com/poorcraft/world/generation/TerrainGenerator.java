@@ -1,5 +1,7 @@
 package com.poorcraft.world.generation;
 
+import com.poorcraft.modding.EventBus;
+import com.poorcraft.modding.events.ChunkGenerateEvent;
 import com.poorcraft.world.block.BlockType;
 import com.poorcraft.world.chunk.Chunk;
 
@@ -16,6 +18,7 @@ public class TerrainGenerator {
     private final SimplexNoise heightNoise;
     private final SimplexNoise detailNoise;
     private final BiomeGenerator biomeGenerator;
+    private EventBus eventBus;
     
     private static final double HEIGHT_SCALE = 0.005;   // Scale for primary height noise
     private static final double DETAIL_SCALE = 0.02;    // Scale for detail noise
@@ -33,6 +36,16 @@ public class TerrainGenerator {
         this.heightNoise = new SimplexNoise(seed);
         this.detailNoise = new SimplexNoise(seed + 500);  // Different seed for detail
         this.biomeGenerator = new BiomeGenerator(seed);
+        this.eventBus = null;
+    }
+    
+    /**
+     * Sets the event bus for firing mod events.
+     * 
+     * @param eventBus Event bus instance
+     */
+    public void setEventBus(EventBus eventBus) {
+        this.eventBus = eventBus;
     }
     
     /**
@@ -82,6 +95,11 @@ public class TerrainGenerator {
                 // Fill column with blocks
                 fillColumn(chunk, x, z, height, biome);
             }
+        }
+        
+        // Fire mod event for chunk generation (mods can modify terrain)
+        if (eventBus != null) {
+            eventBus.fire(new ChunkGenerateEvent(chunk.getPosition().x, chunk.getPosition().z, chunk));
         }
     }
     

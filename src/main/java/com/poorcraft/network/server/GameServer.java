@@ -1,6 +1,9 @@
 package com.poorcraft.network.server;
 
 import com.poorcraft.config.Settings;
+import com.poorcraft.modding.EventBus;
+import com.poorcraft.modding.events.PlayerJoinEvent;
+import com.poorcraft.modding.events.PlayerLeaveEvent;
 import com.poorcraft.network.packet.*;
 import com.poorcraft.world.ChunkManager;
 import com.poorcraft.world.World;
@@ -51,6 +54,7 @@ public class GameServer {
     private volatile boolean running;
     private ScheduledExecutorService tickExecutor;
     private long lastKeepAlive;
+    private EventBus eventBus;
     
     /**
      * Creates a new game server.
@@ -65,6 +69,16 @@ public class GameServer {
         this.nextPlayerId = new AtomicInteger(1);
         this.running = false;
         this.lastKeepAlive = System.currentTimeMillis();
+        this.eventBus = null;
+    }
+    
+    /**
+     * Sets the event bus for firing mod events.
+     * 
+     * @param eventBus Event bus instance
+     */
+    public void setEventBus(EventBus eventBus) {
+        this.eventBus = eventBus;
     }
     
     /**
@@ -228,6 +242,11 @@ public class GameServer {
         // Send login success
         session.sendPacket(new LoginResponsePacket(session.getPlayerId(), spawnX, spawnY, spawnZ, world.getSeed()));
         
+        // Fire mod event for player join
+        if (eventBus != null) {
+            eventBus.fire(new PlayerJoinEvent(session.getPlayerId(), username, spawnX, spawnY, spawnZ));
+        }
+        
         // Broadcast player spawn to all other players
         PlayerSpawnPacket spawnPacket = new PlayerSpawnPacket(
                 session.getPlayerId(), username, spawnX, spawnY, spawnZ, 0, 0
@@ -258,6 +277,11 @@ public class GameServer {
      * @param session Player session
      */
     public void onPlayerDisconnect(PlayerSession session) {
+        // Fire mod event for player leave
+        if (eventBus != null && session.isLoggedIn()) {
+            eventBus.fire(new PlayerLeaveEvent(session.getPlayerId(), session.getUsername(), "Disconnected"));
+        }
+        
         players.remove(session.getPlayerId());
         
         if (session.isLoggedIn()) {
