@@ -208,4 +208,22 @@ public class Camera {
     public void setMouseSensitivity(float mouseSensitivity) {
         this.mouseSensitivity = mouseSensitivity;
     }
+    
+    /**
+     * Gets camera yaw rotation.
+     * 
+     * @return Yaw in degrees
+     */
+    public float getYaw() {
+        return yaw;
+    }
+    
+    /**
+     * Gets camera pitch rotation.
+     * 
+     * @return Pitch in degrees
+     */
+    public float getPitch() {
+        return pitch;
+    }
 }

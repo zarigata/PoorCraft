@@ -39,6 +39,7 @@ public class Game {
     
     private boolean running;
     private boolean worldLoaded;  // Track if world is loaded
+    private boolean multiplayerMode;  // Flag indicating if game is in multiplayer mode
     
     private static final float FIXED_TIME_STEP = 1.0f / 60.0f;  // 60 updates per second
     
@@ -53,6 +54,7 @@ public class Game {
         this.configManager = configManager;
         this.running = false;
         this.worldLoaded = false;
+        this.multiplayerMode = false;
     }
     
     /**
@@ -195,7 +197,8 @@ public class Game {
         
         // Update chunk manager with camera position
         // This handles dynamic chunk loading/unloading as player moves
-        if (worldLoaded) {
+        // In multiplayer mode, chunk loading is handled by network client, not ChunkManager
+        if (worldLoaded && !multiplayerMode && chunkManager != null) {
             chunkManager.update(camera.getPosition());
         }
     }
@@ -325,19 +328,57 @@ public class Game {
     public void createWorld(long seed, boolean generateStructures) {
         System.out.println("[Game] Creating world with seed: " + seed);
         
-        // Initialize world
-        world = new World(seed, generateStructures);
+        // Check if multiplayer mode
+        if (multiplayerMode) {
+            // In multiplayer, world comes from network client, skip local generation
+            System.out.println("[Game] Multiplayer world loaded");
+        } else {
+            // Single-player: create local world
+            // Initialize world
+            world = new World(seed, generateStructures);
+            
+            // Initialize chunk manager
+            chunkManager = new ChunkManager(
+                world,
+                settings.world.chunkLoadDistance,
+                settings.world.chunkUnloadDistance
+            );
+            
+            // Initial chunk load around spawn
+            chunkManager.update(camera.getPosition());
+            System.out.println("[Game] World initialized with seed: " + world.getSeed());
+        }
         
-        // Initialize chunk manager
-        chunkManager = new ChunkManager(
-            world,
-            settings.world.chunkLoadDistance,
-            settings.world.chunkUnloadDistance
-        );
+        // Initialize chunk renderer if not already initialized
+        if (chunkRenderer == null) {
+            chunkRenderer = new ChunkRenderer();
+            chunkRenderer.init();
+            System.out.println("[Game] Chunk renderer initialized");
+        }
         
-        // Initial chunk load around spawn
-        chunkManager.update(camera.getPosition());
-        System.out.println("[Game] World initialized with seed: " + world.getSeed());
+        // Set up chunk unload callback
+        if (world != null) {
+            world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
+        }
+        
+        // Mark world as loaded
+        worldLoaded = true;
+        
+        // Cursor grabbing is now handled by UIManager.setState() when transitioning to IN_GAME
+        // No need to manually grab here anymore. One less thing to worry about!
+        
+        System.out.println("[Game] World creation complete!");
+    }
+    
+    /**
+     * Sets the world for multiplayer mode.
+     * Called by UIManager when connecting to a server.
+     * 
+     * @param world Remote world from network client
+     */
+    public void setWorld(World world) {
+        this.multiplayerMode = true;
+        this.world = world;
         
         // Initialize chunk renderer if not already initialized
         if (chunkRenderer == null) {
@@ -352,10 +393,16 @@ public class Game {
         // Mark world as loaded
         worldLoaded = true;
         
-        // Cursor grabbing is now handled by UIManager.setState() when transitioning to IN_GAME
-        // No need to manually grab here anymore. One less thing to worry about!
-        
-        System.out.println("[Game] World creation complete!");
+        System.out.println("[Game] Remote world set for multiplayer");
+    }
+    
+    /**
+     * Checks if game is in multiplayer mode.
+     * 
+     * @return True if multiplayer mode
+     */
+    public boolean isMultiplayerMode() {
+        return multiplayerMode;
     }
     
     /**

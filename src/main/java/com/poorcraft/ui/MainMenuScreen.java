@@ -59,13 +59,12 @@ public class MainMenuScreen extends UIScreen {
         );
         addComponent(singleplayerButton);
         
-        // Multiplayer button (disabled)
+        // Multiplayer button - now enabled with networking support
         Button multiplayerButton = new Button(
             buttonX, centerY + buttonHeight + buttonSpacing, buttonWidth, buttonHeight,
             "Multiplayer",
-            () -> {} // No action - disabled
+            () -> uiManager.setState(GameState.MULTIPLAYER_MENU)
         );
-        multiplayerButton.setEnabled(false);
         addComponent(multiplayerButton);
         
         // Settings button

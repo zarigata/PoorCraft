@@ -8,8 +8,14 @@ package com.poorcraft.ui;
  * 
  * State transitions:
  * - MAIN_MENU -> WORLD_CREATION (Singleplayer button)
+ * - MAIN_MENU -> MULTIPLAYER_MENU (Multiplayer button)
  * - MAIN_MENU -> SETTINGS_MENU (Settings button)
  * - WORLD_CREATION -> IN_GAME (Create World button)
+ * - MULTIPLAYER_MENU -> CONNECTING (Join Server button)
+ * - MULTIPLAYER_MENU -> HOSTING (Host Game button)
+ * - CONNECTING -> IN_GAME (connection success)
+ * - HOSTING -> IN_GAME (server started)
+ * - CONNECTING/HOSTING -> MAIN_MENU (connection failed)
  * - IN_GAME -> PAUSED (ESC key)
  * - PAUSED -> IN_GAME (Resume button)
  * - PAUSED -> SETTINGS_MENU (Settings button)
@@ -37,6 +43,24 @@ public enum GameState {
      * Configure seed, world name, and generation options.
      */
     WORLD_CREATION,
+    
+    /**
+     * Multiplayer menu screen.
+     * Shows server list, direct connect, and host game options.
+     */
+    MULTIPLAYER_MENU,
+    
+    /**
+     * Connecting to server loading screen.
+     * Shown while establishing connection and logging in.
+     */
+    CONNECTING,
+    
+    /**
+     * Hosting integrated server loading screen.
+     * Shown while starting server and connecting to it.
+     */
+    HOSTING,
     
     /**
      * Active gameplay state.
@@ -76,5 +100,23 @@ public enum GameState {
      */
     public boolean capturesMouse() {
         return this == IN_GAME;
+    }
+    
+    /**
+     * Checks if this state is a multiplayer-related state.
+     * 
+     * @return True if state is MULTIPLAYER_MENU, CONNECTING, or HOSTING
+     */
+    public boolean isMultiplayer() {
+        return this == MULTIPLAYER_MENU || this == CONNECTING || this == HOSTING;
+    }
+    
+    /**
+     * Checks if this state is a loading state.
+     * 
+     * @return True if state is CONNECTING or HOSTING
+     */
+    public boolean isLoading() {
+        return this == CONNECTING || this == HOSTING;
     }
 }

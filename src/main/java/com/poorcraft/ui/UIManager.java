@@ -2,6 +2,8 @@ package com.poorcraft.ui;
 
 import com.poorcraft.config.ConfigManager;
 import com.poorcraft.config.Settings;
+import com.poorcraft.network.client.GameClient;
+import com.poorcraft.network.server.GameServer;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -41,6 +43,10 @@ public class UIManager {
     // Input handling for cursor management
     private Object inputHandler;  // Will be set by Game
     private long windowHandle;    // GLFW window handle
+    
+    // Networking
+    private GameClient gameClient;  // Network client (null when not connected)
+    private GameServer gameServer;  // Integrated server (null when not hosting)
     
     /**
      * Creates a new UI manager.
@@ -114,6 +120,16 @@ public class UIManager {
         // Pause menu
         PauseScreen pauseScreen = new PauseScreen(windowWidth, windowHeight, this);
         screens.put(GameState.PAUSED, pauseScreen);
+        
+        // Multiplayer screens
+        MultiplayerMenuScreen multiplayerMenuScreen = new MultiplayerMenuScreen(windowWidth, windowHeight, this);
+        screens.put(GameState.MULTIPLAYER_MENU, multiplayerMenuScreen);
+        
+        ConnectingScreen connectingScreen = new ConnectingScreen(windowWidth, windowHeight, this);
+        screens.put(GameState.CONNECTING, connectingScreen);
+        
+        HostingScreen hostingScreen = new HostingScreen(windowWidth, windowHeight, this);
+        screens.put(GameState.HOSTING, hostingScreen);
         
         // HUD
         hudScreen = new HUD(windowWidth, windowHeight, game);
@@ -204,6 +220,33 @@ public class UIManager {
      * @param deltaTime Time since last frame in seconds
      */
     public void update(float deltaTime) {
+        // Update network client if connected
+        if (gameClient != null && gameClient.isConnected()) {
+            gameClient.tick();
+            
+            // Send player movement if in game
+            if (currentState == GameState.IN_GAME) {
+                try {
+                    var gameClass = game.getClass();
+                    var cameraMethod = gameClass.getMethod("getCamera");
+                    var camera = cameraMethod.invoke(game);
+                    
+                    var cameraClass = camera.getClass();
+                    var posMethod = cameraClass.getMethod("getPosition");
+                    var yawMethod = cameraClass.getMethod("getYaw");
+                    var pitchMethod = cameraClass.getMethod("getPitch");
+                    
+                    var pos = (org.joml.Vector3f) posMethod.invoke(camera);
+                    float yaw = (float) yawMethod.invoke(camera);
+                    float pitch = (float) pitchMethod.invoke(camera);
+                    
+                    gameClient.sendMovement(pos.x, pos.y, pos.z, yaw, pitch, false);
+                } catch (Exception e) {
+                    // Silently ignore - not critical
+                }
+            }
+        }
+        
         if (currentState == GameState.IN_GAME || currentState == GameState.PAUSED) {
             if (hudScreen != null) {
                 hudScreen.update(deltaTime);
@@ -430,10 +473,226 @@ public class UIManager {
     }
     
     /**
+     * Connects to a multiplayer server.
+     * 
+     * @param host Server hostname/IP
+     * @param port Server port
+     */
+    public void connectToServer(String host, int port) {
+        System.out.println("[UIManager] Connecting to " + host + ":" + port);
+        
+        // Create game client
+        String username = settings.multiplayer.username;
+        gameClient = new GameClient(host, port, username);
+        
+        // Set disconnect callback
+        gameClient.setDisconnectCallback(reason -> onConnectionFailed(reason));
+        
+        // Transition to connecting state
+        setState(GameState.CONNECTING);
+        
+        // Update status
+        ConnectingScreen screen = (ConnectingScreen) screens.get(GameState.CONNECTING);
+        if (screen != null) {
+            screen.setStatus("Establishing connection...");
+        }
+        
+        // Connect in background thread
+        new Thread(() -> {
+            try {
+                gameClient.connect();
+                // Wait a bit for login response
+                Thread.sleep(1000);
+                
+                if (gameClient.isConnected() && gameClient.getRemoteWorld() != null) {
+                    onConnectionSuccess();
+                }
+            } catch (Exception e) {
+                onConnectionFailed("Connection failed: " + e.getMessage());
+            }
+        }).start();
+    }
+    
+    /**
+     * Hosts an integrated server.
+     * 
+     * @param port Server port
+     * @param seed World seed
+     * @param generateStructures Generate structures flag
+     */
+    public void hostServer(int port, long seed, boolean generateStructures) {
+        System.out.println("[UIManager] Hosting server on port " + port);
+        
+        // Create game server
+        gameServer = new GameServer(port, settings);
+        
+        // Transition to hosting state
+        setState(GameState.HOSTING);
+        
+        // Update status
+        HostingScreen screen = (HostingScreen) screens.get(GameState.HOSTING);
+        if (screen != null) {
+            screen.setStatus("Initializing server...");
+        }
+        
+        // Start server in background thread
+        new Thread(() -> {
+            try {
+                gameServer.start(seed, generateStructures);
+                
+                if (screen != null) {
+                    screen.setStatus("Connecting to local server...");
+                }
+                
+                // Connect client to localhost
+                Thread.sleep(500);  // Give server time to start
+                connectToServer("localhost", port);
+                
+            } catch (Exception e) {
+                onHostingFailed("Server startup failed: " + e.getMessage());
+            }
+        }).start();
+    }
+    
+    /**
+     * Called when connection succeeds.
+     */
+    private void onConnectionSuccess() {
+        System.out.println("[UIManager] Connection successful");
+        
+        // Get remote world from client
+        try {
+            var world = gameClient.getRemoteWorld();
+            
+            // Pass remote world to game
+            var gameClass = game.getClass();
+            var method = gameClass.getMethod("setWorld", com.poorcraft.world.World.class);
+            method.invoke(game, world);
+            
+            // Transition to in-game state
+            setState(GameState.IN_GAME);
+        } catch (Exception e) {
+            System.err.println("[UIManager] Failed to set remote world: " + e.getMessage());
+            e.printStackTrace();
+            onConnectionFailed("Failed to load world");
+        }
+    }
+    
+    /**
+     * Called when connection fails.
+     * 
+     * @param reason Failure reason
+     */
+    private void onConnectionFailed(String reason) {
+        System.err.println("[UIManager] Connection failed: " + reason);
+        
+        // Disconnect client if connected
+        if (gameClient != null) {
+            gameClient.disconnect();
+            gameClient = null;
+        }
+        
+        // Stop server if running
+        if (gameServer != null) {
+            gameServer.stop();
+            gameServer = null;
+        }
+        
+        // Return to multiplayer menu
+        setState(GameState.MULTIPLAYER_MENU);
+        
+        // TODO: Show error dialog
+        System.err.println("[UIManager] Error: " + reason);
+    }
+    
+    /**
+     * Called when hosting fails.
+     * 
+     * @param reason Failure reason
+     */
+    private void onHostingFailed(String reason) {
+        System.err.println("[UIManager] Hosting failed: " + reason);
+        
+        // Stop server if running
+        if (gameServer != null) {
+            gameServer.stop();
+            gameServer = null;
+        }
+        
+        // Disconnect client if connected
+        if (gameClient != null) {
+            gameClient.disconnect();
+            gameClient = null;
+        }
+        
+        // Return to multiplayer menu
+        setState(GameState.MULTIPLAYER_MENU);
+        
+        // TODO: Show error dialog
+        System.err.println("[UIManager] Error: " + reason);
+    }
+    
+    /**
+     * Disconnects from server and stops integrated server if running.
+     */
+    public void disconnectFromServer() {
+        if (gameClient != null && gameClient.isConnected()) {
+            gameClient.disconnect();
+            gameClient = null;
+        }
+        
+        if (gameServer != null && gameServer.isRunning()) {
+            gameServer.stop();
+            gameServer = null;
+        }
+        
+        setState(GameState.MAIN_MENU);
+    }
+    
+    /**
+     * Gets the game client.
+     * 
+     * @return Game client (may be null)
+     */
+    public GameClient getGameClient() {
+        return gameClient;
+    }
+    
+    /**
+     * Gets the game server.
+     * 
+     * @return Game server (may be null)
+     */
+    public GameServer getGameServer() {
+        return gameServer;
+    }
+    
+    /**
+     * Checks if in multiplayer mode.
+     * 
+     * @return True if connected to a server
+     */
+    public boolean isMultiplayer() {
+        return gameClient != null && gameClient.isConnected();
+    }
+    
+    /**
+     * Checks if hosting a server.
+     * 
+     * @return True if server is running
+     */
+    public boolean isHosting() {
+        return gameServer != null && gameServer.isRunning();
+    }
+    
+    /**
      * Cleans up UI resources.
      */
     public void cleanup() {
         System.out.println("[UIManager] Cleaning up UI system");
+        
+        // Disconnect from server
+        disconnectFromServer();
         
         if (uiRenderer != null) {
             uiRenderer.cleanup();
