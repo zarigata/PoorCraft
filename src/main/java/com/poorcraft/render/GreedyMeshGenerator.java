@@ -305,41 +305,41 @@ public class GreedyMeshGenerator {
         
         // Add 4 vertices for the quad
         // Vertex order depends on direction to ensure correct winding
-        if (direction == 0) { // Top
-            // v0: (x0, y0, z0)
-            vertices.add(x0); vertices.add(y0); vertices.add(z0);
+        if (direction == 0) { // Top (+Y) - ensure CCW winding when viewed from above
+            float y = depth + 1;
+
+            vertices.add(x0); vertices.add(y); vertices.add(z0);
             vertices.add(u0); vertices.add(v0);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            // v1: (x1, y0, z0)
-            vertices.add(x1); vertices.add(y1); vertices.add(z0);
-            vertices.add(u1); vertices.add(v0);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            // v2: (x1, y0, z1)
-            vertices.add(x1); vertices.add(y1); vertices.add(z1);
-            vertices.add(u1); vertices.add(v1);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            // v3: (x0, y0, z1)
-            vertices.add(x0); vertices.add(y0); vertices.add(z1);
+
+            vertices.add(x0); vertices.add(y); vertices.add(z1);
             vertices.add(u0); vertices.add(v1);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
-        } else if (direction == 1) { // Bottom
-            vertices.add(x0); vertices.add(y0); vertices.add(z0);
+
+            vertices.add(x1); vertices.add(y); vertices.add(z1);
+            vertices.add(u1); vertices.add(v1);
+            vertices.add(nx); vertices.add(ny); vertices.add(nz);
+
+            vertices.add(x1); vertices.add(y); vertices.add(z0);
+            vertices.add(u1); vertices.add(v0);
+            vertices.add(nx); vertices.add(ny); vertices.add(nz);
+        } else if (direction == 1) { // Bottom (-Y) - ensure CCW winding when viewed from below
+            float y = depth;
+
+            vertices.add(x0); vertices.add(y); vertices.add(z0);
             vertices.add(u0); vertices.add(v0);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x0); vertices.add(y1); vertices.add(z1);
-            vertices.add(u0); vertices.add(v1);
+
+            vertices.add(x1); vertices.add(y); vertices.add(z0);
+            vertices.add(u1); vertices.add(v0);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x1); vertices.add(y1); vertices.add(z1);
+
+            vertices.add(x1); vertices.add(y); vertices.add(z1);
             vertices.add(u1); vertices.add(v1);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x1); vertices.add(y0); vertices.add(z0);
-            vertices.add(u1); vertices.add(v0);
+
+            vertices.add(x0); vertices.add(y); vertices.add(z1);
+            vertices.add(u0); vertices.add(v1);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
         } else if (direction == 2) { // North
             vertices.add(x0); vertices.add(y0); vertices.add(z0);
@@ -377,32 +377,32 @@ public class GreedyMeshGenerator {
             vertices.add(x0); vertices.add(y0); vertices.add(z0);
             vertices.add(u0); vertices.add(v0);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x1); vertices.add(y0); vertices.add(z1);
+
+            vertices.add(x0); vertices.add(y1); vertices.add(z0);
             vertices.add(u0); vertices.add(v1);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x1); vertices.add(y1); vertices.add(z1);
+
+            vertices.add(x0); vertices.add(y1); vertices.add(z1);
             vertices.add(u1); vertices.add(v1);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x0); vertices.add(y1); vertices.add(z0);
+
+            vertices.add(x0); vertices.add(y0); vertices.add(z1);
             vertices.add(u1); vertices.add(v0);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
         } else { // East
             vertices.add(x0); vertices.add(y0); vertices.add(z0);
             vertices.add(u0); vertices.add(v0);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x1); vertices.add(y1); vertices.add(z0);
+
+            vertices.add(x0); vertices.add(y0); vertices.add(z1);
             vertices.add(u0); vertices.add(v1);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x1); vertices.add(y1); vertices.add(z1);
+
+            vertices.add(x0); vertices.add(y1); vertices.add(z1);
             vertices.add(u1); vertices.add(v1);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x0); vertices.add(y0); vertices.add(z1);
+
+            vertices.add(x0); vertices.add(y1); vertices.add(z0);
             vertices.add(u1); vertices.add(v0);
             vertices.add(nx); vertices.add(ny); vertices.add(nz);
         }
