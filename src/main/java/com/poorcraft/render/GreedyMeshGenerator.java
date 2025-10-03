@@ -303,108 +303,97 @@ public class GreedyMeshGenerator {
         float u1 = atlasU0 + (atlasU1 - atlasU0) * quadWidth;
         float v1 = atlasV0 + (atlasV1 - atlasV0) * quadHeight;
         
-        // Add 4 vertices for the quad
-        // Vertex order depends on direction to ensure correct winding
-        if (direction == 0) { // Top (+Y) - ensure CCW winding when viewed from above
-            float y = depth + 1;
+        float[][] positions = new float[4][3];
+        float[][] uvs;
 
-            vertices.add(x0); vertices.add(y); vertices.add(z0);
-            vertices.add(u0); vertices.add(v0);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
+        switch (direction) {
+            case 0 -> { // Top (+Y)
+                float y = depth + 1;
+                positions[0] = new float[]{x0, y, z0};
+                positions[1] = new float[]{x1, y, z0};
+                positions[2] = new float[]{x1, y, z1};
+                positions[3] = new float[]{x0, y, z1};
+                uvs = new float[][]{
+                    {u0, v0},
+                    {u1, v0},
+                    {u1, v1},
+                    {u0, v1}
+                };
+            }
+            case 1 -> { // Bottom (-Y)
+                float y = depth;
+                positions[0] = new float[]{x0, y, z1};
+                positions[1] = new float[]{x1, y, z1};
+                positions[2] = new float[]{x1, y, z0};
+                positions[3] = new float[]{x0, y, z0};
+                uvs = new float[][]{
+                    {u0, v1},
+                    {u1, v1},
+                    {u1, v0},
+                    {u0, v0}
+                };
+            }
+            case 2 -> { // North (-Z)
+                positions[0] = new float[]{x1, y0, z0};
+                positions[1] = new float[]{x0, y0, z0};
+                positions[2] = new float[]{x0, y1, z0};
+                positions[3] = new float[]{x1, y1, z0};
+                uvs = new float[][]{
+                    {u1, v0},
+                    {u0, v0},
+                    {u0, v1},
+                    {u1, v1}
+                };
+            }
+            case 3 -> { // South (+Z)
+                positions[0] = new float[]{x0, y0, z1};
+                positions[1] = new float[]{x0, y1, z1};
+                positions[2] = new float[]{x1, y1, z1};
+                positions[3] = new float[]{x1, y0, z1};
+                uvs = new float[][]{
+                    {u0, v0},
+                    {u0, v1},
+                    {u1, v1},
+                    {u1, v0}
+                };
+            }
+            case 4 -> { // West (-X)
+                positions[0] = new float[]{x0, y0, z1};
+                positions[1] = new float[]{x0, y0, z0};
+                positions[2] = new float[]{x0, y1, z0};
+                positions[3] = new float[]{x0, y1, z1};
+                uvs = new float[][]{
+                    {u1, v0},
+                    {u0, v0},
+                    {u0, v1},
+                    {u1, v1}
+                };
+            }
+            default -> { // East (+X)
+                positions[0] = new float[]{x1, y0, z0};
+                positions[1] = new float[]{x1, y0, z1};
+                positions[2] = new float[]{x1, y1, z1};
+                positions[3] = new float[]{x1, y1, z0};
+                uvs = new float[][]{
+                    {u0, v0},
+                    {u0, v1},
+                    {u1, v1},
+                    {u1, v0}
+                };
+            }
+        }
 
-            vertices.add(x0); vertices.add(y); vertices.add(z1);
-            vertices.add(u0); vertices.add(v1);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-
-            vertices.add(x1); vertices.add(y); vertices.add(z1);
-            vertices.add(u1); vertices.add(v1);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-
-            vertices.add(x1); vertices.add(y); vertices.add(z0);
-            vertices.add(u1); vertices.add(v0);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-        } else if (direction == 1) { // Bottom (-Y) - ensure CCW winding when viewed from below
-            float y = depth;
-
-            vertices.add(x0); vertices.add(y); vertices.add(z0);
-            vertices.add(u0); vertices.add(v0);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-
-            vertices.add(x1); vertices.add(y); vertices.add(z0);
-            vertices.add(u1); vertices.add(v0);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-
-            vertices.add(x1); vertices.add(y); vertices.add(z1);
-            vertices.add(u1); vertices.add(v1);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-
-            vertices.add(x0); vertices.add(y); vertices.add(z1);
-            vertices.add(u0); vertices.add(v1);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-        } else if (direction == 2) { // North
-            vertices.add(x0); vertices.add(y0); vertices.add(z0);
-            vertices.add(u0); vertices.add(v0);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x0); vertices.add(y1); vertices.add(z1);
-            vertices.add(u0); vertices.add(v1);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x1); vertices.add(y1); vertices.add(z1);
-            vertices.add(u1); vertices.add(v1);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x1); vertices.add(y0); vertices.add(z0);
-            vertices.add(u1); vertices.add(v0);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-        } else if (direction == 3) { // South
-            vertices.add(x0); vertices.add(y0); vertices.add(z0);
-            vertices.add(u0); vertices.add(v0);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x1); vertices.add(y0); vertices.add(z1);
-            vertices.add(u1); vertices.add(v0);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x1); vertices.add(y1); vertices.add(z1);
-            vertices.add(u1); vertices.add(v1);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-            
-            vertices.add(x0); vertices.add(y1); vertices.add(z0);
-            vertices.add(u0); vertices.add(v1);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-        } else if (direction == 4) { // West
-            vertices.add(x0); vertices.add(y0); vertices.add(z0);
-            vertices.add(u0); vertices.add(v0);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-
-            vertices.add(x0); vertices.add(y1); vertices.add(z0);
-            vertices.add(u0); vertices.add(v1);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-
-            vertices.add(x0); vertices.add(y1); vertices.add(z1);
-            vertices.add(u1); vertices.add(v1);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-
-            vertices.add(x0); vertices.add(y0); vertices.add(z1);
-            vertices.add(u1); vertices.add(v0);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-        } else { // East
-            vertices.add(x0); vertices.add(y0); vertices.add(z0);
-            vertices.add(u0); vertices.add(v0);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-
-            vertices.add(x0); vertices.add(y0); vertices.add(z1);
-            vertices.add(u0); vertices.add(v1);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-
-            vertices.add(x0); vertices.add(y1); vertices.add(z1);
-            vertices.add(u1); vertices.add(v1);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
-
-            vertices.add(x0); vertices.add(y1); vertices.add(z0);
-            vertices.add(u1); vertices.add(v0);
-            vertices.add(nx); vertices.add(ny); vertices.add(nz);
+        for (int i = 0; i < 4; i++) {
+            float[] pos = positions[i];
+            float[] uv = uvs[i];
+            vertices.add(pos[0]);
+            vertices.add(pos[1]);
+            vertices.add(pos[2]);
+            vertices.add(uv[0]);
+            vertices.add(uv[1]);
+            vertices.add(nx);
+            vertices.add(ny);
+            vertices.add(nz);
         }
         
         // Add indices for 2 triangles
