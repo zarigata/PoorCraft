@@ -96,12 +96,10 @@ public class ServerPacketHandler extends SimpleChannelInboundHandler<Packet> {
     }
     
     /**
-     * Handles keep-alive packet (echo back).
+     * Handles keep-alive packet.
      */
     private void handleKeepAlive(KeepAlivePacket packet) {
         session.updateKeepAlive();
-        // Echo packet back to client (ping-pong)
-        session.sendPacket(packet);
     }
     
     /**
