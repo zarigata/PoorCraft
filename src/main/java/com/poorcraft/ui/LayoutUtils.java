@@ -10,28 +10,8 @@ package com.poorcraft.ui;
  */
 public final class LayoutUtils {
 
-    private static final float BASE_WIDTH = 1920.0f;
-    private static final float BASE_HEIGHT = 1080.0f;
-
     private LayoutUtils() {
         // Static utility class
-    }
-
-    /**
-     * Computes a uniform UI scale factor relative to a baseline resolution.
-     * The scale grows proportionally with the window without any hard caps.
-     *
-     * @param windowWidth  current window width in pixels
-     * @param windowHeight current window height in pixels
-     * @return scale factor (defaults to 1 when dimensions are invalid)
-     */
-    public static float computeScale(int windowWidth, int windowHeight) {
-        if (windowWidth <= 0 || windowHeight <= 0) {
-            return 1.0f;
-        }
-        float widthScale = windowWidth / BASE_WIDTH;
-        float heightScale = windowHeight / BASE_HEIGHT;
-        return Math.min(widthScale, heightScale);
     }
 
     /**

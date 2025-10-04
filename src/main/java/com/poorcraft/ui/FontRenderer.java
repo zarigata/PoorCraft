@@ -252,22 +252,22 @@ public class FontRenderer {
         float width = 0;
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
-
+            
             if (c < FIRST_CHAR || c >= FIRST_CHAR + CHAR_COUNT) {
                 continue;
             }
-
+            
             STBTTBakedChar charInfo = charData.get(c - FIRST_CHAR);
             width += charInfo.xadvance();
         }
-
+        
         return width;
     }
     
     /**
      * Returns the approximate line height for this font.
      * 
-{{ ... }}
+     * @return Line height in pixels
      */
     public float getTextHeight() {
         return useFallback ? fontSize : lineHeight;
@@ -281,7 +281,7 @@ public class FontRenderer {
     public int getFontSize() {
         return fontSize;
     }
-
+    
     /**
      * Cleans up OpenGL resources.
      */

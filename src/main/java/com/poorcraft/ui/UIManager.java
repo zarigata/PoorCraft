@@ -49,7 +49,6 @@ public class UIManager {
     // Networking
     private GameClient gameClient;  // Network client (null when not connected)
     private GameServer gameServer;  // Integrated server (null when not hosting)
-    private float uiScale;
     
     /**
      * Creates a new UI manager.
@@ -67,7 +66,6 @@ public class UIManager {
         this.previousState = null;
         this.inputHandler = null;
         this.windowHandle = 0;
-        this.uiScale = 1.0f;
     }
     
     /**
@@ -97,8 +95,8 @@ public class UIManager {
         uiRenderer.init(windowWidth, windowHeight);
         
         // Initialize font renderer with Silkscreen font for that retro vibe
-        // Base size 80 keeps text crisp; individual screens adjust via uiScale
-        fontRenderer = new FontRenderer(uiRenderer, 80);
+        // Using size 20 for better readability with the pixelated font
+        fontRenderer = new FontRenderer(uiRenderer, 20);
         try {
             // Try to load Silkscreen font (the one we just added!)
             fontRenderer.init("src/main/resources/fonts/Silkscreen-Regular.ttf");
@@ -107,9 +105,6 @@ public class UIManager {
             System.err.println("[UIManager] Failed to load Silkscreen font, using fallback: " + e.getMessage());
             // Font renderer will handle fallback internally (probably system font)
         }
-
-        // Compute initial UI scale relative to window size
-        uiScale = LayoutUtils.computeScale(windowWidth, windowHeight);
         
         // Create all screens
         System.out.println("[UIManager] Creating UI screens...");
@@ -145,12 +140,6 @@ public class UIManager {
         
         // HUD
         hudScreen = new HUD(windowWidth, windowHeight, game);
-
-        applyGlobalScale(uiScale);
-
-        if (hudScreen != null) {
-            hudScreen.init();
-        }
 
         System.out.println("[UIManager] Created " + screens.size() + " screens");
         
@@ -404,9 +393,6 @@ public class UIManager {
      */
     public void onResize(int width, int height) {
         uiRenderer.updateProjection(width, height);
-
-        uiScale = LayoutUtils.computeScale(width, height);
-        applyGlobalScale(uiScale);
         
         for (UIScreen screen : screens.values()) {
             screen.onResize(width, height);
@@ -416,6 +402,7 @@ public class UIManager {
             hudScreen.onResize(width, height);
         }
     }
+    
     /**
      * Creates a new world and transitions to in-game state.
      * This is called from the world creation screen.
@@ -484,15 +471,6 @@ public class UIManager {
      */
     public Settings getSettings() {
         return settings;
-    }
-
-    private void applyGlobalScale(float scale) {
-        for (UIScreen screen : screens.values()) {
-            screen.setUIScale(scale);
-        }
-        if (hudScreen != null) {
-            hudScreen.setUIScale(scale);
-        }
     }
     
     /**
