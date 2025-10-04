@@ -18,6 +18,10 @@ public class MainMenuScreen extends UIScreen {
     private UIManager uiManager;
     private MenuBackground background;
     private float animationTime = 0.0f;
+    private float panelX;
+    private float panelY;
+    private float panelWidth;
+    private float panelHeight;
     
     /**
      * Creates the main menu screen.
@@ -34,79 +38,64 @@ public class MainMenuScreen extends UIScreen {
     
     @Override
     public void init() {
-        // Clear old components to start fresh
         clearComponents();
         
-        // Layout calculations - PROPORTIONAL TO SCREEN SIZE
-        float centerX = windowWidth / 2.0f;
+        panelWidth = clamp(windowWidth * 0.72f, 560f, Math.max(560f, windowWidth - 80f));
+        panelHeight = clamp(windowHeight * 0.72f, 460f, Math.max(460f, windowHeight - 80f));
+        panelX = (windowWidth - panelWidth) / 2.0f;
+        panelY = (windowHeight - panelHeight) / 2.0f;
         
-        // Button dimensions scale with screen size (75% of width)
-        // This ensures buttons look the same at ANY resolution
-        float buttonWidth = windowWidth * 0.75f;  // 75% of screen width
-        float buttonHeight = windowHeight * 0.055f;  // ~5.5% of screen height (proportional)
-        float buttonSpacing = buttonHeight * 0.25f;  // Spacing scales with button height
+        float centerX = panelX + panelWidth / 2.0f;
         
-        // Calculate vertical centering
-        float totalMenuHeight = (buttonHeight * 4) + (buttonSpacing * 3);
-        float topMargin = (windowHeight - totalMenuHeight) / 2.0f - 60f;  // -60 for title space
+        float titleScale = Math.max(1.8f, panelWidth / 520f);
+        float subtitleScale = Math.max(1.05f, titleScale * 0.55f);
         
-        // Title
-        float titleY = clamp(topMargin * 0.6f, 30f, 100f);
-        Label titleLabel = new Label(centerX, titleY, "PoorCraft",
-            0.0f, 0.95f, 0.95f, 1.0f);  // Cyan
+        float titleBaseline = panelY + panelHeight * 0.2f;
+        Label titleLabel = new Label(centerX, titleBaseline, "PoorCraft",
+            0.0f, 0.95f, 0.95f, 1.0f);
         titleLabel.setCentered(true);
+        titleLabel.setScale(titleScale);
         addComponent(titleLabel);
         
-        // Subtitle
-        float subtitleY = titleY + 28f;
-        Label subtitleLabel = new Label(centerX, subtitleY, "RETRO EDITION",
-            0.98f, 0.26f, 0.63f, 0.9f);  // Pink
+        float subtitleBaseline = titleBaseline + 48f * (titleScale * 0.55f);
+        Label subtitleLabel = new Label(centerX, subtitleBaseline, "Retro Edition",
+            0.98f, 0.26f, 0.63f, 0.92f);
         subtitleLabel.setCentered(true);
+        subtitleLabel.setScale(subtitleScale);
         addComponent(subtitleLabel);
         
-        // Button starting position
-        float buttonX = centerX - buttonWidth / 2;
-        float firstButtonY = topMargin + 80f;
+        float buttonWidth = panelWidth - 96f;
+        float buttonHeight = clamp(panelHeight * 0.16f, 82f, 158f);
+        float buttonSpacing = Math.max(32f, buttonHeight * 0.38f);
+        float buttonX = panelX + (panelWidth - buttonWidth) / 2.0f;
+        float firstButtonY = subtitleBaseline + buttonSpacing;
         
-        // Create buttons with MenuButton (not VaporwaveButton)
-        MenuButton singleplayerButton = new MenuButton(
-            buttonX, firstButtonY, 
-            buttonWidth, buttonHeight,
-            "SINGLEPLAYER",
-            () -> uiManager.setState(GameState.WORLD_CREATION)
-        );
+        MenuButton singleplayerButton = new MenuButton(buttonX, firstButtonY,
+            buttonWidth, buttonHeight, "SINGLEPLAYER",
+            () -> uiManager.setState(GameState.WORLD_CREATION));
         addComponent(singleplayerButton);
         
-        MenuButton multiplayerButton = new MenuButton(
-            buttonX, firstButtonY + (buttonHeight + buttonSpacing), 
-            buttonWidth, buttonHeight,
-            "MULTIPLAYER",
-            () -> uiManager.setState(GameState.MULTIPLAYER_MENU)
-        );
+        MenuButton multiplayerButton = new MenuButton(buttonX, firstButtonY + buttonHeight + buttonSpacing,
+            buttonWidth, buttonHeight, "MULTIPLAYER",
+            () -> uiManager.setState(GameState.MULTIPLAYER_MENU));
         addComponent(multiplayerButton);
         
-        MenuButton settingsButton = new MenuButton(
-            buttonX, firstButtonY + (buttonHeight + buttonSpacing) * 2, 
-            buttonWidth, buttonHeight,
-            "SETTINGS",
-            () -> uiManager.setState(GameState.SETTINGS_MENU)
-        );
+        MenuButton settingsButton = new MenuButton(buttonX, firstButtonY + (buttonHeight + buttonSpacing) * 2,
+            buttonWidth, buttonHeight, "SETTINGS",
+            () -> uiManager.setState(GameState.SETTINGS_MENU));
         addComponent(settingsButton);
         
-        MenuButton quitButton = new MenuButton(
-            buttonX, firstButtonY + (buttonHeight + buttonSpacing) * 3, 
-            buttonWidth, buttonHeight,
-            "QUIT",
-            () -> uiManager.quit()
-        );
+        MenuButton quitButton = new MenuButton(buttonX, firstButtonY + (buttonHeight + buttonSpacing) * 3,
+            buttonWidth, buttonHeight, "QUIT",
+            () -> uiManager.quit());
         addComponent(quitButton);
         
-        // Footer
-        float footerY = windowHeight - 25f;
-        Label footerLabel = new Label(centerX, footerY,
-            "~ Press buttons to navigate - they're the rectangles! ~",
-            0.7f, 0.5f, 0.9f, 0.7f);
+        float footerBaseline = panelY + panelHeight - 30f;
+        Label footerLabel = new Label(centerX, footerBaseline,
+            "Press a button to explore PoorCraft",
+            0.7f, 0.5f, 0.9f, 0.85f);
         footerLabel.setCentered(true);
+        footerLabel.setScale(Math.max(0.95f, panelWidth / 760f));
         addComponent(footerLabel);
         
         System.out.println("[MainMenuScreen] Layout initialized for " + windowWidth + "x" + windowHeight);
@@ -143,15 +132,21 @@ public class MainMenuScreen extends UIScreen {
     
     @Override
     public void render(UIRenderer renderer, FontRenderer fontRenderer) {
-        // Render textured background (block textures at 20% opacity)
         background.render(renderer, windowWidth, windowHeight);
         
-        // Optional: Add subtle scanline effect for retro CRT feel
-        float scanlineY = (animationTime * 30) % windowHeight;
-        renderer.drawRect(0, scanlineY, windowWidth, 2,
-            0.0f, 0.95f, 0.95f, 0.08f);  // Subtle cyan scanline
+        renderer.drawRect(panelX, panelY, panelWidth, panelHeight,
+            0.07f, 0.09f, 0.12f, 0.92f);
         
-        // Render all UI components (buttons, labels, etc.)
+        float border = Math.max(2f, panelWidth * 0.003f);
+        renderer.drawRect(panelX, panelY, panelWidth, border,
+            0.0f, 0.95f, 0.95f, 0.8f);
+        renderer.drawRect(panelX, panelY + panelHeight - border, panelWidth, border,
+            0.0f, 0.95f, 0.95f, 0.8f);
+        renderer.drawRect(panelX, panelY, border, panelHeight,
+            0.0f, 0.95f, 0.95f, 0.8f);
+        renderer.drawRect(panelX + panelWidth - border, panelY, border, panelHeight,
+            0.0f, 0.95f, 0.95f, 0.8f);
+        
         super.render(renderer, fontRenderer);
     }
     

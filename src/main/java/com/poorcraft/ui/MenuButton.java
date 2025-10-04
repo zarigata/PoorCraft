@@ -1,32 +1,28 @@
 package com.poorcraft.ui;
 
+import com.poorcraft.render.Texture;
+import com.poorcraft.resources.ResourceManager;
+
 /**
- * Simple, reliable menu button with a classic stone background.
- * 
- * Inspired by the vintage Minecraft menus: muted greys with a subtle highlight
- * that brightens on hover and darkens when pressed. No gradients, no surprises –
- * just a clean rectangle that is easy to see and interact with at any scale.
+ * Textured menu button rendered with the asset in {@code UI_FILES/button.png}.
+ * Typography scales with the component height so captions remain legible across
+ * resolutions while tint overlays provide hover and press feedback.
  */
 public class MenuButton extends UIComponent {
     
-    // Classic stone palette – neutral base with subtle hover bloom
-    private static final float[] BG_NORMAL = {0.36f, 0.36f, 0.36f, 0.96f};      // Stone grey
-    private static final float[] BG_HOVER = {0.46f, 0.46f, 0.46f, 0.98f};       // Lightened
-    private static final float[] BG_PRESSED = {0.26f, 0.26f, 0.26f, 0.98f};     // Darkened
-    private static final float[] BG_DISABLED = {0.18f, 0.18f, 0.18f, 0.6f};     // Dimmed
+    private static final float[] ACTIVE_TEXT = {1f, 1f, 1f, 1f};
+    private static final float[] DISABLED_TEXT = {0.65f, 0.65f, 0.65f, 0.7f};
+    private static final float[] BASE_TINT = {0.18f, 0.18f, 0.18f};
+    private static final float[] HOVER_TINT = {0.05f, 0.26f, 0.34f};
+    private static final String BUTTON_TEXTURE_PATH = "UI_FILES/button.png";
     
-    // Borders pick up the classic bevel highlight
-    private static final float[] BORDER_NORMAL = {0.82f, 0.82f, 0.82f, 0.9f};   // Soft highlight
-    private static final float[] BORDER_HOVER = {0.95f, 0.95f, 0.95f, 0.95f};   // Brighter edge
-    private static final float[] BORDER_DISABLED = {0.45f, 0.45f, 0.45f, 0.5f}; // Muted
-    
-    private static final float[] TEXT_COLOR = {1.0f, 1.0f, 1.0f, 1.0f};         // White
-    private static final float[] TEXT_DISABLED = {0.5f, 0.5f, 0.5f, 0.6f};      // Gray
+    private static Texture buttonTexture;
+    private static boolean textureLoadAttempted;
     
     private String text;
     private Runnable onClick;
     private boolean pressed;
-    private float hoverTransition;  // 0.0 = normal, 1.0 = hover
+    private float hoverTransition;
     
     /**
      * Creates a new menu button.
@@ -48,74 +44,67 @@ public class MenuButton extends UIComponent {
     
     @Override
     public void render(UIRenderer renderer, FontRenderer fontRenderer) {
-        if (!visible) return;
-        
-        // Pick colors based on state
-        float[] bgColor, borderColor, textColor;
-        
-        if (!enabled) {
-            bgColor = BG_DISABLED;
-            borderColor = BORDER_DISABLED;
-            textColor = TEXT_DISABLED;
-        } else if (pressed) {
-            bgColor = BG_PRESSED;
-            borderColor = BORDER_HOVER;
-            textColor = TEXT_COLOR;
-        } else {
-            // Smooth transition between normal and hover
-            bgColor = lerp(BG_NORMAL, BG_HOVER, hoverTransition);
-            borderColor = lerp(BORDER_NORMAL, BORDER_HOVER, hoverTransition);
-            textColor = TEXT_COLOR;
+        if (!visible) {
+            return;
         }
         
-        // Draw background rectangle - THIS WILL DEFINITELY SHOW UP
-        renderer.drawRect(x, y, width, height, 
-            bgColor[0], bgColor[1], bgColor[2], bgColor[3]);
+        ensureTextureLoaded();
         
-        // Draw border (4 rectangles forming a frame)
-        float borderWidth = 3.0f;
+        float tintR;
+        float tintG;
+        float tintB;
+        float tintAlpha;
+        float[] textColor;
         
-        // Top border
-        renderer.drawRect(x, y, width, borderWidth,
-            borderColor[0], borderColor[1], borderColor[2], borderColor[3]);
+        if (!enabled) {
+            tintR = tintG = tintB = 0f;
+            tintAlpha = 0.55f;
+            textColor = DISABLED_TEXT;
+        } else if (pressed) {
+            tintR = tintG = tintB = 0f;
+            tintAlpha = 0.38f;
+            textColor = ACTIVE_TEXT;
+        } else {
+            tintR = lerp(BASE_TINT[0], HOVER_TINT[0], hoverTransition);
+            tintG = lerp(BASE_TINT[1], HOVER_TINT[1], hoverTransition);
+            tintB = lerp(BASE_TINT[2], HOVER_TINT[2], hoverTransition);
+            tintAlpha = 0.22f + hoverTransition * 0.18f;
+            textColor = ACTIVE_TEXT;
+        }
         
-        // Bottom border
-        renderer.drawRect(x, y + height - borderWidth, width, borderWidth,
-            borderColor[0], borderColor[1], borderColor[2], borderColor[3]);
+        if (buttonTexture != null) {
+            renderer.drawTexturedRect(x, y, width, height, buttonTexture.getId());
+            renderer.drawRect(x, y, width, height, tintR, tintG, tintB, tintAlpha);
+        } else {
+            renderer.drawRect(x, y, width, height, 0.32f, 0.32f, 0.32f, 0.95f);
+            float border = Math.max(3f, height * 0.05f);
+            renderer.drawRect(x, y, width, border, 0.82f, 0.82f, 0.82f, 0.9f);
+            renderer.drawRect(x, y + height - border, width, border, 0.12f, 0.12f, 0.12f, 0.9f);
+            renderer.drawRect(x, y, border, height, 0.7f, 0.7f, 0.7f, 0.9f);
+            renderer.drawRect(x + width - border, y, border, height, 0.12f, 0.12f, 0.12f, 0.9f);
+        }
         
-        // Left border
-        renderer.drawRect(x, y, borderWidth, height,
-            borderColor[0], borderColor[1], borderColor[2], borderColor[3]);
-        
-        // Right border
-        renderer.drawRect(x + width - borderWidth, y, borderWidth, height,
-            borderColor[0], borderColor[1], borderColor[2], borderColor[3]);
-        
-        // Draw text shadow for readability
         if (text != null && !text.isEmpty()) {
-            float textWidth = fontRenderer.getTextWidth(text);
-            float textHeight = fontRenderer.getTextHeight();
-            float textX = x + (width - textWidth) / 2;
-            float textY = y + (height - textHeight) / 2 + textHeight * 0.7f;
+            float baseHeight = Math.max(1f, fontRenderer.getTextHeight());
+            float targetCapHeight = Math.max(height * 0.52f, 24f);
+            float textScale = Math.max(1.0f, targetCapHeight / baseHeight);
             
-            // Shadow
-            fontRenderer.drawText(text, textX + 2, textY + 2, 0.0f, 0.0f, 0.0f, 0.6f);
+            float textWidth = fontRenderer.getTextWidth(text) * textScale;
+            float drawX = x + (width - textWidth) / 2.0f;
+            float drawBaseline = y + (height + baseHeight * textScale * 0.2f) / 2.0f;
             
-            // Main text
-            fontRenderer.drawText(text, textX, textY,
+            fontRenderer.drawText(text, drawX + 2f * textScale, drawBaseline + 2f * textScale,
+                textScale, 0f, 0f, 0f, 0.6f);
+            fontRenderer.drawText(text, drawX, drawBaseline, textScale,
                 textColor[0], textColor[1], textColor[2], textColor[3]);
         }
     }
     
     @Override
     public void update(float deltaTime) {
-        // Smooth hover transition
         float target = hovered ? 1.0f : 0.0f;
-        float speed = 10.0f;
-        
+        float speed = 8.5f;
         hoverTransition += (target - hoverTransition) * deltaTime * speed;
-        
-        // Clamp to avoid overshoot
         if (Math.abs(hoverTransition - target) < 0.01f) {
             hoverTransition = target;
         }
@@ -139,40 +128,41 @@ public class MenuButton extends UIComponent {
         }
     }
     
-    /**
-     * Linear interpolation between two colors.
-     * 
-     * @param a First color
-     * @param b Second color
-     * @param t Interpolation factor (0.0 to 1.0)
-     * @return Interpolated color
-     */
-    private float[] lerp(float[] a, float[] b, float t) {
-        float[] result = new float[4];
-        for (int i = 0; i < 4; i++) {
-            result[i] = a[i] + (b[i] - a[i]) * t;
-        }
-        return result;
-    }
-    
-    /**
-     * Sets the button text.
-     */
     public void setText(String text) {
         this.text = text;
     }
     
-    /**
-     * Gets the button text.
-     */
     public String getText() {
         return text;
     }
     
-    /**
-     * Sets the click callback.
-     */
     public void setOnClick(Runnable onClick) {
         this.onClick = onClick;
+    }
+    
+    private float lerp(float a, float b, float t) {
+        return a + (b - a) * t;
+    }
+    
+    private void ensureTextureLoaded() {
+        if (textureLoadAttempted) {
+            return;
+        }
+        
+        textureLoadAttempted = true;
+        ResourceManager resourceManager = ResourceManager.getInstance();
+        String absolutePath = resourceManager.getResourcePath(BUTTON_TEXTURE_PATH);
+        try {
+            buttonTexture = Texture.loadFromFile(absolutePath);
+            System.out.println("[MenuButton] Loaded textured button from " + absolutePath);
+        } catch (Exception diskFailure) {
+            try {
+                buttonTexture = Texture.loadFromResource("/" + BUTTON_TEXTURE_PATH);
+                System.out.println("[MenuButton] Loaded textured button from classpath fallback");
+            } catch (Exception fallbackFailure) {
+                System.err.println("[MenuButton] Failed to load button texture: " + fallbackFailure.getMessage());
+                buttonTexture = null;
+            }
+        }
     }
 }

@@ -30,6 +30,8 @@ public class Slider extends UIComponent {
     private boolean dragging;
     private Consumer<Float> onChange;
     private int decimalPlaces;
+    private float labelScale = 1.0f;
+    private float valueScale = 1.0f;
     
     /**
      * Creates a new slider.
@@ -62,35 +64,36 @@ public class Slider extends UIComponent {
     public void render(UIRenderer renderer, FontRenderer fontRenderer) {
         if (!visible) return;
         
-        // Draw label
-        float labelY = y;
-        fontRenderer.drawText(label, x, labelY, TEXT_COLOR[0], TEXT_COLOR[1], TEXT_COLOR[2], TEXT_COLOR[3]);
+        float baseTextHeight = Math.max(1f, fontRenderer.getTextHeight());
+        float scaledLabelHeight = baseTextHeight * labelScale;
+        float labelBaseline = y + scaledLabelHeight;
+        fontRenderer.drawText(label, x, labelBaseline, labelScale,
+            TEXT_COLOR[0], TEXT_COLOR[1], TEXT_COLOR[2], TEXT_COLOR[3]);
         
-        // Calculate track position (below label)
-        float trackY = y + fontRenderer.getTextHeight() + 8;
         float trackX = x;
-        float trackWidth = width - 60; // Leave space for value display
+        float trackWidth = Math.max(width - 120f, 140f);
+        float availableHeight = Math.max(height - scaledLabelHeight - 12f, HANDLE_HEIGHT);
+        float handleHeight = Math.max(availableHeight, HANDLE_HEIGHT);
+        float handleWidth = Math.max(handleHeight * 0.28f, HANDLE_WIDTH);
+        float trackHeight = Math.max(handleHeight * 0.18f, TRACK_HEIGHT);
+        float trackY = labelBaseline + 12f;
+        float trackCenterY = trackY + (handleHeight - trackHeight) / 2f;
         
-        // Draw track
-        float trackCenterY = trackY + (HANDLE_HEIGHT - TRACK_HEIGHT) / 2;
-        renderer.drawRect(trackX, trackCenterY, trackWidth, TRACK_HEIGHT, 
+        renderer.drawRect(trackX, trackCenterY, trackWidth, trackHeight,
             TRACK_COLOR[0], TRACK_COLOR[1], TRACK_COLOR[2], TRACK_COLOR[3]);
         
-        // Calculate handle position
-        float handleX = trackX + (trackWidth - HANDLE_WIDTH) * value;
+        float handleX = trackX + (trackWidth - handleWidth) * value;
         float handleY = trackY;
-        
-        // Draw handle
         float[] handleColor = (hovered || dragging) ? HANDLE_HOVER_COLOR : HANDLE_COLOR;
-        renderer.drawRect(handleX, handleY, HANDLE_WIDTH, HANDLE_HEIGHT, 
+        renderer.drawRect(handleX, handleY, handleWidth, handleHeight,
             handleColor[0], handleColor[1], handleColor[2], handleColor[3]);
         
-        // Draw current value
         float actualValue = minValue + value * (maxValue - minValue);
         String valueText = formatValue(actualValue);
-        float valueX = trackX + trackWidth + 10;
-        float valueY = trackY + HANDLE_HEIGHT / 2 + fontRenderer.getTextHeight() * 0.3f;
-        fontRenderer.drawText(valueText, valueX, valueY, TEXT_COLOR[0], TEXT_COLOR[1], TEXT_COLOR[2], TEXT_COLOR[3]);
+        float valueX = trackX + trackWidth + 16f;
+        float valueBaseline = trackY + handleHeight * 0.65f;
+        fontRenderer.drawText(valueText, valueX, valueBaseline, valueScale,
+            TEXT_COLOR[0], TEXT_COLOR[1], TEXT_COLOR[2], TEXT_COLOR[3]);
     }
     
     @Override
@@ -122,21 +125,15 @@ public class Slider extends UIComponent {
         }
     }
     
-    /**
-     * Updates the slider value based on mouse X position.
-     */
     private void updateValueFromMouse(float mouseX) {
         float trackX = x;
-        float trackWidth = width - 60;
+        float trackWidth = Math.max(width - 120f, 140f);
         
-        // Calculate normalized value from mouse position
         float newValue = (mouseX - trackX) / trackWidth;
-        newValue = Math.max(0.0f, Math.min(1.0f, newValue)); // Clamp to 0-1
+        newValue = Math.max(0.0f, Math.min(1.0f, newValue));
         
         if (newValue != value) {
             value = newValue;
-            
-            // Call onChange callback with actual value
             if (onChange != null) {
                 float actualValue = minValue + value * (maxValue - minValue);
                 onChange.accept(actualValue);
@@ -182,5 +179,16 @@ public class Slider extends UIComponent {
      */
     public void setDecimalPlaces(int decimalPlaces) {
         this.decimalPlaces = decimalPlaces;
+    }
+    
+    /**
+     * Sets the font scale for label and value text.
+     * 
+     * @param labelScale Scale for the label text
+     * @param valueScale Scale for the value text
+     */
+    public void setFontScale(float labelScale, float valueScale) {
+        this.labelScale = Math.max(0.6f, labelScale);
+        this.valueScale = Math.max(0.6f, valueScale);
     }
 }
