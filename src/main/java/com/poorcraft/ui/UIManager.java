@@ -97,7 +97,7 @@ public class UIManager {
         uiRenderer.init(windowWidth, windowHeight);
         
         // Initialize font renderer with Silkscreen font for that retro vibe
-        // Base size 80 keeps text crisp; global scaling handles responsiveness
+        // Base size 80 keeps text crisp; individual screens adjust via uiScale
         fontRenderer = new FontRenderer(uiRenderer, 80);
         try {
             // Try to load Silkscreen font (the one we just added!)
@@ -110,7 +110,6 @@ public class UIManager {
 
         // Compute initial UI scale relative to window size
         uiScale = LayoutUtils.computeScale(windowWidth, windowHeight);
-        fontRenderer.setGlobalScale(uiScale);
         
         // Create all screens
         System.out.println("[UIManager] Creating UI screens...");
@@ -407,7 +406,6 @@ public class UIManager {
         uiRenderer.updateProjection(width, height);
 
         uiScale = LayoutUtils.computeScale(width, height);
-        fontRenderer.setGlobalScale(uiScale);
         applyGlobalScale(uiScale);
         
         for (UIScreen screen : screens.values()) {

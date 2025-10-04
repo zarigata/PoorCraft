@@ -42,7 +42,6 @@ public class FontRenderer {
     private STBTTBakedChar.Buffer charData;
     private float lineHeight;
     private boolean useFallback = false;
-    private float globalScale = 1.0f;
     
     /**
      * Creates a new font renderer.
@@ -167,7 +166,6 @@ public class FontRenderer {
         }
 
         float appliedScale = scale <= 0 ? 1.0f : scale;
-        float effectiveScale = appliedScale * globalScale;
 
         glBindTexture(GL_TEXTURE_2D, fontAtlasTexture);
 
@@ -182,7 +180,7 @@ public class FontRenderer {
 
             if (c == '\n') {
                 currentX = x;
-                currentY += lineHeight * effectiveScale;
+                currentY += lineHeight * appliedScale;
                 continue;
             }
 
@@ -192,10 +190,10 @@ public class FontRenderer {
 
             STBTTBakedChar charInfo = charData.get(c - FIRST_CHAR);
 
-            float charX = currentX + charInfo.xoff() * effectiveScale;
-            float charY = currentY + charInfo.yoff() * effectiveScale;
-            float charW = (charInfo.x1() - charInfo.x0()) * effectiveScale;
-            float charH = (charInfo.y1() - charInfo.y0()) * effectiveScale;
+            float charX = currentX + charInfo.xoff() * appliedScale;
+            float charY = currentY + charInfo.yoff() * appliedScale;
+            float charW = (charInfo.x1() - charInfo.x0()) * appliedScale;
+            float charH = (charInfo.y1() - charInfo.y0()) * appliedScale;
 
             float u0 = charInfo.x0() / (float) ATLAS_WIDTH;
             float v0 = charInfo.y0() / (float) ATLAS_HEIGHT;
@@ -212,7 +210,7 @@ public class FontRenderer {
 
             quadCount++;
 
-            currentX += charInfo.xadvance() * effectiveScale;
+            currentX += charInfo.xadvance() * appliedScale;
         }
 
         if (quadCount == 0) {
@@ -260,7 +258,7 @@ public class FontRenderer {
             }
 
             STBTTBakedChar charInfo = charData.get(c - FIRST_CHAR);
-            width += charInfo.xadvance() * globalScale;
+            width += charInfo.xadvance();
         }
 
         return width;
@@ -272,8 +270,7 @@ public class FontRenderer {
 {{ ... }}
      */
     public float getTextHeight() {
-        float baseHeight = useFallback ? fontSize : lineHeight;
-        return baseHeight * globalScale;
+        return useFallback ? fontSize : lineHeight;
     }
     
     /**
@@ -285,15 +282,6 @@ public class FontRenderer {
         return fontSize;
     }
 
-    /**
-     * Adjusts the global UI scale applied to all text rendering.
-     *
-     * @param globalScale scale factor (> 0)
-     */
-    public void setGlobalScale(float globalScale) {
-        this.globalScale = globalScale > 0.0f ? globalScale : 1.0f;
-    }
-    
     /**
      * Cleans up OpenGL resources.
      */
