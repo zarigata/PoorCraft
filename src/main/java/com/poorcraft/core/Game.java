@@ -21,7 +21,6 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Map;
 
-import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 
 /**
@@ -45,6 +44,7 @@ public class Game {
     private ChunkRenderer chunkRenderer;
     private ModLoader modLoader;
     private DiscordRichPresenceManager discordRPC;
+    private GameMode currentGameMode;
     
     private boolean running;
     private boolean worldLoaded;  // Track if world is loaded
@@ -52,8 +52,6 @@ public class Game {
     private GameState lastGameState;  // Track last game state for Discord presence updates
     private BiomeType lastBiome;  // Track last biome for Discord presence updates
     private float discordUpdateTimer;  // Timer for periodic Discord updates
-    
-    private static final float FIXED_TIME_STEP = 1.0f / 60.0f;  // 60 updates per second
     
     /**
      * Creates a new game instance with the given settings.
@@ -70,6 +68,7 @@ public class Game {
         this.lastGameState = null;
         this.lastBiome = null;
         this.discordUpdateTimer = 0.0f;
+        this.currentGameMode = GameMode.SURVIVAL;
     }
     
     /**
@@ -379,10 +378,13 @@ public class Game {
      * 
      * @param seed World seed (0 for random)
      * @param generateStructures Whether to generate structures
+     * @param gameMode Game mode (SURVIVAL, CREATIVE, ADVENTURE)
      */
-    public void createWorld(long seed, boolean generateStructures) {
+    public void createWorld(long seed, boolean generateStructures, GameMode gameMode) {
         System.out.println("[Game] Creating world with seed: " + seed);
-        
+        GameMode mode = gameMode != null ? gameMode : GameMode.SURVIVAL;
+        currentGameMode = mode;
+
         // Check if multiplayer mode
         if (multiplayerMode) {
             // In multiplayer, world comes from network client, skip local generation
@@ -429,15 +431,16 @@ public class Game {
         // Spawn player at terrain height and sync camera
         if (playerController != null) {
             playerController.respawn(world);
+            playerController.setGameMode(currentGameMode);
             camera.setPosition(playerController.getEyePosition());
         }
-        
+
         // Cursor grabbing is now handled by UIManager.setState() when transitioning to IN_GAME
         // No need to manually grab here anymore. One less thing to worry about!
-        
+
         System.out.println("[Game] World creation complete!");
     }
-    
+
     /**
      * Sets the world for multiplayer mode.
      * Called by UIManager when connecting to a server.
@@ -447,7 +450,8 @@ public class Game {
     public void setWorld(World world) {
         this.multiplayerMode = true;
         this.world = world;
-        
+        this.currentGameMode = GameMode.SURVIVAL;
+
         // Set EventBus on world so mods can receive world/block/chunk events
         // Even in multiplayer, mods need to know about world changes
         world.setEventBus(modLoader.getEventBus());

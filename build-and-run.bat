@@ -48,7 +48,7 @@ echo Build successful! Starting PoorCraft...
 echo ========================================
 echo.
 
-java -jar target\poorcraft-0.1.0-SNAPSHOT-jar-with-dependencies.jar
+java -jar target\poorcraft-0.1.1-jar-with-dependencies.jar
 
 if errorlevel 1 (
     echo.

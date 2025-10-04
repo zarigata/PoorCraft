@@ -11,10 +11,10 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if not exist "target\poorcraft-0.1.0-SNAPSHOT-jar-with-dependencies.jar" (
-    echo Expected jar target\poorcraft-0.1.0-SNAPSHOT-jar-with-dependencies.jar not found.
+if not exist "target\poorcraft-0.1.1-jar-with-dependencies.jar" (
+    echo Expected jar target\poorcraft-0.1.1-jar-with-dependencies.jar not found.
     exit /b 1
 )
 
 echo Launching PoorCraft...
-java -jar "target\poorcraft-0.1.0-SNAPSHOT-jar-with-dependencies.jar"
+java -jar "target\poorcraft-0.1.1-jar-with-dependencies.jar"

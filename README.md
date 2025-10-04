@@ -23,7 +23,7 @@ A free, open-source Minecraft clone that empowers players to create, modify and 
 {{ ... }}
 ```bash
 # Run the game
-java -jar target/poorcraft-0.1.0-SNAPSHOT-jar-with-dependencies.jar
+java -jar target/poorcraft-0.1.1-jar-with-dependencies.jar
 ```
 
 ## World Generation

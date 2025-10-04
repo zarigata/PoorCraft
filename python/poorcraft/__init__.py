@@ -12,7 +12,7 @@ Example usage:
         api.log(f"Block placed at {event.x}, {event.y}, {event.z}")
 """
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 # Import main modules for convenience
 from . import api
