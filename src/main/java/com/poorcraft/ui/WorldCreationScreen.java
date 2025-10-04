@@ -1,5 +1,7 @@
 package com.poorcraft.ui;
 
+import com.poorcraft.core.GameMode;
+
 import java.util.Arrays;
 import java.util.Random;
 
@@ -167,8 +169,16 @@ public class WorldCreationScreen extends UIScreen {
         System.out.println("[WorldCreation] Creating world: " + worldName + 
             ", seed: " + seed + ", structures: " + generateStructures);
         
+        GameMode gameMode = GameMode.SURVIVAL;
+        if (gameModeDropdown != null) {
+            int selectedIndex = gameModeDropdown.getSelectedIndex();
+            if (selectedIndex >= 0 && selectedIndex < GameMode.values().length) {
+                gameMode = GameMode.values()[selectedIndex];
+            }
+        }
+
         // Create world
-        uiManager.createWorld(seed, generateStructures);
+        uiManager.createWorld(seed, generateStructures, gameMode);
     }
     
     /**

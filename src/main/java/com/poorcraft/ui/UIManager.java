@@ -3,6 +3,7 @@ package com.poorcraft.ui;
 import com.poorcraft.config.ConfigManager;
 import com.poorcraft.config.Settings;
 import com.poorcraft.core.Game;
+import com.poorcraft.core.GameMode;
 import com.poorcraft.network.client.GameClient;
 import com.poorcraft.network.server.GameServer;
 
@@ -385,15 +386,15 @@ public class UIManager {
      * @param seed World seed
      * @param generateStructures Whether to generate structures
      */
-    public void createWorld(long seed, boolean generateStructures) {
+    public void createWorld(long seed, boolean generateStructures, GameMode gameMode) {
         System.out.println("[UIManager] Creating world with seed: " + seed);
         
         // Call game method to create world
         // This will be implemented when we integrate with Game.java
         try {
             var gameClass = game.getClass();
-            var method = gameClass.getMethod("createWorld", long.class, boolean.class);
-            method.invoke(game, seed, generateStructures);
+            var method = gameClass.getMethod("createWorld", long.class, boolean.class, GameMode.class);
+            method.invoke(game, seed, generateStructures, gameMode);
         } catch (Exception e) {
             System.err.println("[UIManager] Failed to create world: " + e.getMessage());
             e.printStackTrace();
