@@ -79,6 +79,7 @@ public class Game {
         this.inventory = new Inventory();
         this.blockHighlightRenderer = new BlockHighlightRenderer();
         this.highlightRendererInitialized = false;
+        this.selectedHotbarSlot = 0;
     }
     
     /**
