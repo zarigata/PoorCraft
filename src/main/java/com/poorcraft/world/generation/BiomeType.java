@@ -19,7 +19,12 @@ public enum BiomeType {
         BlockType.SAND,
         BlockType.SANDSTONE,
         62,
-        6.0
+        6.0,
+        3,
+        0.55,
+        0.08,
+        0.35,
+        0.55
     ),
     
     /**
@@ -29,8 +34,13 @@ public enum BiomeType {
         "Snow",
         BlockType.SNOW_BLOCK,
         BlockType.SNOW_BLOCK,
-        70,
-        10.0
+        72,
+        14.0,
+        4,
+        0.6,
+        0.65,
+        0.75,
+        0.85
     ),
     
     /**
@@ -40,8 +50,13 @@ public enum BiomeType {
         "Jungle",
         BlockType.JUNGLE_GRASS,
         BlockType.JUNGLE_DIRT,
-        68,
-        12.0
+        69,
+        11.0,
+        4,
+        0.9,
+        0.35,
+        0.45,
+        0.75
     ),
     
     /**
@@ -52,7 +67,51 @@ public enum BiomeType {
         BlockType.GRASS,
         BlockType.DIRT,
         64,
-        8.0
+        8.0,
+        4,
+        0.7,
+        0.18,
+        0.35,
+        0.65
+    ),
+
+    FOREST(
+        "Forest",
+        BlockType.GRASS,
+        BlockType.DIRT,
+        66,
+        8.5,
+        4,
+        0.85,
+        0.22,
+        0.4,
+        0.7
+    ),
+
+    MOUNTAINS(
+        "Mountains",
+        BlockType.STONE,
+        BlockType.STONE,
+        78,
+        18.0,
+        2,
+        0.5,
+        0.95,
+        0.9,
+        0.95
+    ),
+
+    SWAMP(
+        "Swamp",
+        BlockType.GRASS,
+        BlockType.DIRT,
+        61,
+        5.0,
+        5,
+        0.9,
+        0.05,
+        0.3,
+        0.5
     );
     
     private final String name;
@@ -60,6 +119,11 @@ public enum BiomeType {
     private final BlockType subsurfaceBlock;
     private final int baseHeight;
     private final double heightVariation;
+    private final int surfaceDepth;
+    private final double detailStrength;
+    private final double ridgeStrength;
+    private final double continentInfluence;
+    private final double shapeSharpness;
     
     /**
      * Constructor for BiomeType enum.
@@ -70,13 +134,20 @@ public enum BiomeType {
      * @param baseHeight Base terrain height for this biome
      * @param heightVariation How much terrain height varies
      */
-    BiomeType(String name, BlockType surfaceBlock, BlockType subsurfaceBlock, 
-              int baseHeight, double heightVariation) {
+    BiomeType(String name, BlockType surfaceBlock, BlockType subsurfaceBlock,
+              int baseHeight, double heightVariation, int surfaceDepth,
+              double detailStrength, double ridgeStrength,
+              double continentInfluence, double shapeSharpness) {
         this.name = name;
         this.surfaceBlock = surfaceBlock;
         this.subsurfaceBlock = subsurfaceBlock;
         this.baseHeight = baseHeight;
         this.heightVariation = heightVariation;
+        this.surfaceDepth = Math.max(1, surfaceDepth);
+        this.detailStrength = detailStrength;
+        this.ridgeStrength = ridgeStrength;
+        this.continentInfluence = continentInfluence;
+        this.shapeSharpness = shapeSharpness;
     }
     
     /**
@@ -124,5 +195,25 @@ public enum BiomeType {
      */
     public double getHeightVariation() {
         return heightVariation;
+    }
+
+    public int getSurfaceDepth() {
+        return surfaceDepth;
+    }
+
+    public double getDetailStrength() {
+        return detailStrength;
+    }
+
+    public double getRidgeStrength() {
+        return ridgeStrength;
+    }
+
+    public double getContinentInfluence() {
+        return continentInfluence;
+    }
+
+    public double getShapeSharpness() {
+        return shapeSharpness;
     }
 }

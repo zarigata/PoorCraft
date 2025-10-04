@@ -15,16 +15,19 @@ import com.poorcraft.world.chunk.Chunk;
 public class TerrainGenerator {
     
     private final long seed;
-    private final SimplexNoise heightNoise;
+    private final SimplexNoise continentNoise;
     private final SimplexNoise detailNoise;
+    private final SimplexNoise ridgeNoise;
+    private final SimplexNoise microNoise;
     private final BiomeGenerator biomeGenerator;
     private EventBus eventBus;
     
-    private static final double HEIGHT_SCALE = 0.005;   // Scale for primary height noise
-    private static final double DETAIL_SCALE = 0.02;    // Scale for detail noise
+    private static final double CONTINENT_SCALE = 0.00045;
+    private static final double DETAIL_SCALE = 0.0032;
+    private static final double RIDGE_SCALE = 0.0016;
+    private static final double MICRO_SCALE = 0.01;
     private static final int BEDROCK_LAYER = 0;         // Y level for bedrock
     private static final int STONE_LAYER_START = 1;     // Y level where stone starts
-    private static final int SURFACE_DEPTH = 4;         // Depth of surface/subsurface layers
     
     /**
      * Creates a new terrain generator with the given seed.
@@ -33,8 +36,10 @@ public class TerrainGenerator {
      */
     public TerrainGenerator(long seed) {
         this.seed = seed;
-        this.heightNoise = new SimplexNoise(seed);
+        this.continentNoise = new SimplexNoise(seed);
         this.detailNoise = new SimplexNoise(seed + 500);  // Different seed for detail
+        this.ridgeNoise = new SimplexNoise(seed + 850);
+        this.microNoise = new SimplexNoise(seed + 1337);
         this.biomeGenerator = new BiomeGenerator(seed);
         this.eventBus = null;
     }
@@ -64,35 +69,9 @@ public class TerrainGenerator {
                 int worldX = chunkWorldX + x;
                 int worldZ = chunkWorldZ + z;
                 
-                // Get biome for this column
-                BiomeType biome = biomeGenerator.getBiome(worldX, worldZ);
-                
-                // Calculate terrain height using multi-octave noise
-                double heightValue = heightNoise.octaveNoise2D(
-                    worldX * HEIGHT_SCALE,
-                    worldZ * HEIGHT_SCALE,
-                    4,    // octaves
-                    0.5,  // persistence
-                    2.0   // lacunarity
-                );
-                
-                // Add detail noise for small-scale variation
-                double detailValue = detailNoise.octaveNoise2D(
-                    worldX * DETAIL_SCALE,
-                    worldZ * DETAIL_SCALE,
-                    3,    // octaves
-                    0.5,  // persistence
-                    2.0   // lacunarity
-                );
-                
-                // Combine noise with biome characteristics
-                double combinedHeight = heightValue * biome.getHeightVariation() + detailValue * 3.0;
-                int height = biome.getBaseHeight() + (int) combinedHeight;
-                
-                // Clamp height to valid range
-                height = Math.max(1, Math.min(Chunk.CHUNK_HEIGHT - 1, height));
-                
-                // Fill column with blocks
+                var sample = biomeGenerator.sample(worldX, worldZ);
+                BiomeType biome = sample.getBiome();
+                int height = computeColumnHeight(worldX, worldZ, sample, biome);
                 fillColumn(chunk, x, z, height, biome);
             }
         }
@@ -124,7 +103,8 @@ public class TerrainGenerator {
         chunk.setBlock(x, BEDROCK_LAYER, z, BlockType.BEDROCK);
         
         // Stone core (Y=1 to height-SURFACE_DEPTH)
-        int stoneTop = Math.max(STONE_LAYER_START, height - SURFACE_DEPTH);
+        int surfaceDepth = Math.max(1, biome.getSurfaceDepth());
+        int stoneTop = Math.max(STONE_LAYER_START, height - surfaceDepth);
         for (int y = STONE_LAYER_START; y <= stoneTop; y++) {
             chunk.setBlock(x, y, z, BlockType.STONE);
         }
@@ -156,23 +136,72 @@ public class TerrainGenerator {
      * @return Terrain height at that location
      */
     public int getHeightAt(int worldX, int worldZ) {
-        BiomeType biome = biomeGenerator.getBiome(worldX, worldZ);
-        
-        double heightValue = heightNoise.octaveNoise2D(
-            worldX * HEIGHT_SCALE,
-            worldZ * HEIGHT_SCALE,
-            4, 0.5, 2.0
+        var sample = biomeGenerator.sample(worldX, worldZ);
+        return computeColumnHeight(worldX, worldZ, sample, sample.getBiome());
+    }
+
+    private int computeColumnHeight(int worldX, int worldZ, BiomeGenerator.BiomeSample sample, BiomeType biome) {
+        double continentNoiseValue = continentNoise.octaveNoise2D(
+            worldX * CONTINENT_SCALE,
+            worldZ * CONTINENT_SCALE,
+            5, 0.48, 2.05
         );
-        
-        double detailValue = detailNoise.octaveNoise2D(
-            worldX * DETAIL_SCALE,
-            worldZ * DETAIL_SCALE,
-            3, 0.5, 2.0
+
+        double continentBlend = (continentNoiseValue + 1.0) * 0.5;
+        double continentHeight = lerp(-28.0, 46.0, continentBlend) * biome.getContinentInfluence();
+
+        double ridgeSignalNoise = ridgeNoise.octaveNoise2D(
+            sample.getWarpedX() * RIDGE_SCALE,
+            sample.getWarpedZ() * RIDGE_SCALE,
+            4, 0.6, 2.15
         );
-        
-        double combinedHeight = heightValue * biome.getHeightVariation() + detailValue * 3.0;
-        int height = biome.getBaseHeight() + (int) combinedHeight;
-        
-        return Math.max(1, Math.min(Chunk.CHUNK_HEIGHT - 1, height));
+        double ridgeSignal = saturate((ridgeSignalNoise * 0.55) + Math.max(0.0, sample.getWeirdness()) * 0.45 + 0.25);
+        double erosionFactor = Math.pow(saturate(1.0 - (sample.getErosion() + 1.0) * 0.5), 1.25);
+        double ridgeHeight = Math.pow(ridgeSignal, 1.0 + biome.getShapeSharpness() * 2.0)
+            * biome.getHeightVariation() * biome.getRidgeStrength() * erosionFactor;
+
+        double detailSignal = detailNoise.octaveNoise2D(
+            sample.getWarpedX() * DETAIL_SCALE,
+            sample.getWarpedZ() * DETAIL_SCALE,
+            5, 0.58, 2.05
+        );
+        double detailHeight = detailSignal * biome.getDetailStrength() * 10.0;
+
+        double microSignal = microNoise.octaveNoise2D(
+            sample.getWarpedX() * MICRO_SCALE,
+            sample.getWarpedZ() * MICRO_SCALE,
+            3, 0.6, 2.95
+        );
+        double microHeight = microSignal * 2.5;
+
+        double finalHeight = biome.getBaseHeight()
+            + continentHeight
+            + ridgeHeight
+            + detailHeight
+            + microHeight;
+
+        if (biome == BiomeType.SWAMP) {
+            finalHeight = Math.min(finalHeight, biome.getBaseHeight() + 3.0);
+        } else if (biome == BiomeType.MOUNTAINS) {
+            finalHeight += 6.0 * erosionFactor;
+        }
+
+        int height = (int) Math.round(finalHeight);
+        height = Math.max(1, Math.min(Chunk.CHUNK_HEIGHT - 2, height));
+        return height;
+    }
+
+    private static double lerp(double a, double b, double t) {
+        return a + (b - a) * t;
+    }
+
+    private static double saturate(double value) {
+        if (value < 0.0) {
+            return 0.0;
+        }
+        if (value > 1.0) {
+            return 1.0;
+        }
+        return value;
     }
 }

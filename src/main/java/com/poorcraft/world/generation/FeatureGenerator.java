@@ -51,8 +51,8 @@ public class FeatureGenerator {
                 int worldX = chunkWorldX + x;
                 int worldZ = chunkWorldZ + z;
                 
-                // Get biome for this column
-                BiomeType biome = biomeGenerator.getBiome(worldX, worldZ);
+                BiomeGenerator.BiomeSample sample = biomeGenerator.sample(worldX, worldZ);
+                BiomeType biome = sample.getBiome();
                 
                 // Seed random with deterministic value based on world coordinates
                 // This ensures same features generate at same coordinates every time
@@ -62,27 +62,38 @@ public class FeatureGenerator {
                 // Generate biome-specific features
                 switch (biome) {
                     case DESERT -> {
-                        // 2% chance for cactus
                         if (random.nextFloat() < 0.02f) {
                             placeCactus(chunk, x, z, worldX, worldZ);
                         }
                     }
                     case SNOW -> {
-                        // 60% chance for snow layer on surface
                         if (random.nextFloat() < 0.6f) {
                             placeSnowLayer(chunk, x, z, worldX, worldZ);
                         }
                     }
                     case JUNGLE -> {
-                        // 8% chance for tree (dense jungle)
-                        if (random.nextFloat() < 0.08f) {
-                            placeTree(chunk, x, z, worldX, worldZ, biome);
+                        if (random.nextFloat() < 0.12f) {
+                            placeTree(chunk, x, z, worldX, worldZ, biome, 5, 2);
                         }
                     }
                     case PLAINS -> {
-                        // 3% chance for tree (sparse)
-                        if (random.nextFloat() < 0.03f) {
-                            placeTree(chunk, x, z, worldX, worldZ, biome);
+                        if (random.nextFloat() < 0.035f) {
+                            placeTree(chunk, x, z, worldX, worldZ, biome, 4, 2);
+                        }
+                    }
+                    case FOREST -> {
+                        if (random.nextFloat() < 0.09f) {
+                            placeTree(chunk, x, z, worldX, worldZ, biome, 5, 3);
+                        }
+                    }
+                    case MOUNTAINS -> {
+                        if (random.nextFloat() < 0.025f) {
+                            placeRockOutcrop(chunk, x, z, worldX, worldZ);
+                        }
+                    }
+                    case SWAMP -> {
+                        if (random.nextFloat() < 0.045f) {
+                            placeSwampTree(chunk, x, z, worldX, worldZ);
                         }
                     }
                 }
@@ -137,7 +148,7 @@ public class FeatureGenerator {
      * @param worldZ World Z coordinate
      * @param biome Biome type (affects tree appearance)
      */
-    private void placeTree(Chunk chunk, int x, int z, int worldX, int worldZ, BiomeType biome) {
+    private void placeTree(Chunk chunk, int x, int z, int worldX, int worldZ, BiomeType biome, int baseTrunkHeight, int extraLeaves) {
         int height = terrainGenerator.getHeightAt(worldX, worldZ);
         
         // Check if height is within chunk bounds
@@ -152,8 +163,8 @@ public class FeatureGenerator {
         }
         
         // Generate tree dimensions
-        int trunkHeight = 4 + random.nextInt(3);  // 4-6 blocks tall
-        int leafRadius = 2;
+        int trunkHeight = baseTrunkHeight + random.nextInt(3);
+        int leafRadius = 2 + Math.max(0, extraLeaves - 2);
         
         // Place trunk
         for (int i = 1; i <= trunkHeight; i++) {
@@ -165,11 +176,12 @@ public class FeatureGenerator {
         
         // Place leaves in a sphere/cube around top of trunk
         int leafStartY = height + trunkHeight - 1;
-        for (int dy = 0; dy <= 2; dy++) {
+        int leafLayers = 2 + extraLeaves;
+        for (int dy = 0; dy <= leafLayers; dy++) {
             for (int dx = -leafRadius; dx <= leafRadius; dx++) {
                 for (int dz = -leafRadius; dz <= leafRadius; dz++) {
                     // Skip corners for more natural shape
-                    if (Math.abs(dx) == leafRadius && Math.abs(dz) == leafRadius) {
+                    if (Math.abs(dx) == leafRadius && Math.abs(dz) == leafRadius && dy < leafLayers) {
                         continue;
                     }
                     
@@ -226,6 +238,102 @@ public class FeatureGenerator {
         int snowY = height + 1;
         if (snowY < Chunk.CHUNK_HEIGHT) {
             chunk.setBlock(x, snowY, z, BlockType.SNOW_LAYER);
+        }
+    }
+
+    private void placeRockOutcrop(Chunk chunk, int x, int z, int worldX, int worldZ) {
+        int height = terrainGenerator.getHeightAt(worldX, worldZ);
+        if (height < 1 || height >= Chunk.CHUNK_HEIGHT - 4) {
+            return;
+        }
+
+        BlockType surfaceBlock = chunk.getBlock(x, height, z);
+        if (!surfaceBlock.isSolid()) {
+            return;
+        }
+
+        int radius = 1 + random.nextInt(2);
+        int maxHeight = 2 + random.nextInt(2);
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                if (Math.abs(dx) + Math.abs(dz) > radius + random.nextInt(2)) {
+                    continue;
+                }
+                int columnX = x + dx;
+                int columnZ = z + dz;
+                if (columnX < 0 || columnX >= Chunk.CHUNK_SIZE || columnZ < 0 || columnZ >= Chunk.CHUNK_SIZE) {
+                    continue;
+                }
+                for (int dy = 1; dy <= maxHeight; dy++) {
+                    int y = height + dy;
+                    if (y >= Chunk.CHUNK_HEIGHT) {
+                        break;
+                    }
+                    chunk.setBlock(columnX, y, columnZ, BlockType.STONE);
+                }
+            }
+        }
+    }
+
+    private void placeSwampTree(Chunk chunk, int x, int z, int worldX, int worldZ) {
+        int height = terrainGenerator.getHeightAt(worldX, worldZ);
+        if (height < 0 || height >= Chunk.CHUNK_HEIGHT - 5) {
+            return;
+        }
+
+        BlockType surfaceBlock = chunk.getBlock(x, height, z);
+        if (surfaceBlock != BlockType.GRASS && surfaceBlock != BlockType.JUNGLE_GRASS) {
+            return;
+        }
+
+        // Place a short trunk
+        int trunkHeight = 3 + random.nextInt(2);
+        for (int i = 1; i <= trunkHeight; i++) {
+            int y = height + i;
+            if (y < Chunk.CHUNK_HEIGHT) {
+                chunk.setBlock(x, y, z, BlockType.WOOD);
+            }
+        }
+
+        int canopyStart = height + trunkHeight - 1;
+        for (int dy = 0; dy <= 2; dy++) {
+            int layerRadius = 2 - dy;
+            for (int dx = -layerRadius; dx <= layerRadius; dx++) {
+                for (int dz = -layerRadius; dz <= layerRadius; dz++) {
+                    int leafX = x + dx;
+                    int leafZ = z + dz;
+                    int leafY = canopyStart + dy;
+                    if (leafX < 0 || leafX >= Chunk.CHUNK_SIZE || leafZ < 0 || leafZ >= Chunk.CHUNK_SIZE) {
+                        continue;
+                    }
+                    if (leafY < 0 || leafY >= Chunk.CHUNK_HEIGHT) {
+                        continue;
+                    }
+                    if (Math.abs(dx) == layerRadius && Math.abs(dz) == layerRadius && dy < 2) {
+                        continue;
+                    }
+                    if (chunk.getBlock(leafX, leafY, leafZ) == BlockType.AIR) {
+                        chunk.setBlock(leafX, leafY, leafZ, BlockType.LEAVES);
+                    }
+                }
+            }
+        }
+
+        // Optional moss layer around tree base
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (random.nextFloat() < 0.35f) {
+                    int mossX = x + dx;
+                    int mossZ = z + dz;
+                    if (mossX >= 0 && mossX < Chunk.CHUNK_SIZE && mossZ >= 0 && mossZ < Chunk.CHUNK_SIZE) {
+                        int mossY = height;
+                        BlockType current = chunk.getBlock(mossX, mossY, mossZ);
+                        if (current == BlockType.GRASS) {
+                            chunk.setBlock(mossX, mossY, mossZ, BlockType.JUNGLE_GRASS);
+                        }
+                    }
+                }
+            }
         }
     }
 }
