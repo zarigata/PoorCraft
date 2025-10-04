@@ -1,26 +1,24 @@
 package com.poorcraft.ui;
 
 /**
- * Simple, reliable menu button with CLEAR rectangular background.
+ * Simple, reliable menu button with a classic stone background.
  * 
- * This button is bulletproof. It shows a solid rectangle, text, and responds to clicks.
- * No fancy gradients that might not render. Just good old rectangles.
- * 
- * The vaporwave colors are here, but we're keeping it simple so it ACTUALLY WORKS.
- * Because what good is a pretty button if you can't click it? None. That's what.
+ * Inspired by the vintage Minecraft menus: muted greys with a subtle highlight
+ * that brightens on hover and darkens when pressed. No gradients, no surprises –
+ * just a clean rectangle that is easy to see and interact with at any scale.
  */
 public class MenuButton extends UIComponent {
     
-    // Simple solid colors - no gradients to mess up rendering
-    private static final float[] BG_NORMAL = {0.25f, 0.15f, 0.35f, 0.95f};      // Dark purple
-    private static final float[] BG_HOVER = {0.35f, 0.25f, 0.45f, 0.98f};       // Lighter purple
-    private static final float[] BG_PRESSED = {0.15f, 0.10f, 0.25f, 0.98f};     // Darker purple
-    private static final float[] BG_DISABLED = {0.15f, 0.15f, 0.15f, 0.6f};     // Gray
+    // Classic stone palette – neutral base with subtle hover bloom
+    private static final float[] BG_NORMAL = {0.36f, 0.36f, 0.36f, 0.96f};      // Stone grey
+    private static final float[] BG_HOVER = {0.46f, 0.46f, 0.46f, 0.98f};       // Lightened
+    private static final float[] BG_PRESSED = {0.26f, 0.26f, 0.26f, 0.98f};     // Darkened
+    private static final float[] BG_DISABLED = {0.18f, 0.18f, 0.18f, 0.6f};     // Dimmed
     
-    // Border colors for that vaporwave feel
-    private static final float[] BORDER_NORMAL = {0.98f, 0.26f, 0.63f, 0.9f};   // Hot pink
-    private static final float[] BORDER_HOVER = {0.0f, 0.95f, 0.95f, 1.0f};     // Cyan
-    private static final float[] BORDER_DISABLED = {0.4f, 0.4f, 0.4f, 0.5f};    // Gray
+    // Borders pick up the classic bevel highlight
+    private static final float[] BORDER_NORMAL = {0.82f, 0.82f, 0.82f, 0.9f};   // Soft highlight
+    private static final float[] BORDER_HOVER = {0.95f, 0.95f, 0.95f, 0.95f};   // Brighter edge
+    private static final float[] BORDER_DISABLED = {0.45f, 0.45f, 0.45f, 0.5f}; // Muted
     
     private static final float[] TEXT_COLOR = {1.0f, 1.0f, 1.0f, 1.0f};         // White
     private static final float[] TEXT_DISABLED = {0.5f, 0.5f, 0.5f, 0.6f};      // Gray
@@ -68,11 +66,6 @@ public class MenuButton extends UIComponent {
             bgColor = lerp(BG_NORMAL, BG_HOVER, hoverTransition);
             borderColor = lerp(BORDER_NORMAL, BORDER_HOVER, hoverTransition);
             textColor = TEXT_COLOR;
-        }
-        
-        // DEBUG: Print when rendering (only once per second to avoid spam)
-        if (Math.random() < 0.016) {  // ~1/60 chance = once per second at 60fps
-            System.out.println("[MenuButton] Rendering '" + text + "' at " + x + "," + y + " size " + width + "x" + height);
         }
         
         // Draw background rectangle - THIS WILL DEFINITELY SHOW UP

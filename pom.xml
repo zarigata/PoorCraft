@@ -21,6 +21,14 @@
         <py4j.version>0.10.9.7</py4j.version>
     </properties>
 
+    <repositories>
+        <!-- JitPack repository for Discord RPC -->
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <!-- LWJGL3 Core -->
         <dependency>
@@ -156,12 +164,7 @@
             <version>4.1.100.Final</version>
         </dependency>
 
-        <!-- Discord RPC (Rich Presence) -->
-        <dependency>
-            <groupId>club.minnced</groupId>
-            <artifactId>discord-rpc-release</artifactId>
-            <version>v3.4.0</version>
-        </dependency>
+        <!-- JSON library for Discord IPC (already have Gson, so we'll use that) -->
     </dependencies>
 
     <build>

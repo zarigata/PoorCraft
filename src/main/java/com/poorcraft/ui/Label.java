@@ -14,6 +14,7 @@ public class Label extends UIComponent {
     private String text;
     private float r, g, b, a;
     private boolean centered;
+    private float scale;
     
     /**
      * Creates a label with default white color.
@@ -45,6 +46,7 @@ public class Label extends UIComponent {
         this.b = b;
         this.a = a;
         this.centered = false;
+        this.scale = 1.0f;
     }
     
     @Override
@@ -53,10 +55,10 @@ public class Label extends UIComponent {
             return;
         }
         
-        float textWidth = fontRenderer.getTextWidth(text);
+        float textWidth = fontRenderer.getTextWidth(text) * scale;
         float drawX = centered ? x - textWidth / 2 : x;
         
-        fontRenderer.drawText(text, drawX, y, r, g, b, a);
+        fontRenderer.drawText(text, drawX, y, scale, r, g, b, a);
     }
     
     @Override
@@ -113,5 +115,23 @@ public class Label extends UIComponent {
      */
     public boolean isCentered() {
         return centered;
+    }
+
+    /**
+     * Sets the font scale relative to the base font size.
+     *
+     * @param scale scale factor (values <= 0 fall back to 1)
+     */
+    public void setScale(float scale) {
+        this.scale = scale <= 0 ? 1.0f : scale;
+    }
+
+    /**
+     * Gets the font scale.
+     *
+     * @return current scale factor
+     */
+    public float getScale() {
+        return scale;
     }
 }

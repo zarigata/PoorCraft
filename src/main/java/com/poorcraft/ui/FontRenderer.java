@@ -141,6 +141,22 @@ public class FontRenderer {
      * @param a Alpha component (0.0 to 1.0)
      */
     public void drawText(String text, float x, float y, float r, float g, float b, float a) {
+        drawText(text, x, y, 1.0f, r, g, b, a);
+    }
+
+    /**
+     * Draws text at the specified position with a scale multiplier.
+     *
+     * @param text Text to draw
+     * @param x X position (pixels from left)
+     * @param y Y position (pixels from top, baseline)
+     * @param scale Scale factor relative to the baked font size
+     * @param r Red component (0.0 to 1.0)
+     * @param g Green component (0.0 to 1.0)
+     * @param b Blue component (0.0 to 1.0)
+     * @param a Alpha component (0.0 to 1.0)
+     */
+    public void drawText(String text, float x, float y, float scale, float r, float g, float b, float a) {
         if (useFallback) {
             return;
         }
@@ -148,90 +164,76 @@ public class FontRenderer {
         if (text == null || text.isEmpty()) {
             return;
         }
-        
+
+        float appliedScale = scale <= 0 ? 1.0f : scale;
+
         glBindTexture(GL_TEXTURE_2D, fontAtlasTexture);
-        
+
         float currentX = x;
         float currentY = y;
-        
-        // Batch all character quads into a single buffer
-        // This is way more efficient than drawing each character separately
-        // Old me would've just used glBegin/glEnd, but that's so 2005
+
         FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(text.length() * 6 * 4);
         int quadCount = 0;
-        
+
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
-            
-            // Handle newlines
+
             if (c == '\n') {
                 currentX = x;
-                currentY += lineHeight;
+                currentY += lineHeight * appliedScale;
                 continue;
             }
-            
-            // Skip characters outside our range
+
             if (c < FIRST_CHAR || c >= FIRST_CHAR + CHAR_COUNT) {
                 continue;
             }
-            
-            // Get character data
+
             STBTTBakedChar charInfo = charData.get(c - FIRST_CHAR);
-            
-            // Calculate quad position and size
-            float charX = currentX + charInfo.xoff();
-            float charY = currentY + charInfo.yoff();
-            float charW = charInfo.x1() - charInfo.x0();
-            float charH = charInfo.y1() - charInfo.y0();
-            
-            // Calculate UV coordinates
+
+            float charX = currentX + charInfo.xoff() * appliedScale;
+            float charY = currentY + charInfo.yoff() * appliedScale;
+            float charW = (charInfo.x1() - charInfo.x0()) * appliedScale;
+            float charH = (charInfo.y1() - charInfo.y0()) * appliedScale;
+
             float u0 = charInfo.x0() / (float) ATLAS_WIDTH;
             float v0 = charInfo.y0() / (float) ATLAS_HEIGHT;
             float u1 = charInfo.x1() / (float) ATLAS_WIDTH;
             float v1 = charInfo.y1() / (float) ATLAS_HEIGHT;
-            
-            // Add character quad to batch (6 vertices, 4 floats each: x, y, u, v)
-            // Triangle 1
+
             vertexBuffer.put(charX).put(charY).put(u0).put(v0);
             vertexBuffer.put(charX + charW).put(charY).put(u1).put(v0);
             vertexBuffer.put(charX + charW).put(charY + charH).put(u1).put(v1);
-            
-            // Triangle 2
+
             vertexBuffer.put(charX + charW).put(charY + charH).put(u1).put(v1);
             vertexBuffer.put(charX).put(charY + charH).put(u0).put(v1);
             vertexBuffer.put(charX).put(charY).put(u0).put(v0);
-            
+
             quadCount++;
-            
-            // Advance cursor
-            currentX += charInfo.xadvance();
+
+            currentX += charInfo.xadvance() * appliedScale;
         }
-        
+
         if (quadCount == 0) {
             glBindTexture(GL_TEXTURE_2D, 0);
             return;
         }
-        
+
         vertexBuffer.flip();
-        
-        // Upload vertex data to VBO and draw
-        // Using UIRenderer's VBO for efficiency (no need to create our own)
+
         int vbo = uiRenderer.getVBO();
         int vao = uiRenderer.getVAO();
-        
+
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferData(GL_ARRAY_BUFFER, vertexBuffer, GL_DYNAMIC_DRAW);
-        
-        // Set shader uniforms
+
         uiRenderer.getShader().setUniform("uModel", new org.joml.Matrix4f().identity());
         uiRenderer.getShader().setUniform("uColor", r, g, b, a);
         uiRenderer.getShader().setUniform("uUseTexture", true);
-        
-        // Draw all character quads in one call
+
         glBindVertexArray(vao);
         glDrawArrays(GL_TRIANGLES, 0, quadCount * 6);
         glBindVertexArray(0);
-        
+
         glBindTexture(GL_TEXTURE_2D, 0);
     }
     

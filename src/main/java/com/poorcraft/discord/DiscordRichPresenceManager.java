@@ -1,8 +1,5 @@
 package com.poorcraft.discord;
 
-import club.minnced.discord.rpc.DiscordEventHandlers;
-import club.minnced.discord.rpc.DiscordRPC;
-import club.minnced.discord.rpc.DiscordRichPresence;
 import com.poorcraft.world.generation.BiomeType;
 
 /**
@@ -11,15 +8,15 @@ import com.poorcraft.world.generation.BiomeType;
  * Shows what you're doing in-game to all your Discord friends.
  * Because everyone needs to know you're grinding in a Minecraft clone.
  * This is basically flex culture but for poor people.
+ * 
+ * Uses custom IPC implementation - no external dependencies!
  */
 public class DiscordRichPresenceManager {
     
-    private static final String APPLICATION_ID = "1234567890123456789";  // TODO: Replace with actual Discord App ID
+    private static final long APPLICATION_ID = 1234567890123456789L;  // TODO: Replace with actual Discord App ID
     private static final String GAME_VERSION = "0.1.0-SNAPSHOT";
-    private static final String DOWNLOAD_URL = "https://github.com/yourproject/poorcraft";  // TODO: Update with actual URL
     
-    private final DiscordRPC lib;
-    private DiscordRichPresence presence;
+    private SimpleDiscordIPC ipc;
     private boolean initialized;
     private long startTimestamp;
     
@@ -28,9 +25,9 @@ public class DiscordRichPresenceManager {
      * Doesn't initialize connection yet - call init() for that.
      */
     public DiscordRichPresenceManager() {
-        this.lib = DiscordRPC.INSTANCE;
+        this.ipc = null;
         this.initialized = false;
-        this.startTimestamp = System.currentTimeMillis() / 1000; // Discord wants seconds, not milliseconds
+        this.startTimestamp = System.currentTimeMillis() / 1000;
     }
     
     /**
@@ -47,40 +44,30 @@ public class DiscordRichPresenceManager {
         
         try {
             System.out.println("[Discord] Initializing Rich Presence...");
+            System.out.println("[Discord] NOTE: Discord Rich Presence requires Java 16+ for Unix sockets");
+            System.out.println("[Discord] Windows support requires external library or Java 16+");
             
-            // Set up event handlers
-            // Most of these are just for logging because we're curious
-            // But mostly they just sit there doing nothing. Like me on a Sunday.
-            DiscordEventHandlers handlers = new DiscordEventHandlers();
-            handlers.ready = (user) -> {
-                System.out.println("[Discord] Ready! Connected as: " + user.username + "#" + user.discriminator);
-            };
-            handlers.disconnected = (errorCode, message) -> {
-                System.out.println("[Discord] Disconnected: " + errorCode + " - " + message);
-            };
-            handlers.errored = (errorCode, message) -> {
-                System.err.println("[Discord] Error: " + errorCode + " - " + message);
-            };
+            // Check Java version
+            int javaVersion = getJavaVersion();
+            if (javaVersion < 16) {
+                System.err.println("[Discord] Java " + javaVersion + " detected. Java 16+ required for native Discord IPC");
+                System.err.println("[Discord] Rich Presence disabled. Please upgrade to Java 16+ or use external library.");
+                return false;
+            }
             
-            // Initialize Discord RPC
-            lib.Discord_Initialize(APPLICATION_ID, handlers, true, null);
+            // Create IPC client
+            ipc = new SimpleDiscordIPC(APPLICATION_ID);
             
-            // Create initial presence
-            presence = new DiscordRichPresence();
-            presence.startTimestamp = startTimestamp;
-            presence.largeImageKey = "poorcraft_logo";  // Must match image key in Discord Developer Portal
-            presence.largeImageText = "PoorCraft v" + GAME_VERSION;
-            presence.details = "In Main Menu";
-            presence.state = "Starting up...";
+            try {
+                ipc.connect();
+            } catch (Exception e) {
+                System.err.println("[Discord] Could not connect to Discord: " + e.getMessage());
+                System.err.println("[Discord] Make sure Discord is running!");
+                return false;
+            }
             
-            // Set buttons for download/website
-            // NOTE: Buttons require Discord RPC API v2 which this library supports
-            presence.partyId = "poorcraft";
-            presence.partySize = 1;
-            presence.partyMax = 1;
-            
-            // Update presence
-            lib.Discord_UpdatePresence(presence);
+            // Set initial presence
+            updateMainMenu();
             
             initialized = true;
             System.out.println("[Discord] Rich Presence initialized successfully!");
@@ -95,17 +82,43 @@ public class DiscordRichPresenceManager {
     }
     
     /**
+     * Gets Java major version.
+     */
+    private int getJavaVersion() {
+        String version = System.getProperty("java.version");
+        if (version.startsWith("1.")) {
+            version = version.substring(2, 3);
+        } else {
+            int dot = version.indexOf(".");
+            if (dot != -1) {
+                version = version.substring(0, dot);
+            }
+        }
+        try {
+            return Integer.parseInt(version);
+        } catch (NumberFormatException e) {
+            return 8; // Default to 8 if we can't parse
+        }
+    }
+    
+    /**
      * Updates the rich presence with main menu state.
      */
     public void updateMainMenu() {
-        if (!initialized) return;
+        if (!initialized || ipc == null) return;
         
-        presence.details = "In Main Menu";
-        presence.state = "Deciding what to do";
-        presence.smallImageKey = "";
-        presence.smallImageText = "";
-        
-        lib.Discord_UpdatePresence(presence);
+        try {
+            SimpleDiscordIPC.RichPresenceData presence = new SimpleDiscordIPC.RichPresenceData();
+            presence.state = "Deciding what to do";
+            presence.details = "In Main Menu";
+            presence.startTimestamp = startTimestamp;
+            presence.largeImageKey = "poorcraft_logo";
+            presence.largeImageText = "PoorCraft v" + GAME_VERSION;
+            
+            ipc.updatePresence(presence);
+        } catch (Exception e) {
+            System.err.println("[Discord] Failed to update presence: " + e.getMessage());
+        }
     }
     
     /**
@@ -117,53 +130,67 @@ public class DiscordRichPresenceManager {
      * @param seed World seed (optional, can be 0)
      */
     public void updateInGame(BiomeType biome, boolean multiplayer, long seed) {
-        if (!initialized) return;
+        if (!initialized || ipc == null) return;
         
-        // Set details based on biome
-        // This is where we flex what biome we're in
-        // Because apparently that matters to people
-        String biomeName = biome != null ? biome.getName() : "Unknown";
-        presence.details = "Exploring " + biomeName;
-        
-        // Set state based on mode
-        if (multiplayer) {
-            presence.state = "Playing Multiplayer";
-        } else {
-            presence.state = "Playing Singleplayer";
+        try {
+            SimpleDiscordIPC.RichPresenceData presence = new SimpleDiscordIPC.RichPresenceData();
+            
+            String biomeName = biome != null ? biome.getName() : "Unknown";
+            presence.details = "Exploring " + biomeName;
+            presence.state = multiplayer ? "Playing Multiplayer" : "Playing Singleplayer";
+            presence.startTimestamp = startTimestamp;
+            presence.largeImageKey = "poorcraft_logo";
+            presence.largeImageText = "PoorCraft v" + GAME_VERSION;
+            
+            if (biome != null) {
+                presence.smallImageKey = biome.getName().toLowerCase() + "_biome";
+                presence.smallImageText = biomeName + " Biome";
+            }
+            
+            ipc.updatePresence(presence);
+        } catch (Exception e) {
+            System.err.println("[Discord] Failed to update presence: " + e.getMessage());
         }
-        
-        // Set biome-specific image if available
-        // We'll use small image for biome icon
-        if (biome != null) {
-            presence.smallImageKey = biome.getName().toLowerCase() + "_biome";
-            presence.smallImageText = biomeName + " Biome";
-        }
-        
-        lib.Discord_UpdatePresence(presence);
     }
     
     /**
      * Updates the rich presence with paused state.
      */
     public void updatePaused() {
-        if (!initialized) return;
+        if (!initialized || ipc == null) return;
         
-        presence.details = "Game Paused";
-        presence.state = "Taking a break";
-        
-        lib.Discord_UpdatePresence(presence);
+        try {
+            SimpleDiscordIPC.RichPresenceData presence = new SimpleDiscordIPC.RichPresenceData();
+            presence.state = "Taking a break";
+            presence.details = "Game Paused";
+            presence.startTimestamp = startTimestamp;
+            presence.largeImageKey = "poorcraft_logo";
+            presence.largeImageText = "PoorCraft v" + GAME_VERSION;
+            
+            ipc.updatePresence(presence);
+        } catch (Exception e) {
+            System.err.println("[Discord] Failed to update presence: " + e.getMessage());
+        }
     }
     
     /**
      * Updates the rich presence with world creation state.
      */
     public void updateCreatingWorld() {
-        if (!initialized) return;
+        if (!initialized || ipc == null) return;
         
-        presence.details = "Creating New World";
-        presence.state = "Generating terrain...";
-        
-        lib.Discord_UpdatePresence(presence);
+        try {
+            SimpleDiscordIPC.RichPresenceData presence = new SimpleDiscordIPC.RichPresenceData();
+            presence.state = "Generating terrain...";
+            presence.details = "Creating New World";
+            presence.startTimestamp = startTimestamp;
+            presence.largeImageKey = "poorcraft_logo";
+            presence.largeImageText = "PoorCraft v" + GAME_VERSION;
+            
+            ipc.updatePresence(presence);
+        } catch (Exception e) {
+            System.err.println("[Discord] Failed to update presence: " + e.getMessage());
+        }
     }
     
     /**
@@ -172,41 +199,54 @@ public class DiscordRichPresenceManager {
      * @param serverAddress Server address being connected to
      */
     public void updateConnectingMultiplayer(String serverAddress) {
-        if (!initialized) return;
+        if (!initialized || ipc == null) return;
         
-        presence.details = "Joining Server";
-        presence.state = "Connecting to " + serverAddress;
-        
-        lib.Discord_UpdatePresence(presence);
+        try {
+            SimpleDiscordIPC.RichPresenceData presence = new SimpleDiscordIPC.RichPresenceData();
+            presence.state = "Connecting to " + serverAddress;
+            presence.details = "Joining Server";
+            presence.startTimestamp = startTimestamp;
+            presence.largeImageKey = "poorcraft_logo";
+            presence.largeImageText = "PoorCraft v" + GAME_VERSION;
+            
+            ipc.updatePresence(presence);
+        } catch (Exception e) {
+            System.err.println("[Discord] Failed to update presence: " + e.getMessage());
+        }
     }
     
     /**
      * Shuts down Discord Rich Presence.
      * Call this when the game is closing.
-     * 
-     * Don't forget to call this or Discord will think you're still playing!
-     * I learned this the hard way when my friends kept asking why I was
-     * playing PoorCraft for 48 hours straight. I wasn't. The game crashed.
      */
     public void shutdown() {
-        if (!initialized) return;
+        if (!initialized || ipc == null) return;
         
         System.out.println("[Discord] Shutting down Rich Presence...");
-        lib.Discord_Shutdown();
+        try {
+            ipc.close();
+        } catch (Exception e) {
+            System.err.println("[Discord] Error during shutdown: " + e.getMessage());
+        }
         initialized = false;
         System.out.println("[Discord] Rich Presence shut down");
     }
     
     /**
      * Updates Discord callbacks.
-     * Should be called periodically (e.g., in game loop).
      * 
-     * This is important! Discord needs to process events.
-     * Call this every frame or so, otherwise Discord will think we froze.
+     * With our custom IPC, we don't need periodic callbacks.
+     * This method exists for API compatibility.
      */
     public void runCallbacks() {
-        if (!initialized) return;
-        lib.Discord_RunCallbacks();
+        // No-op - our IPC doesn't need periodic callbacks
+        if (!initialized || ipc == null) return;
+        
+        // Check if still connected
+        if (!ipc.isConnected()) {
+            System.out.println("[Discord] Connection lost");
+            initialized = false;
+        }
     }
     
     /**

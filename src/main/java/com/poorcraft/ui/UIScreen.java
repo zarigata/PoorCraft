@@ -58,7 +58,8 @@ public abstract class UIScreen {
      * @param fontRenderer Font renderer
      */
     public void render(UIRenderer renderer, FontRenderer fontRenderer) {
-        for (UIComponent component : components) {
+        // Use copy to avoid ConcurrentModificationException if components change during rendering
+        for (UIComponent component : new ArrayList<>(components)) {
             if (component.isVisible()) {
                 component.render(renderer, fontRenderer);
             }
@@ -71,7 +72,8 @@ public abstract class UIScreen {
      * @param deltaTime Time since last frame in seconds
      */
     public void update(float deltaTime) {
-        for (UIComponent component : components) {
+        // Use copy to avoid ConcurrentModificationException if components change during update
+        for (UIComponent component : new ArrayList<>(components)) {
             if (component.isVisible()) {
                 component.update(deltaTime);
             }
@@ -85,7 +87,8 @@ public abstract class UIScreen {
      * @param mouseY Mouse Y position
      */
     public void onMouseMove(float mouseX, float mouseY) {
-        for (UIComponent component : components) {
+        // Use copy to avoid ConcurrentModificationException if components change during event
+        for (UIComponent component : new ArrayList<>(components)) {
             if (component.isVisible()) {
                 component.onMouseMove(mouseX, mouseY);
             }
@@ -101,9 +104,12 @@ public abstract class UIScreen {
      * @param button Mouse button
      */
     public void onMouseClick(float mouseX, float mouseY, int button) {
+        // Use copy to avoid ConcurrentModificationException if components change during event
+        List<UIComponent> componentsCopy = new ArrayList<>(components);
+        
         // Update focused component
         UIComponent newFocus = null;
-        for (UIComponent component : components) {
+        for (UIComponent component : componentsCopy) {
             if (component.isVisible() && component.isMouseOver(mouseX, mouseY)) {
                 if (component instanceof TextField) {
                     newFocus = component;
@@ -121,7 +127,7 @@ public abstract class UIScreen {
         focusedComponent = newFocus;
         
         // Forward click to all components
-        for (UIComponent component : components) {
+        for (UIComponent component : componentsCopy) {
             if (component.isVisible()) {
                 component.onMouseClick(mouseX, mouseY, button);
             }
@@ -136,7 +142,9 @@ public abstract class UIScreen {
      * @param button Mouse button
      */
     public void onMouseRelease(float mouseX, float mouseY, int button) {
-        for (UIComponent component : components) {
+        // Use copy to avoid ConcurrentModificationException if components change during event
+        // This is critical because onClick callbacks might rebuild the screen (e.g., tab switches)
+        for (UIComponent component : new ArrayList<>(components)) {
             if (component.isVisible()) {
                 component.onMouseRelease(mouseX, mouseY, button);
             }

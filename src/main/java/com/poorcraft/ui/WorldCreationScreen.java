@@ -3,6 +3,12 @@ package com.poorcraft.ui;
 import java.util.Arrays;
 import java.util.Random;
 
+import static com.poorcraft.ui.LayoutUtils.centerHorizontally;
+import static com.poorcraft.ui.LayoutUtils.centerVertically;
+import static com.poorcraft.ui.LayoutUtils.clamp;
+import static com.poorcraft.ui.LayoutUtils.scaledHeight;
+import static com.poorcraft.ui.LayoutUtils.scaledWidth;
+
 /**
  * World creation screen.
  * 
@@ -14,6 +20,8 @@ import java.util.Random;
  */
 public class WorldCreationScreen extends UIScreen {
     
+    private static final float BASE_FONT_SIZE = 20f;
+
     private UIManager uiManager;
     private TextField worldNameField;
     private TextField seedField;
@@ -35,81 +43,95 @@ public class WorldCreationScreen extends UIScreen {
     @Override
     public void init() {
         clearComponents();
-        
-        float centerX = windowWidth / 2.0f;
-        float startY = windowHeight * 0.2f;
-        float fieldWidth = 300;
-        float fieldHeight = 35;
-        float spacing = 60;
-        
+        float panelWidth = scaledWidth(windowWidth, 0.6f, 520f, 860f);
+        float panelHeight = scaledHeight(windowHeight, 0.65f, 520f, 900f);
+        float panelX = centerHorizontally(windowWidth, panelWidth);
+        float panelY = centerVertically(windowHeight, panelHeight);
+
+        float titleFontSizePx = clamp(windowHeight * 0.04f, 26f, 48f);
+        float labelFontSizePx = clamp(windowHeight * 0.024f, 18f, 28f);
+        float titleScale = titleFontSizePx / BASE_FONT_SIZE;
+        float labelScale = labelFontSizePx / BASE_FONT_SIZE;
+        float fieldHeight = clamp(windowHeight * 0.05f, 42f, 64f);
+        float buttonHeight = clamp(windowHeight * 0.055f, 48f, 68f);
+
+        float innerPadding = fieldHeight * 0.8f;
+        float contentX = panelX + innerPadding;
+        float contentWidth = panelWidth - innerPadding * 2;
+        float currentY = panelY + innerPadding;
+        float rowSpacing = fieldHeight * 1.35f;
+
         // Title
-        Label titleLabel = new Label(centerX, startY, "Create New World", 
+        Label titleLabel = new Label(panelX + panelWidth / 2, currentY, "Create New World",
             1.0f, 1.0f, 1.0f, 1.0f);
         titleLabel.setCentered(true);
+        titleLabel.setScale(titleScale);
         addComponent(titleLabel);
-        
-        // World name
-        float currentY = startY + 60;
-        Label nameLabel = new Label(centerX - fieldWidth / 2, currentY, "World Name:");
+
+        currentY += titleFontSizePx + fieldHeight * 0.6f;
+
+        Label nameLabel = new Label(contentX, currentY, "World Name:");
+        nameLabel.setScale(labelScale);
         addComponent(nameLabel);
-        
-        worldNameField = new TextField(centerX - fieldWidth / 2, currentY + 25, 
-            fieldWidth, fieldHeight, "My World");
+
+        worldNameField = new TextField(contentX, currentY + labelFontSizePx + 10f,
+            contentWidth, fieldHeight, "My World");
         worldNameField.setText("New World");
         addComponent(worldNameField);
-        
+
         // Seed
-        currentY += spacing;
-        Label seedLabel = new Label(centerX - fieldWidth / 2, currentY, "Seed (leave empty for random):");
+        currentY += rowSpacing;
+        Label seedLabel = new Label(contentX, currentY, "Seed (leave empty for random):");
+        seedLabel.setScale(labelScale);
         addComponent(seedLabel);
-        
-        seedField = new TextField(centerX - fieldWidth / 2, currentY + 25, 
-            fieldWidth - 80, fieldHeight, "0");
+
+        float seedFieldWidth = contentWidth - fieldHeight * 1.8f;
+        seedField = new TextField(contentX, currentY + labelFontSizePx + 10f,
+            seedFieldWidth, fieldHeight, "0");
         addComponent(seedField);
-        
-        // Random seed button
-        Button randomButton = new Button(centerX + fieldWidth / 2 - 70, currentY + 25, 
-            70, fieldHeight, "Random", this::onRandomSeed);
+
+        // Random seed button (classic menu button)
+        float randomButtonWidth = fieldHeight * 2.2f;
+        MenuButton randomButton = new MenuButton(contentX + seedFieldWidth + fieldHeight * 0.6f,
+            currentY + labelFontSizePx + 10f, randomButtonWidth, fieldHeight, "RANDOM", this::onRandomSeed);
         addComponent(randomButton);
-        
+
         // Game mode
-        currentY += spacing;
-        Label gameModeLabel = new Label(centerX - fieldWidth / 2, currentY, "Game Mode:");
+        currentY += rowSpacing;
+        Label gameModeLabel = new Label(contentX, currentY, "Game Mode:");
+        gameModeLabel.setScale(labelScale);
         addComponent(gameModeLabel);
-        
-        gameModeDropdown = new Dropdown(centerX - fieldWidth / 2, currentY + 25, 
-            fieldWidth, fieldHeight, 
+
+        gameModeDropdown = new Dropdown(contentX, currentY + labelFontSizePx + 10f, 
+            contentWidth, fieldHeight, 
             Arrays.asList("Survival", "Creative"), 
             0, 
             index -> {});
         addComponent(gameModeDropdown);
-        
+
         // Generate structures
-        currentY += spacing;
-        generateStructuresCheckbox = new Checkbox(centerX - fieldWidth / 2, currentY, 
-            20, "Generate Structures (trees, cacti, etc.)", 
+        currentY += rowSpacing;
+        generateStructuresCheckbox = new Checkbox(contentX, currentY + labelFontSizePx * 0.3f, 
+            fieldHeight * 0.8f, "Generate Structures (trees, cacti, etc.)", 
             true, 
             checked -> {});
         addComponent(generateStructuresCheckbox);
-        
-        // Buttons
-        currentY += spacing + 20;
-        float buttonWidth = 140;
-        float buttonHeight = 40;
-        float buttonSpacing = 20;
-        
-        Button createButton = new Button(
-            centerX - buttonWidth - buttonSpacing / 2, currentY, 
+        currentY += rowSpacing + fieldHeight * 0.6f;
+        float buttonWidth = (contentWidth - fieldHeight * 0.6f) / 2f;
+        float buttonY = currentY;
+
+        MenuButton createButton = new MenuButton(
+            contentX, buttonY, 
             buttonWidth, buttonHeight, 
-            "Create World", 
+            "CREATE WORLD", 
             this::onCreateWorld
         );
         addComponent(createButton);
-        
-        Button cancelButton = new Button(
-            centerX + buttonSpacing / 2, currentY, 
+
+        MenuButton cancelButton = new MenuButton(
+            contentX + buttonWidth + fieldHeight * 0.6f, buttonY, 
             buttonWidth, buttonHeight, 
-            "Cancel", 
+            "CANCEL", 
             () -> uiManager.setState(GameState.MAIN_MENU)
         );
         addComponent(cancelButton);
@@ -166,10 +188,28 @@ public class WorldCreationScreen extends UIScreen {
     
     @Override
     public void render(UIRenderer renderer, FontRenderer fontRenderer) {
-        // Draw background
-        renderer.drawRect(0, 0, windowWidth, windowHeight, 0.1f, 0.1f, 0.15f, 1.0f);
-        
-        // Draw all components
+        // Draw darkened backdrop
+        renderer.drawRect(0, 0, windowWidth, windowHeight, 0.05f, 0.1f, 0.15f, 0.92f);
+
+        // Draw panel behind inputs (stone-inspired card)
+        float panelWidth = scaledWidth(windowWidth, 0.6f, 520f, 860f);
+        float panelHeight = scaledHeight(windowHeight, 0.65f, 520f, 900f);
+        float panelX = centerHorizontally(windowWidth, panelWidth);
+        float panelY = centerVertically(windowHeight, panelHeight);
+
+        renderer.drawRect(panelX, panelY, panelWidth, panelHeight,
+            0.18f, 0.18f, 0.2f, 0.95f);
+
+        float borderSize = 4f;
+        renderer.drawRect(panelX, panelY, panelWidth, borderSize,
+            0.6f, 0.6f, 0.65f, 0.9f);
+        renderer.drawRect(panelX, panelY + panelHeight - borderSize, panelWidth, borderSize,
+            0.12f, 0.12f, 0.14f, 0.9f);
+        renderer.drawRect(panelX, panelY, borderSize, panelHeight,
+            0.6f, 0.6f, 0.65f, 0.9f);
+        renderer.drawRect(panelX + panelWidth - borderSize, panelY, borderSize, panelHeight,
+            0.12f, 0.12f, 0.14f, 0.9f);
+
         super.render(renderer, fontRenderer);
     }
 }
