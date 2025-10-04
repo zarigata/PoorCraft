@@ -10,44 +10,44 @@ package com.poorcraft.world.block;
 public enum BlockType {
     
     // Air - the most important block (it's literally nothing but we need it)
-    AIR(0, true, false),
+    AIR(0, true, false, 0.0f),
     
     // Basic terrain blocks
-    DIRT(1, false, true),
-    STONE(2, false, true),
+    DIRT(1, false, true, 0.5f),
+    STONE(2, false, true, 1.5f),
     
     // Plains biome blocks
-    GRASS(3, false, true),
+    GRASS(3, false, true, 0.4f),
     
     // Desert biome blocks
-    SAND(4, false, true),
-    SANDSTONE(5, false, true),
+    SAND(4, false, true, 0.6f),
+    SANDSTONE(5, false, true, 1.2f),
     
     // Snow biome blocks
-    SNOW_BLOCK(6, false, true),
-    ICE(7, true, true),  // Semi-transparent like in Minecraft
+    SNOW_BLOCK(6, false, true, 0.3f),
+    ICE(7, true, true, 0.8f),  // Semi-transparent like in Minecraft
     
     // Jungle biome blocks
-    JUNGLE_GRASS(8, false, true),
-    JUNGLE_DIRT(9, false, true),
+    JUNGLE_GRASS(8, false, true, 0.45f),
+    JUNGLE_DIRT(9, false, true, 0.55f),
     
     // Tree blocks (for all biomes)
-    WOOD(10, false, true),
-    LEAVES(11, true, true),  // Semi-transparent
+    WOOD(10, false, true, 1.0f),
+    LEAVES(11, true, true, 0.2f),  // Semi-transparent
     
     // Desert features
-    CACTUS(12, false, true),
-    
+    CACTUS(12, false, true, 0.3f),
     // Snow features
-    SNOW_LAYER(13, true, false),  // Decorative, non-solid
+    SNOW_LAYER(13, true, false, 0.1f),  // Decorative, non-solid
     
     // Bedrock - the unbreakable bottom layer
     // Because falling into the void is a feature, not a bug
-    BEDROCK(14, false, true);
-    
+    BEDROCK(14, false, true, Float.POSITIVE_INFINITY);
+
     private final int id;
     private final boolean transparent;
     private final boolean solid;
+    private final float hardness;
     
     /**
      * Constructor for BlockType enum.
@@ -56,10 +56,11 @@ public enum BlockType {
      * @param transparent Whether light passes through (affects face culling)
      * @param solid Whether player collides with it (for future physics)
      */
-    BlockType(int id, boolean transparent, boolean solid) {
+    BlockType(int id, boolean transparent, boolean solid, float hardness) {
         this.id = id;
         this.transparent = transparent;
         this.solid = solid;
+        this.hardness = hardness;
     }
     
     /**
@@ -89,6 +90,16 @@ public enum BlockType {
      */
     public boolean isSolid() {
         return solid;
+    }
+
+    /**
+     * Gets the mining hardness of this block.
+     * Higher values require more time to break by hand.
+     *
+     * @return Hardness value in arbitrary units (0 = instant, {@link Float#POSITIVE_INFINITY} = unbreakable)
+     */
+    public float getHardness() {
+        return hardness;
     }
     
     /**

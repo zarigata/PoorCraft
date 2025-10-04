@@ -6,6 +6,7 @@ import com.poorcraft.config.Settings;
 import com.poorcraft.discord.DiscordRichPresenceManager;
 import com.poorcraft.input.InputHandler;
 import com.poorcraft.modding.ModLoader;
+import com.poorcraft.render.BlockHighlightRenderer;
 import com.poorcraft.render.ChunkRenderer;
 import com.poorcraft.render.TextureGenerator;
 import com.poorcraft.ui.GameState;
@@ -36,15 +37,18 @@ public class Game {
     private InputHandler inputHandler;
     private Camera camera;
     private PlayerController playerController;
+    private MiningSystem miningSystem;
     private Settings settings;
     private ConfigManager configManager;
     private UIManager uiManager;
     private World world;
     private ChunkManager chunkManager;
     private ChunkRenderer chunkRenderer;
+    private BlockHighlightRenderer blockHighlightRenderer;
     private ModLoader modLoader;
     private DiscordRichPresenceManager discordRPC;
     private GameMode currentGameMode;
+    private boolean highlightRendererInitialized;
     
     private boolean running;
     private boolean worldLoaded;  // Track if world is loaded
@@ -69,6 +73,9 @@ public class Game {
         this.lastBiome = null;
         this.discordUpdateTimer = 0.0f;
         this.currentGameMode = GameMode.SURVIVAL;
+        this.miningSystem = new MiningSystem();
+        this.blockHighlightRenderer = new BlockHighlightRenderer();
+        this.highlightRendererInitialized = false;
     }
     
     /**
@@ -241,6 +248,10 @@ public class Game {
             playerController.update(world, inputHandler, settings, camera, deltaTime);
             camera.setPosition(playerController.getEyePosition());
         }
+
+        if (miningSystem != null) {
+            miningSystem.update(world, camera, inputHandler, deltaTime);
+        }
         
         // Update chunk manager with camera position
         // This handles dynamic chunk loading/unloading as player moves
@@ -280,6 +291,12 @@ public class Game {
             // Render all loaded chunks
             Collection<Chunk> loadedChunks = world.getLoadedChunks();
             chunkRenderer.render(loadedChunks, view, projection);
+
+            if (highlightRendererInitialized && miningSystem != null) {
+                miningSystem.getAimedTarget().ifPresent(target ->
+                    blockHighlightRenderer.render(target, miningSystem.getBreakProgress(), view, projection)
+                );
+            }
         }
         
         // Reset OpenGL state before UI rendering
@@ -329,6 +346,11 @@ public class Game {
             chunkManager.shutdown();
             System.out.println("[Game] World cleaned up");
         }
+
+        if (highlightRendererInitialized && blockHighlightRenderer != null) {
+            blockHighlightRenderer.cleanup();
+            highlightRendererInitialized = false;
+        }
         
         window.destroy();
         System.out.println("[Game] Cleanup complete");
@@ -370,6 +392,15 @@ public class Game {
      */
     public ChunkRenderer getChunkRenderer() {
         return chunkRenderer;
+    }
+
+    /**
+     * Exposes the mining system for HUD and other systems.
+     *
+     * @return active MiningSystem instance
+     */
+    public MiningSystem getMiningSystem() {
+        return miningSystem;
     }
     
     /**
@@ -421,21 +452,22 @@ public class Game {
         }
 
         // Set up chunk unload callback
-        if (world != null) {
-            world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
+        world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
+
+        ensureHighlightRendererInitialized();
+        if (miningSystem != null) {
+            miningSystem.reset();
         }
 
         // Mark world as loaded
         worldLoaded = true;
-        
-        // Spawn player at terrain height and sync camera
+
         if (playerController != null) {
             playerController.respawn(world);
             playerController.setGameMode(currentGameMode);
             camera.setPosition(playerController.getEyePosition());
         }
 
-        // Cursor grabbing is now handled by UIManager.setState() when transitioning to IN_GAME
         // No need to manually grab here anymore. One less thing to worry about!
 
         System.out.println("[Game] World creation complete!");
@@ -465,19 +497,22 @@ public class Game {
         } else {
             chunkRenderer.setModLoader(modLoader);
         }
-        
+
         // Set up chunk unload callback
         world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
-        
+
+        ensureHighlightRendererInitialized();
+        if (miningSystem != null) {
+            miningSystem.reset();
+        }
+
         // Mark world as loaded
         worldLoaded = true;
-        
+
         System.out.println("[Game] Remote world set for multiplayer");
     }
-    
+
     /**
-     * Checks if game is in multiplayer mode.
-     * 
      * @return True if multiplayer mode
      */
     public boolean isMultiplayerMode() {
@@ -576,5 +611,12 @@ public class Game {
      */
     public DiscordRichPresenceManager getDiscordRPC() {
         return discordRPC;
+    }
+
+    private void ensureHighlightRendererInitialized() {
+        if (!highlightRendererInitialized && blockHighlightRenderer != null) {
+            blockHighlightRenderer.init();
+            highlightRendererInitialized = true;
+        }
     }
 }
