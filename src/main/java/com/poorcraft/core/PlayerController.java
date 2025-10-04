@@ -32,6 +32,10 @@ public class PlayerController {
     private static final float COLLISION_EPSILON = 0.001f;
     private static final float GROUND_CHECK_DEPTH = 0.05f;
     private static final float DOUBLE_TAP_MAX_TIME = 0.3f;
+    private static final float GROUND_SPRINT_MULTIPLIER = 2.0f;
+    private static final float MAX_SPRINT_MULTIPLIER = 10.0f;
+    private static final float SPRINT_ACCELERATION_RATE = 4.0f;
+    private static final float SPRINT_DECELERATION_RATE = 6.0f;
 
     private final Vector3f position;
     private final Vector3f velocity;
@@ -43,6 +47,7 @@ public class PlayerController {
     private float jumpTapTimer;
     private boolean jumpWasPressed;
     private GameMode gameMode;
+    private float sprintSpeedMultiplier;
 
     public PlayerController(Vector3f startPosition) {
         this.position = new Vector3f(startPosition);
@@ -55,6 +60,7 @@ public class PlayerController {
         this.jumpTapTimer = DOUBLE_TAP_MAX_TIME + 1.0f;
         this.jumpWasPressed = false;
         this.gameMode = GameMode.SURVIVAL;
+        this.sprintSpeedMultiplier = 1.0f;
     }
 
     /**
@@ -67,6 +73,7 @@ public class PlayerController {
         this.playerHeight = STANDING_HEIGHT;
         this.eyeHeight = STANDING_EYE_HEIGHT;
         this.crouching = false;
+        this.sprintSpeedMultiplier = 1.0f;
     }
 
     public void setPosition(Vector3f newPosition) {
@@ -183,11 +190,26 @@ public class PlayerController {
         }
 
         boolean crouchActive = crouching;
-        float speedMultiplier = 1.0f;
-        if (sprintPressed && !crouchActive) {
-            speedMultiplier = settings.camera.sprintMultiplier;
-        } else if (crouchActive) {
-            speedMultiplier = settings.camera.sneakMultiplier;
+        float speedMultiplier;
+
+        if (flying) {
+            if (sprintPressed) {
+                sprintSpeedMultiplier = Math.min(MAX_SPRINT_MULTIPLIER,
+                    sprintSpeedMultiplier + SPRINT_ACCELERATION_RATE * deltaTime);
+            } else {
+                sprintSpeedMultiplier = Math.max(1.0f,
+                    sprintSpeedMultiplier - SPRINT_DECELERATION_RATE * deltaTime);
+            }
+            speedMultiplier = sprintSpeedMultiplier;
+        } else {
+            sprintSpeedMultiplier = 1.0f;
+            if (crouchActive) {
+                speedMultiplier = settings.camera.sneakMultiplier;
+            } else if (sprintPressed) {
+                speedMultiplier = GROUND_SPRINT_MULTIPLIER;
+            } else {
+                speedMultiplier = 1.0f;
+            }
         }
 
         float moveSpeed = settings.camera.moveSpeed * speedMultiplier;
@@ -196,7 +218,7 @@ public class PlayerController {
         velocity.z = horizontalVelocity.z;
 
         if (flying) {
-            float flySpeed = settings.camera.moveSpeed * (sprintPressed ? settings.camera.sprintMultiplier : 1.0f);
+            float flySpeed = settings.camera.moveSpeed * speedMultiplier;
             float verticalVelocity = 0.0f;
             if (jumpPressed) {
                 verticalVelocity += flySpeed;

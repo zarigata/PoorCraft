@@ -65,8 +65,8 @@ public class Settings {
         settings.controls.keybinds.put("left", 65);       // A
         settings.controls.keybinds.put("right", 68);      // D
         settings.controls.keybinds.put("jump", 32);       // Space
-        settings.controls.keybinds.put("sneak", 340);     // Left Shift
-        settings.controls.keybinds.put("sprint", 341);    // Left Control
+        settings.controls.keybinds.put("sneak", 341);     // Left Control
+        settings.controls.keybinds.put("sprint", 340);    // Left Shift
         settings.controls.keybinds.put("inventory", 69);  // E
         settings.controls.keybinds.put("debug", 290);     // F3
         
