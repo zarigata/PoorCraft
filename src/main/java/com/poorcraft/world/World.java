@@ -13,9 +13,9 @@ import com.poorcraft.world.generation.FeatureGenerator;
 import com.poorcraft.world.generation.TerrainGenerator;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
@@ -53,7 +53,7 @@ public class World {
         }
         
         this.generateStructures = generateStructures;
-        this.chunks = new HashMap<>();
+        this.chunks = new ConcurrentHashMap<>();
         this.biomeGenerator = new BiomeGenerator(this.seed);
         this.terrainGenerator = new TerrainGenerator(this.seed);
         this.featureGenerator = new FeatureGenerator(this.seed, biomeGenerator, terrainGenerator);

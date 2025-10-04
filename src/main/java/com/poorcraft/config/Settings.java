@@ -50,6 +50,9 @@ public class Settings {
         settings.graphics.fov = 70.0f;
         settings.graphics.renderDistance = 8;
         settings.graphics.maxFps = 144;
+        settings.graphics.fogStart = 48.0f;
+        settings.graphics.fogEnd = 96.0f;
+        settings.graphics.fogColor = new float[]{0.74f, 0.84f, 0.93f};
         
         settings.audio = new AudioSettings();
         settings.audio.masterVolume = 1.0f;
@@ -115,6 +118,9 @@ public class Settings {
         public float fov;           // Field of view in degrees
         public int renderDistance;  // Render distance in chunks
         public int maxFps;          // Maximum FPS (0 for unlimited)
+        public float fogStart;      // Distance where fog starts (world units)
+        public float fogEnd;        // Distance where fog is fully opaque (world units)
+        public float[] fogColor;    // Fog color RGB
     }
     
     /**

@@ -10,6 +10,8 @@ import com.poorcraft.inventory.Inventory;
 import com.poorcraft.render.BlockHighlightRenderer;
 import com.poorcraft.render.ChunkRenderer;
 import com.poorcraft.render.ItemDropRenderer;
+import com.poorcraft.render.SkyRenderer;
+import com.poorcraft.render.SunLight;
 import com.poorcraft.render.TextureGenerator;
 import com.poorcraft.ui.GameState;
 import com.poorcraft.ui.UIManager;
@@ -48,6 +50,7 @@ public class Game {
     private World world;
     private ChunkManager chunkManager;
     private ChunkRenderer chunkRenderer;
+    private SkyRenderer skyRenderer;
     private BlockHighlightRenderer blockHighlightRenderer;
     private ItemDropRenderer itemDropRenderer;
     private DropManager dropManager;
@@ -55,6 +58,9 @@ public class Game {
     private DiscordRichPresenceManager discordRPC;
     private GameMode currentGameMode;
     private boolean highlightRendererInitialized;
+    private SunLight sunLight;
+    private float timeOfDay;
+    private static final float DAY_LENGTH_SECONDS = 600.0f;
     
     private boolean running;
     private boolean worldLoaded;  // Track if world is loaded
@@ -90,6 +96,8 @@ public class Game {
         this.highlightRendererInitialized = false;
         this.selectedHotbarSlot = 0;
         this.hotbarScrollRemainder = 0.0;
+        this.sunLight = new SunLight();
+        this.timeOfDay = 0.25f; // Start early morning
     }
     
     /**
@@ -143,6 +151,9 @@ public class Game {
         modLoader = new ModLoader(this);
         modLoader.init();
         System.out.println("[Game] Mod loader initialized");
+
+        skyRenderer = new SkyRenderer();
+        skyRenderer.init();
 
         // Generate baseline textures before mods start tinkering with them
         Map<String, ByteBuffer> generatedTextures = TextureGenerator.ensureDefaultBlockTextures();
@@ -232,7 +243,14 @@ public class Game {
     private void update(float deltaTime) {
         // Update UI
         uiManager.update(deltaTime);
-        
+
+        timeOfDay = (timeOfDay + (deltaTime / DAY_LENGTH_SECONDS)) % 1.0f;
+        updateSkyLighting(timeOfDay);
+
+        if (skyRenderer != null) {
+            skyRenderer.update(deltaTime);
+        }
+
         // Update Discord Rich Presence callbacks
         // Discord needs regular updates or it'll think we froze
         // Kind of like a needy friend who needs constant attention
@@ -285,6 +303,20 @@ public class Game {
     }
     
     /**
+     * Updates sky lighting based on time of day.
+     * 
+     * @param timeOfDay Time of day (0.0 = midnight, 0.5 = noon, 1.0 = midnight)
+     */
+    private void updateSkyLighting(float timeOfDay) {
+        Vector3f focusPoint = camera != null ? camera.getPosition() : new Vector3f();
+        float coverage = settings != null ? settings.world.chunkLoadDistance * Chunk.CHUNK_SIZE : 128f;
+        sunLight.update(timeOfDay, focusPoint, coverage);
+        if (chunkRenderer != null) {
+            chunkRenderer.setSunLight(sunLight);
+        }
+    }
+    
+    /**
      * Renders the current frame.
      * Renders all loaded chunks with frustum culling and lighting.
      */
@@ -308,6 +340,11 @@ public class Game {
                 1000.0f // Far plane
             );
             
+            if (skyRenderer != null && sunLight != null) {
+                float aspect = (float) window.getWidth() / window.getHeight();
+                skyRenderer.render(camera, settings.graphics.fov, aspect, sunLight.getDirection());
+            }
+
             // Render all loaded chunks
             Collection<Chunk> loadedChunks = world.getLoadedChunks();
             chunkRenderer.render(loadedChunks, view, projection);
@@ -363,6 +400,10 @@ public class Game {
         if (chunkRenderer != null) {
             chunkRenderer.cleanup();
             System.out.println("[Game] Chunk renderer cleaned up");
+        }
+
+        if (skyRenderer != null) {
+            skyRenderer.cleanup();
         }
         
         // Shutdown world system
@@ -471,53 +512,49 @@ public class Game {
         GameMode mode = gameMode != null ? gameMode : GameMode.SURVIVAL;
         currentGameMode = mode;
 
-        // Check if multiplayer mode
-        if (multiplayerMode) {
-            // In multiplayer, world comes from network client, skip local generation
-            System.out.println("[Game] Multiplayer world loaded");
-        } else {
-            // Single-player: create local world
-            // Initialize world
+        if (!multiplayerMode) {
             world = new World(seed, generateStructures);
-            
-            // Set EventBus on world so mods can receive world/block/chunk events
-            // This is critical - without it, mods never get notified of world changes!
             world.setEventBus(modLoader.getEventBus());
-            
-            // Initialize chunk manager
             chunkManager = new ChunkManager(
                 world,
                 settings.world.chunkLoadDistance,
                 settings.world.chunkUnloadDistance
             );
-            
-            // Initial chunk load around spawn
             chunkManager.update(camera.getPosition());
             System.out.println("[Game] World initialized with seed: " + world.getSeed());
+        } else if (world == null) {
+            System.err.println("[Game] Warning: multiplayer world not provided before createWorld call");
+            return;
         }
 
-        // Initialize chunk renderer if not already initialized
         if (chunkRenderer == null) {
             chunkRenderer = new ChunkRenderer();
             chunkRenderer.setModLoader(modLoader);
+            chunkRenderer.setSettings(settings);
+            chunkRenderer.setSunLight(sunLight);
             chunkRenderer.init();
-            itemDropRenderer.init();
-            itemDropRenderer.setTextureAtlas(chunkRenderer.getTextureAtlas());
             System.out.println("[Game] Chunk renderer initialized");
         } else {
-            chunkRenderer.setModLoader(modLoader);
-            itemDropRenderer.setTextureAtlas(chunkRenderer.getTextureAtlas());
+            chunkRenderer.setSettings(settings);
+            chunkRenderer.setSunLight(sunLight);
         }
 
-        // Set up chunk unload callback
-        world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
+        if (world != null) {
+            world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
+        }
+
+        updateSkyLighting(0.0f);
+
+        itemDropRenderer.init();
+        itemDropRenderer.setTextureAtlas(chunkRenderer.getTextureAtlas());
+        dropManager.clear();
 
         ensureHighlightRendererInitialized();
+
         if (miningSystem != null) {
             miningSystem.reset();
         }
 
-        // Mark world as loaded
         worldLoaded = true;
 
         if (playerController != null) {
@@ -526,9 +563,11 @@ public class Game {
             camera.setPosition(playerController.getEyePosition());
         }
 
-        // No need to manually grab here anymore. One less thing to worry about!
-
         System.out.println("[Game] World creation complete!");
+    }
+
+    public SunLight getSunLight() {
+        return sunLight;
     }
 
     /**
@@ -545,30 +584,40 @@ public class Game {
         // Set EventBus on world so mods can receive world/block/chunk events
         // Even in multiplayer, mods need to know about world changes
         world.setEventBus(modLoader.getEventBus());
-        
-        // Initialize chunk renderer if not already initialized
-        if (chunkRenderer == null) {
-            chunkRenderer = new ChunkRenderer();
-            chunkRenderer.setModLoader(modLoader);
-            chunkRenderer.init();
-            System.out.println("[Game] Chunk renderer initialized");
-        } else {
-            chunkRenderer.setModLoader(modLoader);
-        }
-
-        // Set up chunk unload callback
-        world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
-
         ensureHighlightRendererInitialized();
         if (miningSystem != null) {
             miningSystem.reset();
         }
 
-        // Mark world as loaded
-        worldLoaded = true;
+        if (chunkRenderer == null) {
+            chunkRenderer = new ChunkRenderer();
+            chunkRenderer.setModLoader(modLoader);
+            chunkRenderer.setSettings(settings);
+            chunkRenderer.setSunLight(sunLight);
+            chunkRenderer.init();
+            System.out.println("[Game] Chunk renderer initialized");
+        } else {
+            chunkRenderer.setSettings(settings);
+            chunkRenderer.setSunLight(sunLight);
+        }
 
+        if (world != null) {
+            world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
+        }
+
+        updateSkyLighting(0.0f);
+
+        itemDropRenderer.init();
         itemDropRenderer.setTextureAtlas(chunkRenderer.getTextureAtlas());
         dropManager.clear();
+
+        ensureHighlightRendererInitialized();
+
+        if (miningSystem != null) {
+            miningSystem.reset();
+        }
+
+        worldLoaded = true;
 
         System.out.println("[Game] Remote world set for multiplayer");
     }

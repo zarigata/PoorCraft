@@ -4,6 +4,7 @@
 in vec2 vTexCoord;  // Texture coordinates
 in vec3 vNormal;    // Normal vector (for lighting)
 in vec3 vFragPos;   // World position (for lighting)
+in float vFogDistance; // Distance for fog calculation
 
 // Output color
 out vec4 FragColor;
@@ -14,6 +15,9 @@ uniform vec3 uLightDirection;      // Directional light direction (normalized)
 uniform vec3 uLightColor;          // Directional light color
 uniform vec3 uAmbientColor;        // Ambient light color
 uniform float uAmbientStrength;    // Ambient light strength (0.0 to 1.0)
+uniform vec3 uFogColor;            // Fog color
+uniform float uFogStart;           // Distance where fog starts
+uniform float uFogEnd;             // Distance where fog is fully opaque
 
 void main() {
     // Sample texture from atlas
@@ -45,6 +49,10 @@ void main() {
     // Apply lighting to texture color
     vec3 result = lighting * texColor.rgb;
     
+    // Apply distance-based fog
+    float fogFactor = clamp((vFogDistance - uFogStart) / max(uFogEnd - uFogStart, 0.001), 0.0, 1.0);
+    vec3 foggedColor = mix(result, uFogColor, fogFactor);
+    
     // Output final color with original alpha
-    FragColor = vec4(result, texColor.a);
+    FragColor = vec4(foggedColor, texColor.a);
 }

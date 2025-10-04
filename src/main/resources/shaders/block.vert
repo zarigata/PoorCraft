@@ -9,6 +9,7 @@ layout(location = 2) in vec3 aNormal;    // Vertex normal for lighting
 out vec2 vTexCoord;   // Pass texture coordinates
 out vec3 vNormal;     // Pass normal for lighting calculations
 out vec3 vFragPos;    // Pass world position for lighting
+out float vFogDistance; // Distance for fog calculation
 
 // Transformation matrices
 uniform mat4 uModel;      // Model matrix (chunk world position)
@@ -31,4 +32,8 @@ void main() {
     
     // Pass world position for lighting calculations in fragment shader
     vFragPos = worldPos.xyz;
+
+    // Distance from camera for fog
+    vec3 viewSpacePos = (uView * worldPos).xyz;
+    vFogDistance = length(viewSpacePos);
 }

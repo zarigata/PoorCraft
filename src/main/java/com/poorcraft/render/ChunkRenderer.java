@@ -1,5 +1,6 @@
 package com.poorcraft.render;
 
+import com.poorcraft.config.Settings;
 import com.poorcraft.modding.ModLoader;
 import com.poorcraft.world.chunk.Chunk;
 import com.poorcraft.world.chunk.ChunkMesh;
@@ -10,8 +11,10 @@ import org.lwjgl.BufferUtils;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
-import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.lwjgl.opengl.GL11.*;
 
@@ -37,10 +40,17 @@ import static org.lwjgl.opengl.GL11.*;
  * @author PoorCraft Team
  */
 public class ChunkRenderer {
-    
+
+    // Fog defaults - overridden by settings when available
+    private static final Vector3f DEFAULT_FOG_COLOR = new Vector3f(0.74f, 0.84f, 0.93f);
+    private static final float DEFAULT_FOG_START = 48.0f;
+    private static final float DEFAULT_FOG_END = 96.0f;
+
     private Shader blockShader;
     private TextureAtlas textureAtlas;
     private ModLoader modLoader;
+    private Settings settings;
+    private SunLight sunLight;
     private Map<ChunkPos, ChunkRenderData> chunkRenderData;
     private Frustum frustum;
     private Matrix4f modelMatrix;
@@ -48,18 +58,19 @@ public class ChunkRenderer {
     
     // Lighting configuration
     // These values create a nice warm sunlight with cool ambient lighting
-    private static final Vector3f LIGHT_DIRECTION = new Vector3f(0.3f, -0.7f, 0.5f).normalize();
+    private static final Vector3f DEFAULT_LIGHT_DIRECTION = new Vector3f(0.3f, -0.7f, 0.5f).normalize();
     private static final Vector3f LIGHT_COLOR = new Vector3f(1.0f, 0.95f, 0.8f);
     private static final Vector3f AMBIENT_COLOR = new Vector3f(0.6f, 0.7f, 0.8f);
     private static final float AMBIENT_STRENGTH = 0.4f;
-    
+
     /**
      * Creates a new chunk renderer.
      */
     public ChunkRenderer() {
-        this.chunkRenderData = new LinkedHashMap<>();
+        this.chunkRenderData = new ConcurrentHashMap<>();
         this.modelMatrix = new Matrix4f();
         this.viewProjectionMatrix = new Matrix4f();
+        this.sunLight = new SunLight();
     }
 
     /**
@@ -70,9 +81,29 @@ public class ChunkRenderer {
     public void setModLoader(ModLoader modLoader) {
         this.modLoader = modLoader;
     }
+    public void setSettings(Settings settings) {
+        this.settings = settings;
+    }
+
+    public void setSunDirection(Vector3f direction) {
+        if (direction != null) {
+            sunLight.setDirection(direction);
+        }
+    }
+
+    public Vector3f getSunDirection() {
+        return sunLight.getDirection();
+    }
+
+    public void setSunLight(SunLight sunLight) {
+        this.sunLight = sunLight;
+    }
+
+    public SunLight getSunLight() {
+        return sunLight;
+    }
 
     /**
-     * Initializes the chunk renderer.
      * Loads shaders, creates texture atlas, and sets up rendering resources.
      */
     public void init() {
@@ -151,6 +182,8 @@ public class ChunkRenderer {
      * @param projection Projection matrix from camera
      */
     public void render(Collection<Chunk> chunks, Matrix4f view, Matrix4f projection) {
+        List<Chunk> chunkSnapshot = new ArrayList<>(chunks);
+
         // Enable depth testing and face culling
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
@@ -170,28 +203,65 @@ public class ChunkRenderer {
         blockShader.setUniform("uTexture", 0);
         
         // Set lighting uniforms
-        blockShader.setUniform("uLightDirection", LIGHT_DIRECTION);
-        blockShader.setUniform("uLightColor", LIGHT_COLOR);
+        Vector3f lightDir = sunLight != null ? sunLight.getDirection() : DEFAULT_LIGHT_DIRECTION;
+        Vector3f lightColor = new Vector3f(LIGHT_COLOR);
+        if (sunLight != null) {
+            lightColor.mul(sunLight.getColor());
+            lightColor.mul(sunLight.getIntensity());
+        }
+        blockShader.setUniform("uLightDirection", lightDir);
+        blockShader.setUniform("uLightColor", lightColor);
         blockShader.setUniform("uAmbientColor", AMBIENT_COLOR);
         blockShader.setUniform("uAmbientStrength", AMBIENT_STRENGTH);
+
+        Vector3f fogColor = new Vector3f(DEFAULT_FOG_COLOR);
+        float fogStart = DEFAULT_FOG_START;
+        float fogEnd = DEFAULT_FOG_END;
+
+        if (settings != null && settings.graphics != null) {
+            float renderDistanceChunks = settings.graphics.renderDistance > 0
+                ? settings.graphics.renderDistance
+                : DEFAULT_FOG_END / Chunk.CHUNK_SIZE;
+            float chunkSize = Chunk.CHUNK_SIZE;
+            float maxDistance = Math.max(32f, renderDistanceChunks * chunkSize);
+
+            if (settings.graphics.fogEnd > 0f) {
+                fogEnd = settings.graphics.fogEnd;
+                fogStart = settings.graphics.fogStart > 0f ? settings.graphics.fogStart : fogEnd * 0.6f;
+            } else {
+                fogEnd = maxDistance * 0.95f;
+                fogStart = fogEnd * 0.55f;
+            }
+
+            if (settings.graphics.fogColor != null && settings.graphics.fogColor.length >= 3) {
+                fogColor.set(
+                    settings.graphics.fogColor[0],
+                    settings.graphics.fogColor[1],
+                    settings.graphics.fogColor[2]
+                );
+            }
+        }
+
+        blockShader.setUniform("uFogColor", fogColor);
+        blockShader.setUniform("uFogStart", fogStart);
+        blockShader.setUniform("uFogEnd", fogEnd);
         
         // Update frustum for culling
         projection.mul(view, viewProjectionMatrix);
         frustum.update(viewProjectionMatrix);
         
         // Render chunks
-        for (Chunk chunk : chunks) {
+        for (Chunk chunk : chunkSnapshot) {
             // Frustum culling - skip chunks outside view
             if (!frustum.testChunk(chunk)) {
                 continue;
             }
-            
+
             // Get or create render data for this chunk
             ChunkRenderData renderData = getOrCreateRenderData(chunk);
             
             // Update mesh if dirty and upload only when version changed
             // This prevents redundant GPU uploads every frame! Huge performance win.
-            // I don't know what was going on before but this should fix it.
             ChunkMesh chunkMesh = chunk.getMesh(textureAtlas);
             if (chunkMesh != null && renderData.needsUpload(chunk.getMeshVersion())) {
                 renderData.uploadMesh(chunkMesh, chunk.getMeshVersion());
@@ -227,12 +297,7 @@ public class ChunkRenderer {
      */
     private ChunkRenderData getOrCreateRenderData(Chunk chunk) {
         ChunkPos pos = chunk.getPosition();
-        
-        if (!chunkRenderData.containsKey(pos)) {
-            chunkRenderData.put(pos, new ChunkRenderData());
-        }
-        
-        return chunkRenderData.get(pos);
+        return chunkRenderData.computeIfAbsent(pos, ignored -> new ChunkRenderData());
     }
     
     /**
@@ -247,7 +312,7 @@ public class ChunkRenderer {
             renderData.cleanup();
         }
     }
-    
+
     /**
      * Cleans up all rendering resources.
      * Should be called when shutting down.
