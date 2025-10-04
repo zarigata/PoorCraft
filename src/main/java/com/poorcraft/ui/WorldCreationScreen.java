@@ -45,97 +45,116 @@ public class WorldCreationScreen extends UIScreen {
     @Override
     public void init() {
         clearComponents();
-        float panelWidth = scaledWidth(windowWidth, 0.6f, 520f, 860f);
-        float panelHeight = scaledHeight(windowHeight, 0.65f, 520f, 900f);
+        float panelWidth = scaledWidth(windowWidth, 0.62f, 560f, 920f);
+        float panelHeight = scaledHeight(windowHeight, 0.72f, 580f, 960f);
         float panelX = centerHorizontally(windowWidth, panelWidth);
         float panelY = centerVertically(windowHeight, panelHeight);
 
-        float titleFontSizePx = clamp(windowHeight * 0.04f, 26f, 48f);
-        float labelFontSizePx = clamp(windowHeight * 0.024f, 18f, 28f);
+        float titleFontSizePx = clamp(windowHeight * 0.05f, 30f, 56f);
+        float sectionFontSizePx = clamp(windowHeight * 0.03f, 20f, 34f);
+        float labelFontSizePx = clamp(windowHeight * 0.026f, 18f, 30f);
+        float helperFontSizePx = clamp(windowHeight * 0.022f, 14f, 22f);
         float titleScale = titleFontSizePx / BASE_FONT_SIZE;
+        float sectionScale = sectionFontSizePx / BASE_FONT_SIZE;
         float labelScale = labelFontSizePx / BASE_FONT_SIZE;
-        float fieldHeight = clamp(windowHeight * 0.05f, 42f, 64f);
-        float buttonHeight = clamp(windowHeight * 0.055f, 48f, 68f);
+        float helperScale = helperFontSizePx / BASE_FONT_SIZE;
+        float fieldHeight = clamp(windowHeight * 0.058f, 52f, 76f);
+        float buttonHeight = clamp(windowHeight * 0.064f, 56f, 82f);
 
-        float innerPadding = fieldHeight * 0.8f;
+        float innerPadding = Math.max(42f, panelWidth * 0.065f);
         float contentX = panelX + innerPadding;
-        float contentWidth = panelWidth - innerPadding * 2;
+        float contentWidth = panelWidth - innerPadding * 2f;
         float currentY = panelY + innerPadding;
-        float rowSpacing = fieldHeight * 1.35f;
 
-        // Title
-        Label titleLabel = new Label(panelX + panelWidth / 2, currentY, "Create New World",
-            1.0f, 1.0f, 1.0f, 1.0f);
+        float labelSpacing = Math.max(14f, fieldHeight * 0.24f);
+        float sectionSpacing = Math.max(44f, fieldHeight * 1.0f);
+
+        Label titleLabel = new Label(panelX + panelWidth / 2f, currentY, "Create New World",
+            0.96f, 0.98f, 1.0f, 1.0f);
         titleLabel.setCentered(true);
         titleLabel.setScale(titleScale);
         addComponent(titleLabel);
 
-        currentY += titleFontSizePx + fieldHeight * 0.6f;
+        currentY += titleFontSizePx + sectionSpacing * 0.8f;
 
-        Label nameLabel = new Label(contentX, currentY, "World Name:");
+        Label worldSettingsHeading = new Label(contentX, currentY,
+            "World Settings", 0.75f, 0.88f, 1.0f, 0.95f);
+        worldSettingsHeading.setScale(sectionScale);
+        addComponent(worldSettingsHeading);
+
+        currentY += sectionFontSizePx + labelSpacing;
+
+        Label nameLabel = new Label(contentX, currentY, "World Name:",
+            0.84f, 0.9f, 0.98f, 0.96f);
         nameLabel.setScale(labelScale);
         addComponent(nameLabel);
 
-        worldNameField = new TextField(contentX, currentY + labelFontSizePx + 10f,
-            contentWidth, fieldHeight, "My World");
+        float nameFieldY = currentY + labelFontSizePx + labelSpacing;
+        worldNameField = new TextField(contentX, nameFieldY, contentWidth, fieldHeight, "Enter a name");
         worldNameField.setText("New World");
         addComponent(worldNameField);
+        currentY = nameFieldY + fieldHeight + sectionSpacing * 0.9f;
 
-        // Seed
-        currentY += rowSpacing;
-        Label seedLabel = new Label(contentX, currentY, "Seed (leave empty for random):");
+        Label seedLabel = new Label(contentX, currentY, "Seed (leave empty for random):",
+            0.84f, 0.9f, 0.98f, 0.96f);
         seedLabel.setScale(labelScale);
         addComponent(seedLabel);
 
-        float seedFieldWidth = contentWidth - fieldHeight * 1.8f;
-        seedField = new TextField(contentX, currentY + labelFontSizePx + 10f,
-            seedFieldWidth, fieldHeight, "0");
+        float seedInputY = currentY + labelFontSizePx + labelSpacing;
+        float randomSpacing = Math.max(24f, fieldHeight * 0.35f);
+        float randomButtonWidth = Math.max(fieldHeight * 2.7f, contentWidth * 0.22f);
+        float seedFieldWidth = Math.max(contentWidth - randomButtonWidth - randomSpacing, contentWidth * 0.48f);
+
+        seedField = new TextField(contentX, seedInputY, seedFieldWidth, fieldHeight, "Random seed");
         addComponent(seedField);
 
-        // Random seed button (classic menu button)
-        float randomButtonWidth = fieldHeight * 2.2f;
-        MenuButton randomButton = new MenuButton(contentX + seedFieldWidth + fieldHeight * 0.6f,
-            currentY + labelFontSizePx + 10f, randomButtonWidth, fieldHeight, "RANDOM", this::onRandomSeed);
+        MenuButton randomButton = new MenuButton(contentX + seedFieldWidth + randomSpacing,
+            seedInputY, randomButtonWidth, fieldHeight, "RANDOM", this::onRandomSeed);
         addComponent(randomButton);
+        currentY = seedInputY + fieldHeight + sectionSpacing * 0.9f;
 
-        // Game mode
-        currentY += rowSpacing;
-        Label gameModeLabel = new Label(contentX, currentY, "Game Mode:");
+        Label generationHeading = new Label(contentX, currentY,
+            "Gameplay", 0.75f, 0.88f, 1.0f, 0.95f);
+        generationHeading.setScale(sectionScale);
+        addComponent(generationHeading);
+
+        currentY += sectionFontSizePx + labelSpacing;
+
+        Label gameModeLabel = new Label(contentX, currentY, "Game Mode:",
+            0.84f, 0.9f, 0.98f, 0.96f);
         gameModeLabel.setScale(labelScale);
         addComponent(gameModeLabel);
 
-        gameModeDropdown = new Dropdown(contentX, currentY + labelFontSizePx + 10f, 
-            contentWidth, fieldHeight, 
-            Arrays.asList("Survival", "Creative"), 
-            0, 
-            index -> {});
+        float gameModeY = currentY + labelFontSizePx + labelSpacing;
+        gameModeDropdown = new Dropdown(contentX, gameModeY, contentWidth, fieldHeight,
+            Arrays.asList("Survival", "Creative"), 0, index -> {});
         addComponent(gameModeDropdown);
+        currentY = gameModeY + fieldHeight + sectionSpacing * 0.8f;
 
-        // Generate structures
-        currentY += rowSpacing;
-        generateStructuresCheckbox = new Checkbox(contentX, currentY + labelFontSizePx * 0.3f, 
-            fieldHeight * 0.8f, "Generate Structures (trees, cacti, etc.)", 
-            true, 
-            checked -> {});
+        generateStructuresCheckbox = new Checkbox(contentX, currentY,
+            fieldHeight * 0.8f, "Generate Structures (trees, cacti, etc.)",
+            true, checked -> {});
         addComponent(generateStructuresCheckbox);
-        currentY += rowSpacing + fieldHeight * 0.6f;
-        float buttonWidth = (contentWidth - fieldHeight * 0.6f) / 2f;
+
+        Label structuresHint = new Label(contentX + fieldHeight * 1.05f, currentY + fieldHeight * 0.95f,
+            "Toggle to include villages, pyramids, strongholds, and more.",
+            0.68f, 0.74f, 0.82f, 0.88f);
+        structuresHint.setScale(helperScale);
+        addComponent(structuresHint);
+
+        currentY += fieldHeight * 1.35f + sectionSpacing;
+
+        float buttonSpacing = Math.max(30f, contentWidth * 0.05f);
+        float buttonWidth = (contentWidth - buttonSpacing) / 2f;
         float buttonY = currentY;
 
-        MenuButton createButton = new MenuButton(
-            contentX, buttonY, 
-            buttonWidth, buttonHeight, 
-            "CREATE WORLD", 
-            this::onCreateWorld
-        );
+        MenuButton createButton = new MenuButton(contentX, buttonY,
+            buttonWidth, buttonHeight, "CREATE WORLD", this::onCreateWorld);
         addComponent(createButton);
 
-        MenuButton cancelButton = new MenuButton(
-            contentX + buttonWidth + fieldHeight * 0.6f, buttonY, 
-            buttonWidth, buttonHeight, 
-            "CANCEL", 
-            () -> uiManager.setState(GameState.MAIN_MENU)
-        );
+        MenuButton cancelButton = new MenuButton(contentX + buttonWidth + buttonSpacing, buttonY,
+            buttonWidth, buttonHeight, "CANCEL",
+            () -> uiManager.setState(GameState.MAIN_MENU));
         addComponent(cancelButton);
     }
     

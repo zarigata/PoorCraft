@@ -1,10 +1,9 @@
 package com.poorcraft.ui;
 
-import java.util.Random;
-
 /**
- * Responsive main menu with text inputs and clearly framed buttons. The layout
- * centers a 70% panel with padded content to avoid overlap at narrow widths.
+ * Clean main menu inspired by classic Minecraft layouts. Focuses on a centered
+ * logo with a vertical stack of primary navigation buttons for clear, readable
+ * interaction regardless of resolution.
  */
 public class MainMenuScreen extends UIScreen {
 
@@ -16,9 +15,6 @@ public class MainMenuScreen extends UIScreen {
     private float panelWidth;
     private float panelHeight;
 
-    private TextField serverNameField;
-    private TextField seedField;
-
     public MainMenuScreen(int windowWidth, int windowHeight, UIManager uiManager) {
         super(windowWidth, windowHeight);
         this.uiManager = uiManager;
@@ -29,88 +25,71 @@ public class MainMenuScreen extends UIScreen {
     public void init() {
         clearComponents();
 
-        panelWidth = clamp(windowWidth * 0.7f, 640f, Math.max(640f, windowWidth - 120f));
-        panelHeight = clamp(windowHeight * 0.7f, 540f, Math.max(540f, windowHeight - 120f));
+        panelWidth = clamp(windowWidth * 0.58f, 520f, Math.max(520f, windowWidth - 180f));
+        panelHeight = clamp(windowHeight * 0.7f, 520f, Math.max(520f, windowHeight - 180f));
         panelX = (windowWidth - panelWidth) / 2.0f;
         panelY = (windowHeight - panelHeight) / 2.0f;
 
-        float padding = Math.max(28f, panelWidth * 0.05f);
-        float innerX = panelX + padding;
-        float innerWidth = panelWidth - padding * 2f;
+        float padding = Math.max(32f, panelWidth * 0.06f);
+        float centerX = panelX + panelWidth / 2f;
         float currentY = panelY + padding;
 
-        float titleScale = Math.max(2.0f, panelWidth / 520f);
-        float subtitleScale = titleScale * 0.55f;
+        float titleScale = clamp(panelWidth / 420f, 1.8f, 2.6f);
+        float subtitleScale = clamp(titleScale * 0.55f, 0.9f, 1.4f);
 
-        Label titleLabel = new Label(panelX + panelWidth / 2f, currentY, "PoorCraft",
-            0.02f, 0.92f, 0.95f, 1.0f);
+        Label titleLabel = new Label(centerX, currentY, "POORCRAFT",
+            0.96f, 0.98f, 1.0f, 1.0f);
         titleLabel.setCentered(true);
         titleLabel.setScale(titleScale);
         addComponent(titleLabel);
-        currentY += 44f * titleScale;
+        currentY += titleScale * 48f;
 
-        Label subtitleLabel = new Label(panelX + panelWidth / 2f, currentY, "Retro Edition",
-            0.92f, 0.32f, 0.72f, 0.9f);
+        Label subtitleLabel = new Label(centerX, currentY, "Retro Edition",
+            0.82f, 0.48f, 0.88f, 0.92f);
         subtitleLabel.setCentered(true);
         subtitleLabel.setScale(subtitleScale);
         addComponent(subtitleLabel);
-        currentY += Math.max(34f, 26f * subtitleScale);
+        currentY += Math.max(40f, subtitleScale * 30f);
 
-        float labelScale = Math.max(0.85f, panelWidth / 840f);
-        float fieldHeight = Math.max(46f, panelHeight * 0.085f);
+        Label taglineLabel = new Label(centerX, currentY,
+            "Choose a mode to begin your adventure",
+            0.76f, 0.82f, 0.9f, 0.9f);
+        taglineLabel.setCentered(true);
+        taglineLabel.setScale(Math.max(0.95f, panelWidth / 760f));
+        addComponent(taglineLabel);
 
-        Label nameLabel = new Label(innerX, currentY, "Server Name",
-            0.8f, 0.84f, 0.92f, 0.95f);
-        nameLabel.setScale(labelScale);
-        addComponent(nameLabel);
-        currentY += 24f * labelScale;
+        currentY += Math.max(56f, panelHeight * 0.1f);
 
-        serverNameField = new TextField(innerX, currentY, innerWidth, fieldHeight, "My Server");
-        addComponent(serverNameField);
-        currentY += fieldHeight + Math.max(18f, fieldHeight * 0.25f);
+        float buttonWidth = panelWidth - padding * 2f;
+        float buttonHeight = clamp(panelHeight * 0.17f, 88f, 150f);
+        float buttonSpacing = Math.max(28f, buttonHeight * 0.4f);
+        float buttonX = panelX + (panelWidth - buttonWidth) / 2f;
 
-        Label seedLabel = new Label(innerX, currentY, "World Seed",
-            0.8f, 0.84f, 0.92f, 0.95f);
-        seedLabel.setScale(labelScale);
-        addComponent(seedLabel);
-        currentY += 24f * labelScale;
-
-        float seedFieldWidth = Math.max(innerWidth * 0.6f, innerWidth - 220f);
-        seedField = new TextField(innerX, currentY, seedFieldWidth, fieldHeight, "Random");
-        addComponent(seedField);
-
-        float randomWidth = Math.max(fieldHeight * 2.4f, innerWidth - seedFieldWidth - padding * 0.6f);
-        MenuButton randomSeedButton = new MenuButton(innerX + seedFieldWidth + padding * 0.4f,
-            currentY, randomWidth, fieldHeight, "RANDOM", this::applyRandomSeed);
-        addComponent(randomSeedButton);
-        currentY += fieldHeight + Math.max(28f, fieldHeight * 0.35f);
-
-        float buttonHeight = clamp(panelHeight * 0.16f, 90f, 160f);
-        float buttonSpacing = Math.max(22f, buttonHeight * 0.35f);
-        float buttonWidth = (innerWidth - buttonSpacing) / 2f;
-
-        MenuButton singleplayerButton = new MenuButton(innerX, currentY,
+        MenuButton singleplayerButton = new MenuButton(buttonX, currentY,
             buttonWidth, buttonHeight, "SINGLEPLAYER",
             () -> uiManager.setState(GameState.WORLD_CREATION));
         addComponent(singleplayerButton);
+        currentY += buttonHeight + buttonSpacing;
 
-        MenuButton multiplayerButton = new MenuButton(innerX + buttonWidth + buttonSpacing, currentY,
+        MenuButton multiplayerButton = new MenuButton(buttonX, currentY,
             buttonWidth, buttonHeight, "MULTIPLAYER",
             () -> uiManager.setState(GameState.MULTIPLAYER_MENU));
         addComponent(multiplayerButton);
+        currentY += buttonHeight + buttonSpacing;
 
-        MenuButton settingsButton = new MenuButton(innerX, currentY + buttonHeight + buttonSpacing,
+        MenuButton settingsButton = new MenuButton(buttonX, currentY,
             buttonWidth, buttonHeight, "SETTINGS",
             () -> uiManager.setState(GameState.SETTINGS_MENU));
         addComponent(settingsButton);
+        currentY += buttonHeight + buttonSpacing;
 
-        MenuButton quitButton = new MenuButton(innerX + buttonWidth + buttonSpacing, currentY + buttonHeight + buttonSpacing,
+        MenuButton quitButton = new MenuButton(buttonX, currentY,
             buttonWidth, buttonHeight, "QUIT",
             () -> uiManager.quit());
         addComponent(quitButton);
 
-        Label footerLabel = new Label(panelX + panelWidth / 2f, panelY + panelHeight - padding * 0.6f,
-            "Press ENTER to confirm or ESC to exit", 0.72f, 0.78f, 0.86f, 0.86f);
+        Label footerLabel = new Label(centerX, panelY + panelHeight - padding * 0.35f,
+            "Press ENTER to confirm or ESC to exit", 0.7f, 0.75f, 0.85f, 0.85f);
         footerLabel.setCentered(true);
         footerLabel.setScale(Math.max(0.92f, panelWidth / 780f));
         addComponent(footerLabel);
@@ -132,9 +111,9 @@ public class MainMenuScreen extends UIScreen {
         background.render(renderer, windowWidth, windowHeight);
 
         renderer.drawRect(panelX, panelY, panelWidth, panelHeight,
-            0.07f, 0.09f, 0.12f, 0.92f);
+            0.08f, 0.09f, 0.12f, 0.92f);
 
-        float border = Math.max(2f, panelWidth * 0.003f);
+        float border = Math.max(3f, panelWidth * 0.004f);
         renderer.drawRect(panelX, panelY, panelWidth, border,
             0.0f, 0.95f, 0.95f, 0.82f);
         renderer.drawRect(panelX, panelY + panelHeight - border, panelWidth, border,
@@ -145,12 +124,5 @@ public class MainMenuScreen extends UIScreen {
             0.0f, 0.95f, 0.95f, 0.82f);
 
         super.render(renderer, fontRenderer);
-    }
-
-    private void applyRandomSeed() {
-        long randomSeed = new Random().nextLong();
-        if (seedField != null) {
-            seedField.setText(Long.toString(randomSeed));
-        }
     }
 }

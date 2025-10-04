@@ -87,6 +87,7 @@ public class PauseScreen extends UIScreen {
         float topContentY = titleBaseline + Math.max(52f, 34f * titleScale);
         float columnWidth = (panelWidth - contentPadding * 3f) / 2f;
         float leftPanelX = panelX + contentPadding;
+        float leftPanelWidth = columnWidth;
         float rightPanelX = panelX + contentPadding * 2f + columnWidth;
         float sliderHeight = Math.max(56f, panelHeight * 0.11f);
         float sliderSpacing = Math.max(20f, sliderHeight * 0.32f);
@@ -141,9 +142,7 @@ public class PauseScreen extends UIScreen {
             0.8f, 0.8f, 0.8f, 0.9f);
         addComponent(chunkUnloadLabel);
         
-        float rightPanelX = panelX + panelWidth / 2f + contentPadding / 2f;
-        contentY = titleBaseline + 52f;
-        
+        contentY = topContentY;
         Label modsLabel = new Label(rightPanelX, contentY, "LOADED MODS",
             0.95f, 0.7f, 0.9f, 1.0f);
         modsLabel.setScale(Math.max(1.1f, sliderFontScale * 0.95f));
