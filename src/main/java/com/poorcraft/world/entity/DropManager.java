@@ -1,6 +1,7 @@
 package com.poorcraft.world.entity;
 
 import com.poorcraft.inventory.Inventory;
+import com.poorcraft.world.World;
 import com.poorcraft.world.block.BlockType;
 import org.joml.Vector3f;
 
@@ -27,14 +28,14 @@ public class DropManager {
         drops.add(new ItemDrop(blockType, x, y, z, amount, phase));
     }
 
-    public void update(Vector3f playerPosition, Inventory inventory, float deltaTime) {
+    public void update(World world, Vector3f playerPosition, Inventory inventory, float deltaTime) {
         if (drops.isEmpty()) {
             return;
         }
 
         for (int i = drops.size() - 1; i >= 0; i--) {
             ItemDrop drop = drops.get(i);
-            drop.update(deltaTime);
+            drop.update(world, deltaTime);
 
             if (drop.isExpired()) {
                 drops.remove(i);
@@ -42,9 +43,9 @@ public class DropManager {
             }
 
             if (playerPosition != null && inventory != null) {
-                float dx = (drop.getOriginX()) - playerPosition.x;
-                float dy = (drop.getRenderY()) - (playerPosition.y + 1.0f); // approximate eye height
-                float dz = (drop.getOriginZ()) - playerPosition.z;
+                float dx = drop.getX() - playerPosition.x;
+                float dy = drop.getRenderY() - (playerPosition.y + 1.0f); // approximate eye height
+                float dz = drop.getZ() - playerPosition.z;
                 float distanceSquared = dx * dx + dy * dy + dz * dz;
                 if (distanceSquared <= PICKUP_RADIUS_SQUARED) {
                     int remaining = inventory.add(drop.getBlockType(), drop.getAmount());

@@ -26,6 +26,7 @@ public class InventoryScreen extends UIScreen {
     private float gridY;
     private float gridWidth;
     private float gridHeight;
+    private float currentSlotSpacing;
 
     private int hoveredRow = -1;
     private int hoveredColumn = -1;
@@ -67,22 +68,32 @@ public class InventoryScreen extends UIScreen {
 
         renderer.drawRect(0, 0, windowWidth, windowHeight, 0f, 0f, 0f, OVERLAY_ALPHA);
 
-        float panelWidth = gridWidth + PANEL_PADDING * 2f;
-        float panelHeight = gridHeight + PANEL_PADDING * 2f + INFO_AREA_HEIGHT;
+        float panelPadding = scale(PANEL_PADDING);
+        float infoHeight = scale(INFO_AREA_HEIGHT);
+        float titleOffset = scale(TITLE_OFFSET);
+
+        float panelWidth = gridWidth + panelPadding * 2f;
+        float panelHeight = gridHeight + panelPadding * 2f + infoHeight;
         float panelX = (windowWidth - panelWidth) / 2f;
-        float panelY = gridY - PANEL_PADDING - TITLE_OFFSET;
+        float panelY = gridY - panelPadding - titleOffset;
 
         renderer.drawRect(panelX, panelY, panelWidth, panelHeight, 0.08f, 0.08f, 0.1f, 0.92f);
-        renderer.drawRect(panelX, panelY, panelWidth, 2f, 0.3f, 0.3f, 0.4f, 1.0f);
-        renderer.drawRect(panelX, panelY + panelHeight - 2f, panelWidth, 2f, 0.3f, 0.3f, 0.4f, 1.0f);
+        float borderThickness = Math.max(1.5f, scale(2f));
+        renderer.drawRect(panelX, panelY, panelWidth, borderThickness, 0.3f, 0.3f, 0.4f, 1.0f);
+        renderer.drawRect(panelX, panelY + panelHeight - borderThickness, panelWidth, borderThickness, 0.3f, 0.3f, 0.4f, 1.0f);
 
         String title = "Inventory";
-        float titleWidth = fontRenderer.getTextWidth(title);
-        fontRenderer.drawText(title, panelX + (panelWidth - titleWidth) / 2f, panelY + 28f, 1.0f, 0.95f, 0.95f, 0.95f, 1.0f);
+        float titleScale = getUiScale();
+        float titleWidth = fontRenderer.getTextWidth(title) * titleScale;
+        fontRenderer.drawText(title,
+            panelX + (panelWidth - titleWidth) / 2f,
+            panelY + scale(28f),
+            titleScale,
+            0.95f, 0.95f, 0.95f, 1.0f);
 
         drawInventoryGrid(renderer, fontRenderer);
-        drawSelectionDetails(renderer, fontRenderer, panelX, panelY + panelHeight - INFO_AREA_HEIGHT, panelWidth);
-        drawInstructions(fontRenderer, panelX, panelY + panelHeight - 26f, panelWidth);
+        drawSelectionDetails(renderer, fontRenderer, panelX, panelY + panelHeight - infoHeight, panelWidth, infoHeight);
+        drawInstructions(fontRenderer, panelX, panelY + panelHeight - scale(26f), panelWidth);
     }
 
     @Override
@@ -120,8 +131,8 @@ public class InventoryScreen extends UIScreen {
     private void drawInventoryGrid(UIRenderer renderer, FontRenderer fontRenderer) {
         for (int row = 0; row < Inventory.HEIGHT; row++) {
             for (int column = 0; column < Inventory.WIDTH; column++) {
-                float cellX = gridX + column * (slotSize + SLOT_SPACING);
-                float cellY = gridY + row * (slotSize + SLOT_SPACING);
+                float cellX = gridX + column * (slotSize + currentSlotSpacing);
+                float cellY = gridY + row * (slotSize + currentSlotSpacing);
 
                 boolean isHotbarRow = row == Inventory.HEIGHT - 1;
                 boolean isSelected = row == selectedRow && column == selectedColumn;
@@ -164,20 +175,20 @@ public class InventoryScreen extends UIScreen {
                     BlockType blockType = stack.getBlockType();
                     String label = formatBlockLabel(blockType);
                     if (!label.isEmpty()) {
-                        float labelScale = Math.min(0.55f, (slotSize - 6f) / Math.max(fontRenderer.getTextWidth(label), 1f));
+                        float labelScale = Math.min(1.0f, (slotSize - scale(6f)) / Math.max(fontRenderer.getTextWidth(label), 1f));
                         float labelWidth = fontRenderer.getTextWidth(label) * labelScale;
                         float labelX = cellX + (slotSize - labelWidth) / 2f;
-                        float labelY = cellY + slotSize / 2f + fontRenderer.getTextHeight() * (labelScale - 1f) * 0.5f;
+                        float labelY = cellY + slotSize / 2f + fontRenderer.getTextHeight() * (labelScale - 1f) * 0.25f;
                         fontRenderer.drawText(label, labelX, labelY, labelScale, 0.92f, 0.92f, 0.95f, 1.0f);
                     }
 
                     int count = stack.getCount();
                     if (count > 0) {
                         String countText = formatCount(count);
-                        float countScale = 0.45f;
+                        float countScale = getUiScale() * 0.6f;
                         float countWidth = fontRenderer.getTextWidth(countText) * countScale;
-                        float countX = cellX + slotSize - countWidth - 5f;
-                        float countY = cellY + slotSize - 6f;
+                        float countX = cellX + slotSize - countWidth - scale(5f);
+                        float countY = cellY + slotSize - scale(6f);
                         fontRenderer.drawText(countText, countX, countY, countScale, 1f, 1f, 1f, 1f);
                     }
                 }
@@ -185,8 +196,13 @@ public class InventoryScreen extends UIScreen {
         }
     }
 
-    private void drawSelectionDetails(UIRenderer renderer, FontRenderer fontRenderer, float panelX, float infoY, float panelWidth) {
-        renderer.drawRect(panelX + 12f, infoY + 10f, panelWidth - 24f, INFO_AREA_HEIGHT - 20f, 0.1f, 0.1f, 0.14f, 0.8f);
+    private void drawSelectionDetails(UIRenderer renderer, FontRenderer fontRenderer,
+                                      float panelX, float infoY, float panelWidth, float infoHeight) {
+        float innerPadding = scale(12f);
+        renderer.drawRect(panelX + innerPadding, infoY + scale(10f),
+            panelWidth - innerPadding * 2f,
+            infoHeight - scale(20f),
+            0.1f, 0.1f, 0.14f, 0.8f);
 
         ItemStack selectedStack = inventory != null ? inventory.getSlot(selectedRow, selectedColumn) : null;
         String labelText;
@@ -200,28 +216,37 @@ public class InventoryScreen extends UIScreen {
             countText = "";
         }
 
-        fontRenderer.drawText(labelText, panelX + 28f, infoY + 38f, 0.9f, 0.94f, 0.94f, 0.94f, 1f);
+        float primaryScale = getUiScale();
+        fontRenderer.drawText(labelText,
+            panelX + scale(28f),
+            infoY + scale(38f),
+            primaryScale,
+            0.94f, 0.94f, 0.94f, 1f);
         if (!countText.isEmpty()) {
-            fontRenderer.drawText(countText, panelX + 28f, infoY + 38f + fontRenderer.getTextHeight() * 0.8f,
-                0.8f, 0.8f, 0.85f, 0.9f, 1f);
+            fontRenderer.drawText(countText,
+                panelX + scale(28f),
+                infoY + scale(38f) + fontRenderer.getTextHeight() * (primaryScale * 0.85f),
+                primaryScale * 0.85f,
+                0.8f, 0.8f, 0.85f, 0.9f);
         }
     }
 
     private void drawInstructions(FontRenderer fontRenderer, float panelX, float textY, float panelWidth) {
         String instructions = "Press E or Esc to close • Click a hotbar slot to equip";
-        float textWidth = fontRenderer.getTextWidth(instructions) * 0.8f;
+        float scaleFactor = getUiScale() * 0.85f;
+        float textWidth = fontRenderer.getTextWidth(instructions) * scaleFactor;
         float textX = panelX + (panelWidth - textWidth) / 2f;
-        fontRenderer.drawText(instructions, textX, textY, 0.8f, 0.75f, 0.75f, 0.78f, 1f);
+        fontRenderer.drawText(instructions, textX, textY, scaleFactor, 0.75f, 0.75f, 0.78f, 1f);
     }
 
     private SlotPosition findSlotAt(float mouseX, float mouseY) {
         for (int row = 0; row < Inventory.HEIGHT; row++) {
-            float cellY = gridY + row * (slotSize + SLOT_SPACING);
+            float cellY = gridY + row * (slotSize + currentSlotSpacing);
             if (mouseY < cellY || mouseY > cellY + slotSize) {
                 continue;
             }
             for (int column = 0; column < Inventory.WIDTH; column++) {
-                float cellX = gridX + column * (slotSize + SLOT_SPACING);
+                float cellX = gridX + column * (slotSize + currentSlotSpacing);
                 if (mouseX >= cellX && mouseX <= cellX + slotSize) {
                     return new SlotPosition(row, column);
                 }
@@ -231,17 +256,20 @@ public class InventoryScreen extends UIScreen {
     }
 
     private void recalculateLayout() {
+        float spacing = scale(SLOT_SPACING);
+        this.currentSlotSpacing = spacing;
+
         float maxGridWidth = windowWidth * 0.82f;
         float maxGridHeight = windowHeight * 0.72f;
 
-        float slotSizeByWidth = (maxGridWidth - (Inventory.WIDTH - 1) * SLOT_SPACING) / Inventory.WIDTH;
-        float slotSizeByHeight = (maxGridHeight - (Inventory.HEIGHT - 1) * SLOT_SPACING) / Inventory.HEIGHT;
-        this.slotSize = clamp(Math.min(slotSizeByWidth, slotSizeByHeight), 28f, 56f);
+        float slotSizeByWidth = (maxGridWidth - (Inventory.WIDTH - 1) * spacing) / Inventory.WIDTH;
+        float slotSizeByHeight = (maxGridHeight - (Inventory.HEIGHT - 1) * spacing) / Inventory.HEIGHT;
+        this.slotSize = Math.max(0f, Math.min(slotSizeByWidth, slotSizeByHeight));
 
-        this.gridWidth = Inventory.WIDTH * slotSize + (Inventory.WIDTH - 1) * SLOT_SPACING;
-        this.gridHeight = Inventory.HEIGHT * slotSize + (Inventory.HEIGHT - 1) * SLOT_SPACING;
+        this.gridWidth = Inventory.WIDTH * slotSize + (Inventory.WIDTH - 1) * spacing;
+        this.gridHeight = Inventory.HEIGHT * slotSize + (Inventory.HEIGHT - 1) * spacing;
         this.gridX = (windowWidth - gridWidth) / 2f;
-        this.gridY = (windowHeight - gridHeight) / 2f + TITLE_OFFSET;
+        this.gridY = (windowHeight - gridHeight) / 2f + scale(TITLE_OFFSET);
     }
 
     private String formatBlockLabel(BlockType blockType) {
@@ -291,10 +319,6 @@ public class InventoryScreen extends UIScreen {
             }
         }
         return builder.toString();
-    }
-
-    private float clamp(float value, float min, float max) {
-        return Math.max(min, Math.min(max, value));
     }
 
     private Game resolveGameReference() {

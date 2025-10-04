@@ -86,6 +86,7 @@ public class Game {
         this.blockHighlightRenderer = new BlockHighlightRenderer();
         this.itemDropRenderer = new ItemDropRenderer();
         this.dropManager = new DropManager();
+        this.miningSystem.setDropManager(this.dropManager);
         this.highlightRendererInitialized = false;
         this.selectedHotbarSlot = 0;
         this.hotbarScrollRemainder = 0.0;
@@ -269,7 +270,7 @@ public class Game {
         }
 
         if (dropManager != null && inventory != null && playerController != null) {
-            dropManager.update(playerController.getPosition(), inventory, deltaTime);
+            dropManager.update(world, playerController.getPosition(), inventory, deltaTime);
         }
         
         // Update chunk manager with camera position

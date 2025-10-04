@@ -21,6 +21,7 @@ public abstract class UIScreen {
     protected int windowWidth;
     protected int windowHeight;
     protected UIComponent focusedComponent;
+    protected float uiScale;
     
     /**
      * Creates a new UI screen.
@@ -33,6 +34,7 @@ public abstract class UIScreen {
         this.windowWidth = windowWidth;
         this.windowHeight = windowHeight;
         this.focusedComponent = null;
+        this.uiScale = 1.0f;
     }
     
     /**
@@ -49,6 +51,34 @@ public abstract class UIScreen {
      * @param height New window height
      */
     public abstract void onResize(int width, int height);
+
+    /**
+     * Updates the UI scale used by this screen.
+     *
+     * @param uiScale new uniform UI scale factor (> 0)
+     */
+    public void setUIScale(float uiScale) {
+        this.uiScale = uiScale > 0.0f ? uiScale : 1.0f;
+    }
+
+    /**
+     * Retrieves the current UI scale for subclasses.
+     *
+     * @return scale factor applied to UI elements
+     */
+    protected float getUiScale() {
+        return uiScale;
+    }
+
+    /**
+     * Convenience helper to scale a constant by the current UI scale.
+     *
+     * @param value base value
+     * @return scaled value
+     */
+    protected float scale(float value) {
+        return value * uiScale;
+    }
     
     /**
      * Renders all components on this screen.

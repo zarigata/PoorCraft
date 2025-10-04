@@ -42,6 +42,7 @@ public class FontRenderer {
     private STBTTBakedChar.Buffer charData;
     private float lineHeight;
     private boolean useFallback = false;
+    private float globalScale = 1.0f;
     
     /**
      * Creates a new font renderer.
@@ -166,6 +167,7 @@ public class FontRenderer {
         }
 
         float appliedScale = scale <= 0 ? 1.0f : scale;
+        float effectiveScale = appliedScale * globalScale;
 
         glBindTexture(GL_TEXTURE_2D, fontAtlasTexture);
 
@@ -180,7 +182,7 @@ public class FontRenderer {
 
             if (c == '\n') {
                 currentX = x;
-                currentY += lineHeight * appliedScale;
+                currentY += lineHeight * effectiveScale;
                 continue;
             }
 
@@ -190,10 +192,10 @@ public class FontRenderer {
 
             STBTTBakedChar charInfo = charData.get(c - FIRST_CHAR);
 
-            float charX = currentX + charInfo.xoff() * appliedScale;
-            float charY = currentY + charInfo.yoff() * appliedScale;
-            float charW = (charInfo.x1() - charInfo.x0()) * appliedScale;
-            float charH = (charInfo.y1() - charInfo.y0()) * appliedScale;
+            float charX = currentX + charInfo.xoff() * effectiveScale;
+            float charY = currentY + charInfo.yoff() * effectiveScale;
+            float charW = (charInfo.x1() - charInfo.x0()) * effectiveScale;
+            float charH = (charInfo.y1() - charInfo.y0()) * effectiveScale;
 
             float u0 = charInfo.x0() / (float) ATLAS_WIDTH;
             float v0 = charInfo.y0() / (float) ATLAS_HEIGHT;
@@ -210,7 +212,7 @@ public class FontRenderer {
 
             quadCount++;
 
-            currentX += charInfo.xadvance() * appliedScale;
+            currentX += charInfo.xadvance() * effectiveScale;
         }
 
         if (quadCount == 0) {
@@ -252,25 +254,26 @@ public class FontRenderer {
         float width = 0;
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
-            
+
             if (c < FIRST_CHAR || c >= FIRST_CHAR + CHAR_COUNT) {
                 continue;
             }
-            
+
             STBTTBakedChar charInfo = charData.get(c - FIRST_CHAR);
-            width += charInfo.xadvance();
+            width += charInfo.xadvance() * globalScale;
         }
-        
+
         return width;
     }
     
     /**
      * Returns the approximate line height for this font.
      * 
-     * @return Line height in pixels
+{{ ... }}
      */
     public float getTextHeight() {
-        return useFallback ? fontSize : lineHeight;
+        float baseHeight = useFallback ? fontSize : lineHeight;
+        return baseHeight * globalScale;
     }
     
     /**
@@ -280,6 +283,15 @@ public class FontRenderer {
      */
     public int getFontSize() {
         return fontSize;
+    }
+
+    /**
+     * Adjusts the global UI scale applied to all text rendering.
+     *
+     * @param globalScale scale factor (> 0)
+     */
+    public void setGlobalScale(float globalScale) {
+        this.globalScale = globalScale > 0.0f ? globalScale : 1.0f;
     }
     
     /**

@@ -68,41 +68,43 @@ public class MenuButton extends UIComponent {
             textColor = TEXT_COLOR;
         }
         
-        // Draw background rectangle - THIS WILL DEFINITELY SHOW UP
-        renderer.drawRect(x, y, width, height, 
+        // Draw background rectangle
+        renderer.drawRect(x, y, width, height,
             bgColor[0], bgColor[1], bgColor[2], bgColor[3]);
-        
-        // Draw border (4 rectangles forming a frame)
-        float borderWidth = 3.0f;
-        
+
+        float borderWidth = Math.max(2.0f, height * 0.08f);
+
         // Top border
         renderer.drawRect(x, y, width, borderWidth,
             borderColor[0], borderColor[1], borderColor[2], borderColor[3]);
-        
+
         // Bottom border
         renderer.drawRect(x, y + height - borderWidth, width, borderWidth,
             borderColor[0], borderColor[1], borderColor[2], borderColor[3]);
-        
+
         // Left border
         renderer.drawRect(x, y, borderWidth, height,
             borderColor[0], borderColor[1], borderColor[2], borderColor[3]);
-        
+
         // Right border
         renderer.drawRect(x + width - borderWidth, y, borderWidth, height,
             borderColor[0], borderColor[1], borderColor[2], borderColor[3]);
-        
-        // Draw text shadow for readability
+
         if (text != null && !text.isEmpty()) {
-            float textWidth = fontRenderer.getTextWidth(text);
-            float textHeight = fontRenderer.getTextHeight();
-            float textX = x + (width - textWidth) / 2;
-            float textY = y + (height - textHeight) / 2 + textHeight * 0.7f;
-            
-            // Shadow
-            fontRenderer.drawText(text, textX + 2, textY + 2, 0.0f, 0.0f, 0.0f, 0.6f);
-            
-            // Main text
-            fontRenderer.drawText(text, textX, textY,
+            float baseHeight = Math.max(fontRenderer.getTextHeight(), 1e-4f);
+            float textScale = height > 0 ? Math.min(1.0f, (height * 0.55f) / baseHeight) : 1.0f;
+            float textWidth = fontRenderer.getTextWidth(text) * textScale;
+            float textHeight = fontRenderer.getTextHeight() * textScale;
+            float textX = x + (width - textWidth) / 2f;
+            float textY = y + (height + textHeight) / 2f - textHeight * 0.25f;
+            float shadowOffset = height * 0.06f;
+
+            // Shadow for readability
+            fontRenderer.drawText(text, textX + shadowOffset, textY + shadowOffset,
+                textScale, 0.0f, 0.0f, 0.0f, 0.55f);
+
+            // Main label
+            fontRenderer.drawText(text, textX, textY, textScale,
                 textColor[0], textColor[1], textColor[2], textColor[3]);
         }
     }

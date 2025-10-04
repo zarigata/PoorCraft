@@ -96,7 +96,7 @@ public class ItemDropRenderer {
             float[] uv = textureAtlas.getUVsForFace(blockType, 0);
             dropShader.setUniform("uUVRect", uv[0], uv[1], uv[2], uv[3]);
 
-            position.set(drop.getOriginX(), drop.getRenderY(), drop.getOriginZ());
+            position.set(drop.getX(), drop.getRenderY(), drop.getZ());
             dropShader.setUniform("uPosition", position);
             dropShader.setUniform("uCameraRight", cameraRight);
             dropShader.setUniform("uCameraUp", cameraUp);
