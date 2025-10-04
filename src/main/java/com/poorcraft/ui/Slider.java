@@ -3,113 +3,108 @@ package com.poorcraft.ui;
 import java.util.function.Consumer;
 
 /**
- * Slider UI component for numeric values.
- * 
- * A draggable slider with a track and handle.
- * Useful for settings like volume, FOV, render distance, etc.
- * 
- * The math here is simple but I still managed to mess it up the first time.
- * Remember: normalize to 0-1, then map to min-max range. Not the other way around.
- * I don't know why I keep forgetting this.
+ * Responsive slider with padded layout so the track, handle, and value label do
+ * not bleed outside their container. Values are stored normalized (0..1) and
+ * mapped to [min,max] when queried.
  */
 public class Slider extends UIComponent {
-    
-    private static final float[] TRACK_COLOR = {0.2f, 0.2f, 0.2f, 0.8f};
-    private static final float[] HANDLE_COLOR = {0.5f, 0.5f, 0.5f, 1.0f};
-    private static final float[] HANDLE_HOVER_COLOR = {0.6f, 0.6f, 0.6f, 1.0f};
-    private static final float[] TEXT_COLOR = {1.0f, 1.0f, 1.0f, 1.0f};
-    
-    private static final float HANDLE_WIDTH = 12;
-    private static final float HANDLE_HEIGHT = 20;
-    private static final float TRACK_HEIGHT = 4;
-    
-    private String label;
-    private float value;        // Normalized value (0.0 to 1.0)
-    private float minValue;
-    private float maxValue;
+
+    private static final float[] TRACK_COLOR = {0.22f, 0.22f, 0.25f, 0.84f};
+    private static final float[] TRACK_BORDER = {0.05f, 0.86f, 0.96f, 0.4f};
+    private static final float[] HANDLE_COLOR = {0.55f, 0.92f, 0.96f, 1.0f};
+    private static final float[] HANDLE_HOVER_COLOR = {0.72f, 0.98f, 1.0f, 1.0f};
+    private static final float[] LABEL_COLOR = {0.96f, 0.97f, 0.99f, 1.0f};
+    private static final float[] VALUE_COLOR = {0.8f, 0.82f, 0.85f, 0.92f};
+
+    private final String label;
+    private final float minValue;
+    private final float maxValue;
+    private final Consumer<Float> onChange;
+
+    private float value; // normalized 0..1
     private boolean dragging;
-    private Consumer<Float> onChange;
-    private int decimalPlaces;
+    private int decimalPlaces = 2;
     private float labelScale = 1.0f;
     private float valueScale = 1.0f;
-    
-    /**
-     * Creates a new slider.
-     * 
-     * @param x X position
-     * @param y Y position
-     * @param width Slider width
-     * @param height Slider height
-     * @param label Slider label
-     * @param minValue Minimum value
-     * @param maxValue Maximum value
-     * @param initialValue Initial value
-     * @param onChange Callback when value changes
-     */
-    public Slider(float x, float y, float width, float height, String label, 
-                  float minValue, float maxValue, float initialValue, Consumer<Float> onChange) {
+
+    private float cachedTrackX;
+    private float cachedTrackWidth;
+
+    public Slider(float x, float y, float width, float height, String label,
+                  float minValue, float maxValue, float initialValue,
+                  Consumer<Float> onChange) {
         super(x, y, width, height);
         this.label = label;
         this.minValue = minValue;
         this.maxValue = maxValue;
         this.onChange = onChange;
-        this.dragging = false;
-        this.decimalPlaces = 2;
-        
-        // Normalize initial value to 0-1 range
         setValue(initialValue);
     }
-    
+
     @Override
     public void render(UIRenderer renderer, FontRenderer fontRenderer) {
-        if (!visible) return;
-        
-        float baseTextHeight = Math.max(1f, fontRenderer.getTextHeight());
-        float scaledLabelHeight = baseTextHeight * labelScale;
-        float labelBaseline = y + scaledLabelHeight;
-        fontRenderer.drawText(label, x, labelBaseline, labelScale,
-            TEXT_COLOR[0], TEXT_COLOR[1], TEXT_COLOR[2], TEXT_COLOR[3]);
-        
-        float trackX = x;
-        float trackWidth = Math.max(width - 120f, 140f);
-        float availableHeight = Math.max(height - scaledLabelHeight - 12f, HANDLE_HEIGHT);
-        float handleHeight = Math.max(availableHeight, HANDLE_HEIGHT);
-        float handleWidth = Math.max(handleHeight * 0.28f, HANDLE_WIDTH);
-        float trackHeight = Math.max(handleHeight * 0.18f, TRACK_HEIGHT);
-        float trackY = labelBaseline + 12f;
-        float trackCenterY = trackY + (handleHeight - trackHeight) / 2f;
-        
-        renderer.drawRect(trackX, trackCenterY, trackWidth, trackHeight,
+        if (!visible) {
+            return;
+        }
+
+        float baseHeight = Math.max(1f, fontRenderer.getTextHeight());
+        float appliedLabelScale = Math.max(0.75f, labelScale);
+        float appliedValueScale = Math.max(0.65f, valueScale);
+        float padding = Math.max(10f, height * 0.2f);
+
+        float labelBaseline = y + padding + baseHeight * appliedLabelScale;
+        fontRenderer.drawText(label, x + padding, labelBaseline, appliedLabelScale,
+            LABEL_COLOR[0], LABEL_COLOR[1], LABEL_COLOR[2], LABEL_COLOR[3]);
+
+        float actualValue = minValue + value * (maxValue - minValue);
+        String valueText = formatValue(actualValue);
+        float valueTextWidth = fontRenderer.getTextWidth(valueText) * appliedValueScale;
+        float valueSlotWidth = Math.max(valueTextWidth + padding * 1.3f, Math.min(160f, width * 0.33f));
+
+        float trackX = x + padding;
+        float trackWidth = Math.max(60f, width - padding * 2f - valueSlotWidth);
+        float trackHeight = Math.max(6f, height * 0.18f);
+        float trackY = labelBaseline + Math.max(8f, padding * 0.55f);
+        float trackCenterY = trackY + trackHeight / 2f;
+
+        renderer.drawRect(trackX - 2f, trackCenterY - trackHeight / 2f - 2f,
+            trackWidth + 4f, trackHeight + 4f,
+            TRACK_BORDER[0], TRACK_BORDER[1], TRACK_BORDER[2], TRACK_BORDER[3]);
+        renderer.drawRect(trackX, trackCenterY - trackHeight / 2f,
+            trackWidth, trackHeight,
             TRACK_COLOR[0], TRACK_COLOR[1], TRACK_COLOR[2], TRACK_COLOR[3]);
-        
-        float handleX = trackX + (trackWidth - handleWidth) * value;
-        float handleY = trackY;
+
+        float handleWidth = Math.min(trackWidth, Math.max(trackHeight * 2.1f, 20f));
+        float handleHeight = Math.max(trackHeight * 2.4f, 26f);
+        float normalized = Math.max(0f, Math.min(1f, value));
+        float handleX = trackX + (trackWidth - handleWidth) * normalized;
+        float handleY = trackCenterY - handleHeight / 2f;
         float[] handleColor = (hovered || dragging) ? HANDLE_HOVER_COLOR : HANDLE_COLOR;
         renderer.drawRect(handleX, handleY, handleWidth, handleHeight,
             handleColor[0], handleColor[1], handleColor[2], handleColor[3]);
-        
-        float actualValue = minValue + value * (maxValue - minValue);
-        String valueText = formatValue(actualValue);
-        float valueX = trackX + trackWidth + 16f;
-        float valueBaseline = trackY + handleHeight * 0.65f;
-        fontRenderer.drawText(valueText, valueX, valueBaseline, valueScale,
-            TEXT_COLOR[0], TEXT_COLOR[1], TEXT_COLOR[2], TEXT_COLOR[3]);
+
+        float valueX = trackX + trackWidth + padding * 0.6f;
+        float valueBaseline = trackCenterY + baseHeight * appliedValueScale * 0.35f;
+        fontRenderer.drawText(valueText, valueX, valueBaseline, appliedValueScale,
+            VALUE_COLOR[0], VALUE_COLOR[1], VALUE_COLOR[2], VALUE_COLOR[3]);
+
+        cachedTrackX = trackX;
+        cachedTrackWidth = trackWidth;
     }
-    
+
     @Override
     public void update(float deltaTime) {
-        // No animation needed
+        // No animation beyond dragging
     }
-    
+
     @Override
     public void onMouseMove(float mouseX, float mouseY) {
         super.onMouseMove(mouseX, mouseY);
-        
         if (dragging) {
             updateValueFromMouse(mouseX);
         }
     }
-    
+
     @Override
     public void onMouseClick(float mouseX, float mouseY, int button) {
         if (button == 0 && isMouseOver(mouseX, mouseY)) {
@@ -117,76 +112,49 @@ public class Slider extends UIComponent {
             updateValueFromMouse(mouseX);
         }
     }
-    
+
     @Override
     public void onMouseRelease(float mouseX, float mouseY, int button) {
         if (button == 0) {
             dragging = false;
         }
     }
-    
+
     private void updateValueFromMouse(float mouseX) {
-        float trackX = x;
-        float trackWidth = Math.max(width - 120f, 140f);
-        
-        float newValue = (mouseX - trackX) / trackWidth;
-        newValue = Math.max(0.0f, Math.min(1.0f, newValue));
-        
-        if (newValue != value) {
-            value = newValue;
+        float trackX = cachedTrackX > 0f ? cachedTrackX : x + Math.max(10f, width * 0.1f);
+        float trackWidth = cachedTrackWidth > 0f ? cachedTrackWidth : Math.max(80f, width - 80f);
+
+        float normalized = (mouseX - trackX) / trackWidth;
+        normalized = Math.max(0f, Math.min(1f, normalized));
+        if (normalized != value) {
+            value = normalized;
             if (onChange != null) {
-                float actualValue = minValue + value * (maxValue - minValue);
-                onChange.accept(actualValue);
+                float actual = minValue + value * (maxValue - minValue);
+                onChange.accept(actual);
             }
         }
     }
-    
-    /**
-     * Formats a value for display.
-     */
+
     private String formatValue(float value) {
         if (decimalPlaces == 0) {
             return String.valueOf((int) value);
-        } else {
-            return String.format("%." + decimalPlaces + "f", value);
         }
+        return String.format("%." + decimalPlaces + "f", value);
     }
-    
-    /**
-     * Gets the current value (mapped to min-max range).
-     * 
-     * @return Current value
-     */
+
     public float getValue() {
         return minValue + value * (maxValue - minValue);
     }
-    
-    /**
-     * Sets the value (will be clamped to min-max range).
-     * 
-     * @param value New value
-     */
+
     public void setValue(float value) {
-        // Normalize to 0-1 range
         this.value = (value - minValue) / (maxValue - minValue);
         this.value = Math.max(0.0f, Math.min(1.0f, this.value));
     }
-    
-    /**
-     * Sets the number of decimal places to display.
-     * 
-     * @param decimalPlaces Number of decimal places (0 for integers)
-     */
+
     public void setDecimalPlaces(int decimalPlaces) {
         this.decimalPlaces = decimalPlaces;
     }
-    
-    /**
-     * Sets the font scale for label and value text.
-     * 
-     * @param labelScale Scale for the label text
-     * @param valueScale Scale for the value text
-     */
+
     public void setFontScale(float labelScale, float valueScale) {
         this.labelScale = Math.max(0.6f, labelScale);
         this.valueScale = Math.max(0.6f, valueScale);

@@ -4,165 +4,160 @@ import com.poorcraft.render.Texture;
 import com.poorcraft.resources.ResourceManager;
 
 /**
- * Textured menu button rendered with the asset in {@code UI_FILES/button.png}.
- * Typography scales with the component height so captions remain legible across
- * resolutions while tint overlays provide hover and press feedback.
+ * Menu button rendered using the textured asset in {@code UI_FILES/button.png}.
+ * The texture is scaled uniformly and a hover overlay keeps the button legible
+ * across bright backdrops. Typography scales with button height while honoring
+ * horizontal padding.
  */
 public class MenuButton extends UIComponent {
-    
-    private static final float[] ACTIVE_TEXT = {1f, 1f, 1f, 1f};
-    private static final float[] DISABLED_TEXT = {0.65f, 0.65f, 0.65f, 0.7f};
-    private static final float[] BASE_TINT = {0.18f, 0.18f, 0.18f};
-    private static final float[] HOVER_TINT = {0.05f, 0.26f, 0.34f};
+
     private static final String BUTTON_TEXTURE_PATH = "UI_FILES/button.png";
-    
+    private static final float[] ACTIVE_TEXT_COLOR = {0.98f, 0.98f, 0.98f, 1.0f};
+    private static final float[] DISABLED_TEXT_COLOR = {0.62f, 0.62f, 0.62f, 0.7f};
+    private static final float[] SHADOW_COLOR = {0f, 0f, 0f, 0.55f};
+
     private static Texture buttonTexture;
     private static boolean textureLoadAttempted;
-    
+
     private String text;
     private Runnable onClick;
     private boolean pressed;
-    private float hoverTransition;
-    
-    /**
-     * Creates a new menu button.
-     * 
-     * @param x X position (top-left corner)
-     * @param y Y position (top-left corner)
-     * @param width Button width
-     * @param height Button height
-     * @param text Button text
-     * @param onClick Click callback
-     */
+    private float hoverBlend;
+    private float paddingX = 20f;
+
     public MenuButton(float x, float y, float width, float height, String text, Runnable onClick) {
         super(x, y, width, height);
         this.text = text;
         this.onClick = onClick;
-        this.pressed = false;
-        this.hoverTransition = 0.0f;
     }
-    
+
+    public void setHorizontalPadding(float padding) {
+        this.paddingX = Math.max(6f, padding);
+    }
+
+    @Override
+    public void update(float deltaTime) {
+        float target = hovered ? 1.0f : 0.0f;
+        float speed = pressed ? 11.0f : 7.5f;
+        hoverBlend += (target - hoverBlend) * deltaTime * speed;
+        if (Math.abs(hoverBlend - target) < 0.01f) {
+            hoverBlend = target;
+        }
+    }
+
     @Override
     public void render(UIRenderer renderer, FontRenderer fontRenderer) {
         if (!visible) {
             return;
         }
-        
+
         ensureTextureLoaded();
-        
-        float tintR;
-        float tintG;
-        float tintB;
-        float tintAlpha;
-        float[] textColor;
-        
-        if (!enabled) {
-            tintR = tintG = tintB = 0f;
-            tintAlpha = 0.55f;
-            textColor = DISABLED_TEXT;
-        } else if (pressed) {
-            tintR = tintG = tintB = 0f;
-            tintAlpha = 0.38f;
-            textColor = ACTIVE_TEXT;
-        } else {
-            tintR = lerp(BASE_TINT[0], HOVER_TINT[0], hoverTransition);
-            tintG = lerp(BASE_TINT[1], HOVER_TINT[1], hoverTransition);
-            tintB = lerp(BASE_TINT[2], HOVER_TINT[2], hoverTransition);
-            tintAlpha = 0.22f + hoverTransition * 0.18f;
-            textColor = ACTIVE_TEXT;
-        }
-        
+
+        float disabledMul = enabled ? 1.0f : 0.4f;
+        renderer.drawRect(x, y, width, height,
+            0.07f * disabledMul, 0.11f * disabledMul, 0.14f * disabledMul, 0.92f);
+
         if (buttonTexture != null) {
             renderer.drawTexturedRect(x, y, width, height, buttonTexture.getId());
-            renderer.drawRect(x, y, width, height, tintR, tintG, tintB, tintAlpha);
-        } else {
-            renderer.drawRect(x, y, width, height, 0.32f, 0.32f, 0.32f, 0.95f);
-            float border = Math.max(3f, height * 0.05f);
-            renderer.drawRect(x, y, width, border, 0.82f, 0.82f, 0.82f, 0.9f);
-            renderer.drawRect(x, y + height - border, width, border, 0.12f, 0.12f, 0.12f, 0.9f);
-            renderer.drawRect(x, y, border, height, 0.7f, 0.7f, 0.7f, 0.9f);
-            renderer.drawRect(x + width - border, y, border, height, 0.12f, 0.12f, 0.12f, 0.9f);
         }
-        
-        if (text != null && !text.isEmpty()) {
-            float baseHeight = Math.max(1f, fontRenderer.getTextHeight());
-            float targetCapHeight = Math.max(height * 0.52f, 24f);
-            float textScale = Math.max(1.0f, targetCapHeight / baseHeight);
-            
-            float textWidth = fontRenderer.getTextWidth(text) * textScale;
-            float drawX = x + (width - textWidth) / 2.0f;
-            float drawBaseline = y + (height + baseHeight * textScale * 0.2f) / 2.0f;
-            
-            fontRenderer.drawText(text, drawX + 2f * textScale, drawBaseline + 2f * textScale,
-                textScale, 0f, 0f, 0f, 0.6f);
-            fontRenderer.drawText(text, drawX, drawBaseline, textScale,
-                textColor[0], textColor[1], textColor[2], textColor[3]);
+
+        float overlayAlpha = 0.18f + 0.25f * hoverBlend + (pressed ? 0.15f : 0f);
+        renderer.drawRect(x, y, width, height,
+            0.06f + 0.18f * hoverBlend,
+            0.26f + 0.2f * hoverBlend,
+            0.32f + 0.22f * hoverBlend,
+            overlayAlpha * disabledMul);
+
+        float border = clamp(Math.min(width, height) * 0.085f, 3f, 10f);
+        renderer.drawRect(x, y, width, border,
+            0.0f, 0.93f * disabledMul, 0.93f * disabledMul, 0.86f);
+        renderer.drawRect(x, y + height - border, width, border,
+            0.0f, 0.82f * disabledMul, 0.82f * disabledMul, 0.72f);
+        renderer.drawRect(x, y, border, height,
+            0.02f, 0.78f * disabledMul, 0.82f * disabledMul, 0.78f);
+        renderer.drawRect(x + width - border, y, border, height,
+            0.02f, 0.78f * disabledMul, 0.82f * disabledMul, 0.78f);
+
+        if (text == null || text.isEmpty()) {
+            return;
         }
+
+        float baseHeight = Math.max(1f, fontRenderer.getTextHeight());
+        float availableWidth = Math.max(12f, width - paddingX * 2f);
+        float targetCapHeight = clamp(height * 0.5f, 22f, height * 0.68f);
+        float textScale = Math.max(1.0f, targetCapHeight / baseHeight);
+        float textWidth = fontRenderer.getTextWidth(text) * textScale;
+        if (textWidth > availableWidth) {
+            textScale = Math.max(0.7f, availableWidth / textWidth);
+            textWidth = fontRenderer.getTextWidth(text) * textScale;
+        }
+
+        float textX = x + (width - textWidth) / 2f;
+        float textBaseline = y + (height + baseHeight * textScale * 0.3f) / 2f;
+
+        fontRenderer.drawText(text, textX + 2f * textScale, textBaseline + 2f * textScale,
+            textScale, SHADOW_COLOR[0], SHADOW_COLOR[1], SHADOW_COLOR[2], SHADOW_COLOR[3] * disabledMul);
+
+        float[] color = enabled ? ACTIVE_TEXT_COLOR : DISABLED_TEXT_COLOR;
+        fontRenderer.drawText(text, textX, textBaseline, textScale,
+            color[0], color[1], color[2], color[3] * disabledMul);
     }
-    
-    @Override
-    public void update(float deltaTime) {
-        float target = hovered ? 1.0f : 0.0f;
-        float speed = 8.5f;
-        hoverTransition += (target - hoverTransition) * deltaTime * speed;
-        if (Math.abs(hoverTransition - target) < 0.01f) {
-            hoverTransition = target;
-        }
-    }
-    
+
     @Override
     public void onMouseClick(float mouseX, float mouseY, int button) {
-        if (enabled && isMouseOver(mouseX, mouseY) && button == 0) {
+        if (enabled && button == 0 && isMouseOver(mouseX, mouseY)) {
             pressed = true;
         }
     }
-    
+
     @Override
     public void onMouseRelease(float mouseX, float mouseY, int button) {
         if (pressed && button == 0) {
             pressed = false;
-            // Only trigger callback if mouse is still over button
             if (enabled && isMouseOver(mouseX, mouseY) && onClick != null) {
                 onClick.run();
             }
         }
     }
-    
+
     public void setText(String text) {
         this.text = text;
     }
-    
+
     public String getText() {
         return text;
     }
-    
+
     public void setOnClick(Runnable onClick) {
         this.onClick = onClick;
     }
-    
-    private float lerp(float a, float b, float t) {
-        return a + (b - a) * t;
+
+    private float clamp(float value, float min, float max) {
+        return Math.max(min, Math.min(max, value));
     }
-    
+
     private void ensureTextureLoaded() {
         if (textureLoadAttempted) {
             return;
         }
-        
+
         textureLoadAttempted = true;
         ResourceManager resourceManager = ResourceManager.getInstance();
         String absolutePath = resourceManager.getResourcePath(BUTTON_TEXTURE_PATH);
         try {
             buttonTexture = Texture.loadFromFile(absolutePath);
             System.out.println("[MenuButton] Loaded textured button from " + absolutePath);
+            return;
         } catch (Exception diskFailure) {
-            try {
-                buttonTexture = Texture.loadFromResource("/" + BUTTON_TEXTURE_PATH);
-                System.out.println("[MenuButton] Loaded textured button from classpath fallback");
-            } catch (Exception fallbackFailure) {
-                System.err.println("[MenuButton] Failed to load button texture: " + fallbackFailure.getMessage());
-                buttonTexture = null;
-            }
+            System.err.println("[MenuButton] Disk load failed for button texture: " + diskFailure.getMessage());
+        }
+
+        try {
+            buttonTexture = Texture.loadFromResource("/" + BUTTON_TEXTURE_PATH);
+            System.out.println("[MenuButton] Loaded textured button from classpath fallback");
+        } catch (Exception fallbackFailure) {
+            System.err.println("[MenuButton] Failed to load button texture: " + fallbackFailure.getMessage());
+            buttonTexture = null;
         }
     }
 }

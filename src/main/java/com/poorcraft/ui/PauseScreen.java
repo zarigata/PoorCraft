@@ -64,40 +64,40 @@ public class PauseScreen extends UIScreen {
             this.game = null;
         }
     }
-    
     @Override
     public void init() {
         clearComponents();
         
         float centerX = windowWidth / 2.0f;
-        
-        panelWidth = clamp(windowWidth * 0.72f, 700f, Math.max(700f, windowWidth - 80f));
-        panelHeight = clamp(windowHeight * 0.72f, 520f, Math.max(520f, windowHeight - 80f));
+
+        panelWidth = clamp(windowWidth * 0.72f, 720f, Math.max(720f, windowWidth - 90f));
+        panelHeight = clamp(windowHeight * 0.72f, 540f, Math.max(540f, windowHeight - 100f));
         panelX = (windowWidth - panelWidth) / 2.0f;
         panelY = (windowHeight - panelHeight) / 2.0f;
-        contentPadding = Math.max(24f, panelWidth * 0.035f);
-        
-        float titleScale = Math.max(1.6f, panelWidth / 600f);
-        float titleBaseline = panelY + panelHeight * 0.12f;
+        contentPadding = Math.max(26f, panelWidth * 0.038f);
+
+        float titleScale = Math.max(1.7f, panelWidth / 620f);
+        float titleBaseline = panelY + contentPadding;
         Label titleLabel = new Label(centerX, titleBaseline, "GAME PAUSED",
-            0.0f, 0.95f, 0.95f, 1.0f);
+            0.02f, 0.96f, 0.96f, 1.0f);
         titleLabel.setCentered(true);
         titleLabel.setScale(titleScale);
         addComponent(titleLabel);
-        
+
+        float topContentY = titleBaseline + Math.max(52f, 34f * titleScale);
+        float columnWidth = (panelWidth - contentPadding * 3f) / 2f;
         float leftPanelX = panelX + contentPadding;
-        float leftPanelWidth = (panelWidth - contentPadding * 3f) / 2f;
-        float contentY = titleBaseline + 52f;
-        float sliderHeight = Math.max(52f, panelHeight * 0.11f);
-        float sliderSpacing = Math.max(18f, sliderHeight * 0.35f);
-        float sliderFontScale = Math.max(1.0f, panelWidth / 720f);
+        float rightPanelX = panelX + contentPadding * 2f + columnWidth;
+        float sliderHeight = Math.max(56f, panelHeight * 0.11f);
+        float sliderSpacing = Math.max(20f, sliderHeight * 0.32f);
+        float sliderFontScale = Math.max(1.0f, panelWidth / 760f);
+        float contentY = topContentY;
         
         Label quickSettingsLabel = new Label(leftPanelX, contentY, "QUICK SETTINGS",
             0.7f, 0.9f, 0.95f, 1.0f);
         quickSettingsLabel.setScale(Math.max(1.1f, sliderFontScale * 0.95f));
         addComponent(quickSettingsLabel);
         contentY += 38f;
-        
         fovSlider = new Slider(leftPanelX, contentY, leftPanelWidth, sliderHeight,
             "Field of View", 60, 110, settings.graphics.fov,
             value -> settings.graphics.fov = value);
@@ -185,9 +185,7 @@ public class PauseScreen extends UIScreen {
             addComponent(errorLabel);
         }
         
-        contentY = panelY + 320;  // Position for game info
-        
-        // Game info section - because why not show off some stats?
+        contentY = Math.max(contentY + 36f, topContentY + columnWidth * 0.25f);
         Label gameInfoLabel = new Label(rightPanelX, contentY, "GAME INFO",
             0.9f, 0.9f, 0.7f, 1.0f);
         addComponent(gameInfoLabel);
@@ -286,7 +284,6 @@ public class PauseScreen extends UIScreen {
         
         renderer.drawRect(panelX, panelY, panelWidth, panelHeight,
             0.08f, 0.05f, 0.12f, 0.95f);
-        
         float border = Math.max(2f, panelWidth * 0.003f);
         renderer.drawRect(panelX, panelY, panelWidth, border,
             0.0f, 0.95f, 0.95f, 0.8f);
@@ -296,10 +293,8 @@ public class PauseScreen extends UIScreen {
             0.0f, 0.95f, 0.95f, 0.8f);
         renderer.drawRect(panelX + panelWidth - border, panelY, border, panelHeight,
             0.0f, 0.95f, 0.95f, 0.8f);
-        
-        float dividerX = panelX + panelWidth * 0.5f;
-        renderer.drawRect(dividerX, panelY + 50, 1, panelHeight - 100,
-            0.0f, 0.95f, 0.95f, 0.3f);
+        renderer.drawRect(panelX + panelWidth / 2f, panelY + contentPadding * 1.2f,
+            2f, panelHeight - contentPadding * 2.4f, 0.0f, 0.95f, 0.95f, 0.32f);
         
         super.render(renderer, fontRenderer);
     }
