@@ -1,15 +1,16 @@
 package com.poorcraft.world;
 
-import com.poorcraft.world.chunk.Chunk;
 import com.poorcraft.world.chunk.ChunkPos;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -26,8 +27,10 @@ public class ChunkManager {
     private final World world;
     private int loadDistance;
     private int unloadDistance;
+    private int preloadDistance;
     private ChunkPos lastPlayerChunk;
     private final Set<ChunkPos> loadedChunkPositions;
+    private final Set<ChunkPos> pendingChunkLoads;
     private final ExecutorService chunkLoadExecutor;
     
     /**
@@ -41,9 +44,22 @@ public class ChunkManager {
         this.world = world;
         this.loadDistance = loadDistance;
         this.unloadDistance = unloadDistance;
-        this.loadedChunkPositions = new HashSet<>();
-        this.chunkLoadExecutor = Executors.newSingleThreadExecutor();  // Single-threaded for simplicity
+        this.preloadDistance = Math.max(1, loadDistance / 2);
+        this.loadedChunkPositions = ConcurrentHashMap.newKeySet();
+        this.pendingChunkLoads = ConcurrentHashMap.newKeySet();
+        this.chunkLoadExecutor = createChunkExecutor();
         this.lastPlayerChunk = null;
+    }
+
+    private ExecutorService createChunkExecutor() {
+        int threadCount = Math.max(1, Math.min(Runtime.getRuntime().availableProcessors() - 1, 4));
+        ThreadFactory factory = r -> {
+            Thread thread = new Thread(r, "ChunkLoader-" + Integer.toHexString(r.hashCode()));
+            thread.setDaemon(true);
+            thread.setPriority(Thread.NORM_PRIORITY - 1);
+            return thread;
+        };
+        return Executors.newFixedThreadPool(threadCount, factory);
     }
     
     /**
@@ -76,22 +92,46 @@ public class ChunkManager {
      * @param centerChunk Center chunk position (player's chunk)
      */
     private void loadChunksAroundPlayer(ChunkPos centerChunk) {
-        for (int x = -loadDistance; x <= loadDistance; x++) {
-            for (int z = -loadDistance; z <= loadDistance; z++) {
-                ChunkPos pos = new ChunkPos(centerChunk.x + x, centerChunk.z + z);
-                
-                // Skip if already loaded
-                if (loadedChunkPositions.contains(pos)) {
+        int maxRadius = loadDistance + preloadDistance;
+        List<ChunkRequest> requests = new ArrayList<>();
+
+        for (int dx = -maxRadius; dx <= maxRadius; dx++) {
+            for (int dz = -maxRadius; dz <= maxRadius; dz++) {
+                ChunkPos pos = new ChunkPos(centerChunk.x + dx, centerChunk.z + dz);
+
+                if (loadedChunkPositions.contains(pos) || pendingChunkLoads.contains(pos)) {
                     continue;
                 }
-                
-                // Load chunk (synchronous for now - async can be added later)
-                world.getOrCreateChunk(pos);
-                loadedChunkPositions.add(pos);
-                
-                // Optional: Log chunk loads (can be verbose)
-                // System.out.println("[ChunkManager] Loaded chunk: " + pos);
+
+                int manhattan = Math.max(Math.abs(dx), Math.abs(dz));
+                if (manhattan > maxRadius) {
+                    continue;
+                }
+
+                boolean withinActiveView = manhattan <= loadDistance;
+                int distanceSq = dx * dx + dz * dz;
+                requests.add(new ChunkRequest(pos, distanceSq, withinActiveView));
             }
+        }
+
+        if (requests.isEmpty()) {
+            return;
+        }
+
+        requests.sort(Comparator
+            .comparingInt((ChunkRequest req) -> req.withinActiveView ? 0 : 1)
+            .thenComparingInt(req -> req.distanceSq));
+
+        for (ChunkRequest request : requests) {
+            pendingChunkLoads.add(request.pos);
+            chunkLoadExecutor.submit(() -> {
+                try {
+                    world.getOrCreateChunk(request.pos);
+                    loadedChunkPositions.add(request.pos);
+                } finally {
+                    pendingChunkLoads.remove(request.pos);
+                }
+            });
         }
     }
     
@@ -118,6 +158,7 @@ public class ChunkManager {
         for (ChunkPos pos : toUnload) {
             world.unloadChunk(pos);
             loadedChunkPositions.remove(pos);
+            pendingChunkLoads.remove(pos);
             
             // Optional: Log chunk unloads (can be verbose)
             // System.out.println("[ChunkManager] Unloaded chunk: " + pos);
@@ -135,13 +176,20 @@ public class ChunkManager {
     
     /**
      * Sets the unload distance.
-     * 
      * @param distance Unload distance in chunks
      */
     public void setUnloadDistance(int distance) {
         this.unloadDistance = distance;
     }
-    
+
+    /**
+     * Sets the preload distance.
+     * 
+     * @param distance Preload distance in chunks
+     */
+    public void setPreloadDistance(int distance) {
+        this.preloadDistance = Math.max(0, distance);
+    }
     /**
      * Gets the number of currently loaded chunks.
      * 
@@ -150,7 +198,17 @@ public class ChunkManager {
     public int getLoadedChunkCount() {
         return loadedChunkPositions.size();
     }
-    
+
+    /**
+     * Gets the number of chunks currently queued for loading.
+     * Useful for debugging streaming performance.
+     *
+     * @return Pending chunk load count
+     */
+    public int getPendingChunkCount() {
+        return pendingChunkLoads.size();
+    }
+
     /**
      * Shuts down the chunk loading thread pool.
      * Should be called when the game exits.
@@ -164,6 +222,18 @@ public class ChunkManager {
         } catch (InterruptedException e) {
             chunkLoadExecutor.shutdownNow();
             Thread.currentThread().interrupt();
+        }
+    }
+
+    private static final class ChunkRequest {
+        private final ChunkPos pos;
+        private final int distanceSq;
+        private final boolean withinActiveView;
+
+        private ChunkRequest(ChunkPos pos, int distanceSq, boolean withinActiveView) {
+            this.pos = pos;
+            this.distanceSq = distanceSq;
+            this.withinActiveView = withinActiveView;
         }
     }
 }
