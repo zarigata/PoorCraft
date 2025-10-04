@@ -24,6 +24,7 @@ public class InputHandler {
     private double mouseDeltaY;
     private boolean firstMouse;
     private boolean cursorGrabbed;
+    private double scrollOffset;
     
     // Callbacks for UI integration
     private Consumer<Integer> keyPressCallback;
@@ -40,6 +41,7 @@ public class InputHandler {
         this.mouseButtons = new boolean[8];  // Support 8 mouse buttons
         this.firstMouse = true;
         this.cursorGrabbed = false;
+        this.scrollOffset = 0.0;
     }
     
     /**
@@ -86,6 +88,11 @@ public class InputHandler {
         glfwSetCursorPosCallback(windowHandle, (window, xpos, ypos) -> {
             mouseX = xpos;
             mouseY = ypos;
+        });
+        
+        // Scroll callback - accumulates scroll offset for hotbar selection and UI
+        glfwSetScrollCallback(windowHandle, (window, xoffset, yoffset) -> {
+            scrollOffset += yoffset;
         });
         
         // Initialize last mouse position to window center
@@ -188,6 +195,18 @@ public class InputHandler {
     public void resetMouseDeltas() {
         mouseDeltaX = 0.0;
         mouseDeltaY = 0.0;
+    }
+
+    /**
+     * Retrieves accumulated scroll offset since last call and resets it.
+     * Positive values indicate scrolling up, negative indicate scrolling down.
+     * 
+     * @return scroll offset
+     */
+    public double consumeScrollOffset() {
+        double offset = scrollOffset;
+        scrollOffset = 0.0;
+        return offset;
     }
     
     /**
