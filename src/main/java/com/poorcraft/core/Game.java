@@ -6,6 +6,7 @@ import com.poorcraft.config.Settings;
 import com.poorcraft.discord.DiscordRichPresenceManager;
 import com.poorcraft.input.InputHandler;
 import com.poorcraft.modding.ModLoader;
+import com.poorcraft.inventory.Inventory;
 import com.poorcraft.render.BlockHighlightRenderer;
 import com.poorcraft.render.ChunkRenderer;
 import com.poorcraft.render.TextureGenerator;
@@ -38,6 +39,7 @@ public class Game {
     private Camera camera;
     private PlayerController playerController;
     private MiningSystem miningSystem;
+    private Inventory inventory;
     private Settings settings;
     private ConfigManager configManager;
     private UIManager uiManager;
@@ -74,6 +76,7 @@ public class Game {
         this.discordUpdateTimer = 0.0f;
         this.currentGameMode = GameMode.SURVIVAL;
         this.miningSystem = new MiningSystem();
+        this.inventory = new Inventory();
         this.blockHighlightRenderer = new BlockHighlightRenderer();
         this.highlightRendererInitialized = false;
     }

@@ -76,6 +76,13 @@ public class ItemStack {
     }
 
     /**
+     * @return how many more blocks can be added before the stack is full
+     */
+    public int remainingCapacity() {
+        return Math.max(0, MAX_STACK_SIZE - count);
+    }
+
+    /**
      * Creates a deep copy of this stack.
      */
     public ItemStack copy() {
