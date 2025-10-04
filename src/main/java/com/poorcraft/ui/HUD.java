@@ -1,5 +1,10 @@
 package com.poorcraft.ui;
 
+import com.poorcraft.core.Game;
+import com.poorcraft.inventory.Inventory;
+import com.poorcraft.inventory.ItemStack;
+import com.poorcraft.world.block.BlockType;
+
 /**
  * In-game HUD overlay.
  * 
@@ -11,26 +16,25 @@ package com.poorcraft.ui;
  */
 public class HUD extends UIScreen {
     
-    private Object game;  // Reference to game instance
+    private final Game game;  // Reference to game instance
     private boolean debugVisible;
     
     /**
      * Creates the HUD.
-     * 
+     *
      * @param windowWidth Window width
      * @param windowHeight Window height
      * @param game Game instance for accessing stats
      */
     public HUD(int windowWidth, int windowHeight, Object game) {
         super(windowWidth, windowHeight);
-        this.game = game;
+        this.game = (game instanceof Game) ? (Game) game : null;
         this.debugVisible = false;
     }
-    
+
     @Override
     public void init() {
-        // HUD doesn't use components, it renders directly
-        // This keeps it simple and efficient
+        // HUD renders directly; no components to initialize.
     }
     
     @Override
@@ -77,37 +81,117 @@ public class HUD extends UIScreen {
      * Draws the hotbar at bottom center.
      */
     private void drawHotbar(UIRenderer renderer, FontRenderer fontRenderer) {
-        float slotSize = 40;
-        float slotSpacing = 2;
-        int slotCount = 9;
+        if (game == null) {
+            return;
+        }
+
+        Inventory inventory = game.getInventory();
+        if (inventory == null) {
+            return;
+        }
+
+        final int hotbarSlots = 16;
+        float slotSize = 44f;
+        float slotSpacing = 4f;
+        int slotCount = hotbarSlots;
         float totalWidth = slotCount * slotSize + (slotCount - 1) * slotSpacing;
         float startX = windowWidth / 2.0f - totalWidth / 2;
-        float startY = windowHeight - slotSize - 20;
-        
+        float startY = windowHeight - slotSize - 24;
+
+        int selectedSlot = game.getSelectedHotbarSlot();
+
         for (int i = 0; i < slotCount; i++) {
             float slotX = startX + i * (slotSize + slotSpacing);
-            
-            // Draw slot background
-            if (i == 0) {
-                // Highlight selected slot (slot 0)
-                renderer.drawRect(slotX, startY, slotSize, slotSize, 
-                    0.4f, 0.4f, 0.4f, 0.9f);
-            } else {
-                renderer.drawRect(slotX, startY, slotSize, slotSize, 
-                    0.2f, 0.2f, 0.2f, 0.8f);
+
+            float bgR = 0.2f;
+            float bgG = 0.2f;
+            float bgB = 0.2f;
+            float bgA = 0.65f;
+
+            if (i == selectedSlot) {
+                bgR = 0.8f;
+                bgG = 0.8f;
+                bgB = 0.4f;
+                bgA = 0.85f;
             }
-            
-            // Draw slot border
+
+            renderer.drawRect(slotX, startY, slotSize, slotSize, bgR, bgG, bgB, bgA);
+
             float borderWidth = 2;
-            renderer.drawRect(slotX, startY, slotSize, borderWidth, 
-                0.5f, 0.5f, 0.5f, 1.0f);
-            renderer.drawRect(slotX, startY + slotSize - borderWidth, slotSize, borderWidth, 
-                0.5f, 0.5f, 0.5f, 1.0f);
-            renderer.drawRect(slotX, startY, borderWidth, slotSize, 
-                0.5f, 0.5f, 0.5f, 1.0f);
-            renderer.drawRect(slotX + slotSize - borderWidth, startY, borderWidth, slotSize, 
-                0.5f, 0.5f, 0.5f, 1.0f);
+            renderer.drawRect(slotX, startY, slotSize, borderWidth,
+                0.1f, 0.1f, 0.1f, 0.9f);
+            renderer.drawRect(slotX, startY + slotSize - borderWidth, slotSize, borderWidth,
+                0.05f, 0.05f, 0.05f, 0.9f);
+            renderer.drawRect(slotX, startY, borderWidth, slotSize,
+                0.1f, 0.1f, 0.1f, 0.9f);
+            renderer.drawRect(slotX + slotSize - borderWidth, startY, borderWidth, slotSize,
+                0.05f, 0.05f, 0.05f, 0.9f);
+
+            ItemStack stack = inventory.getSlot(i);
+            if (stack != null && !stack.isEmpty()) {
+                BlockType blockType = stack.getBlockType();
+                String label = formatBlockLabel(blockType);
+                if (!label.isEmpty()) {
+                    float labelScale = 0.5f;
+                    float labelWidth = fontRenderer.getTextWidth(label) * labelScale;
+                    float labelX = slotX + (slotSize - labelWidth) / 2f;
+                    float labelY = startY + slotSize - 14f;
+                    fontRenderer.drawText(label, labelX, labelY, labelScale, 0.95f, 0.95f, 0.95f, 1.0f);
+                }
+
+                int count = stack.getCount();
+                if (count > 0) {
+                    String countText = formatCount(count);
+                    float countScale = 0.45f;
+                    float countWidth = fontRenderer.getTextWidth(countText) * countScale;
+                    float countX = slotX + slotSize - countWidth - 6f;
+                    float countY = startY + slotSize - 6f;
+                    fontRenderer.drawText(countText, countX, countY, countScale, 1f, 1f, 1f, 1f);
+                }
+            }
         }
+    }
+
+    private String formatBlockLabel(BlockType blockType) {
+        if (blockType == null || blockType == BlockType.AIR) {
+            return "";
+        }
+        String name = blockType.name().replace('_', ' ').toLowerCase();
+        if (name.length() <= 10) {
+            return capitalizeWords(name);
+        }
+        String[] parts = name.split(" ");
+        StringBuilder acronym = new StringBuilder();
+        for (String part : parts) {
+            if (!part.isEmpty()) {
+                acronym.append(Character.toUpperCase(part.charAt(0)));
+            }
+        }
+        return acronym.toString();
+    }
+
+    private String capitalizeWords(String input) {
+        StringBuilder builder = new StringBuilder(input.length());
+        boolean capitalizeNext = true;
+        for (char c : input.toCharArray()) {
+            if (Character.isWhitespace(c)) {
+                capitalizeNext = true;
+                builder.append(c);
+            } else if (capitalizeNext) {
+                builder.append(Character.toUpperCase(c));
+                capitalizeNext = false;
+            } else {
+                builder.append(c);
+            }
+        }
+        return builder.toString();
+    }
+
+    private String formatCount(int count) {
+        if (count >= 1000) {
+            return (count / 1000) + "k";
+        }
+        return Integer.toString(count);
     }
     
     /**

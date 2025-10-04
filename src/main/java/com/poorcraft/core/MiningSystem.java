@@ -4,6 +4,7 @@ import com.poorcraft.camera.Camera;
 import com.poorcraft.input.InputHandler;
 import com.poorcraft.world.World;
 import com.poorcraft.world.block.BlockType;
+import com.poorcraft.world.entity.DropManager;
 import org.joml.Vector3f;
 
 import java.util.Optional;
@@ -23,6 +24,7 @@ public class MiningSystem {
     private Target aimedTarget;
     private Target miningTarget;
     private float breakProgress;
+    private DropManager dropManager;
 
     /**
      * Updates current mining state.
@@ -54,7 +56,9 @@ public class MiningSystem {
         }
 
         if (hardness <= 0.0f) {
+            BlockType brokenBlock = miningTarget.blockType;
             world.setBlock(miningTarget.x, miningTarget.y, miningTarget.z, BlockType.AIR);
+            spawnDrop(brokenBlock, miningTarget.x, miningTarget.y, miningTarget.z);
             miningTarget = null;
             breakProgress = 0.0f;
             aimedTarget = pickTarget(world, camera);
@@ -65,7 +69,9 @@ public class MiningSystem {
         breakProgress += deltaTime / breakTime;
 
         if (breakProgress >= 1.0f) {
+            BlockType brokenBlock = miningTarget.blockType;
             world.setBlock(miningTarget.x, miningTarget.y, miningTarget.z, BlockType.AIR);
+            spawnDrop(brokenBlock, miningTarget.x, miningTarget.y, miningTarget.z);
             miningTarget = null;
             breakProgress = 0.0f;
             aimedTarget = pickTarget(world, camera);
@@ -102,6 +108,10 @@ public class MiningSystem {
         return breakProgress;
     }
 
+    public void setDropManager(DropManager dropManager) {
+        this.dropManager = dropManager;
+    }
+
     private Target pickTarget(World world, Camera camera) {
         Vector3f origin = camera.getPosition();
         Vector3f direction = camera.getFront();
@@ -120,6 +130,13 @@ public class MiningSystem {
             }
         }
         return null;
+    }
+
+    private void spawnDrop(BlockType blockType, int x, int y, int z) {
+        if (dropManager == null || blockType == null || blockType == BlockType.AIR) {
+            return;
+        }
+        dropManager.spawn(blockType, x + 0.5f, y + 0.1f, z + 0.5f, 1);
     }
 
     /**

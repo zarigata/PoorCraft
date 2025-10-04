@@ -9,6 +9,7 @@ import com.poorcraft.modding.ModLoader;
 import com.poorcraft.inventory.Inventory;
 import com.poorcraft.render.BlockHighlightRenderer;
 import com.poorcraft.render.ChunkRenderer;
+import com.poorcraft.render.ItemDropRenderer;
 import com.poorcraft.render.TextureGenerator;
 import com.poorcraft.ui.GameState;
 import com.poorcraft.ui.UIManager;
@@ -16,6 +17,7 @@ import com.poorcraft.world.ChunkManager;
 import com.poorcraft.world.World;
 import com.poorcraft.world.chunk.Chunk;
 import com.poorcraft.world.generation.BiomeType;
+import com.poorcraft.world.entity.DropManager;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
@@ -47,6 +49,8 @@ public class Game {
     private ChunkManager chunkManager;
     private ChunkRenderer chunkRenderer;
     private BlockHighlightRenderer blockHighlightRenderer;
+    private ItemDropRenderer itemDropRenderer;
+    private DropManager dropManager;
     private ModLoader modLoader;
     private DiscordRichPresenceManager discordRPC;
     private GameMode currentGameMode;
@@ -58,6 +62,8 @@ public class Game {
     private GameState lastGameState;  // Track last game state for Discord presence updates
     private BiomeType lastBiome;  // Track last biome for Discord presence updates
     private float discordUpdateTimer;  // Timer for periodic Discord updates
+    private int selectedHotbarSlot;
+    private double hotbarScrollRemainder;
     
     /**
      * Creates a new game instance with the given settings.
@@ -78,8 +84,11 @@ public class Game {
         this.miningSystem = new MiningSystem();
         this.inventory = new Inventory();
         this.blockHighlightRenderer = new BlockHighlightRenderer();
+        this.itemDropRenderer = new ItemDropRenderer();
+        this.dropManager = new DropManager();
         this.highlightRendererInitialized = false;
         this.selectedHotbarSlot = 0;
+        this.hotbarScrollRemainder = 0.0;
     }
     
     /**
@@ -248,6 +257,8 @@ public class Game {
             (float) inputHandler.getMouseDeltaY()
         );
 
+        handleHotbarScroll();
+
         if (playerController != null) {
             playerController.update(world, inputHandler, settings, camera, deltaTime);
             camera.setPosition(playerController.getEyePosition());
@@ -255,6 +266,10 @@ public class Game {
 
         if (miningSystem != null) {
             miningSystem.update(world, camera, inputHandler, deltaTime);
+        }
+
+        if (dropManager != null && inventory != null && playerController != null) {
+            dropManager.update(playerController.getPosition(), inventory, deltaTime);
         }
         
         // Update chunk manager with camera position
@@ -300,6 +315,10 @@ public class Game {
                 miningSystem.getAimedTarget().ifPresent(target ->
                     blockHighlightRenderer.render(target, miningSystem.getBreakProgress(), view, projection)
                 );
+            }
+
+            if (itemDropRenderer != null && dropManager != null) {
+                itemDropRenderer.render(dropManager.getDrops(), camera, view, projection);
             }
         }
         
@@ -406,6 +425,37 @@ public class Game {
     public MiningSystem getMiningSystem() {
         return miningSystem;
     }
+
+    public Inventory getInventory() {
+        return inventory;
+    }
+
+    public int getSelectedHotbarSlot() {
+        return selectedHotbarSlot;
+    }
+
+    public void selectHotbarSlot(int slot) {
+        if (inventory == null) {
+            selectedHotbarSlot = 0;
+            return;
+        }
+        int normalized = ((slot % 16) + 16) % 16;
+        selectedHotbarSlot = normalized;
+    }
+
+    private void handleHotbarScroll() {
+        double scrollDelta = inputHandler.consumeScrollOffset();
+        if (scrollDelta == 0.0) {
+            return;
+        }
+        hotbarScrollRemainder += scrollDelta;
+        int steps = (int) hotbarScrollRemainder;
+        if (steps != 0) {
+            selectHotbarSlot(selectedHotbarSlot - steps);
+            hotbarScrollRemainder -= steps;
+        }
+    }
+
     
     /**
      * Creates a new world with the specified parameters.
@@ -450,9 +500,12 @@ public class Game {
             chunkRenderer = new ChunkRenderer();
             chunkRenderer.setModLoader(modLoader);
             chunkRenderer.init();
+            itemDropRenderer.init();
+            itemDropRenderer.setTextureAtlas(chunkRenderer.getTextureAtlas());
             System.out.println("[Game] Chunk renderer initialized");
         } else {
             chunkRenderer.setModLoader(modLoader);
+            itemDropRenderer.setTextureAtlas(chunkRenderer.getTextureAtlas());
         }
 
         // Set up chunk unload callback
@@ -512,6 +565,9 @@ public class Game {
 
         // Mark world as loaded
         worldLoaded = true;
+
+        itemDropRenderer.setTextureAtlas(chunkRenderer.getTextureAtlas());
+        dropManager.clear();
 
         System.out.println("[Game] Remote world set for multiplayer");
     }
@@ -591,13 +647,18 @@ public class Game {
                     discordRPC.updatePaused();
                 }
                 break;
-                
+
+            case INVENTORY:
+                if (stateChanged) {
+                    discordRPC.updatePaused();
+                }
+                break;
+
             case IN_GAME:
                 // Update biome info if in game
                 if (world != null && playerController != null) {
                     Vector3f pos = playerController.getPosition();
                     BiomeType currentBiome = world.getBiome((int)pos.x, (int)pos.z);
-                    
                     // Update if biome changed or state changed
                     if (stateChanged || currentBiome != lastBiome) {
                         discordRPC.updateInGame(currentBiome, multiplayerMode, world.getSeed());

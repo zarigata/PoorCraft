@@ -129,16 +129,18 @@ public class UIManager {
         // Multiplayer screens
         MultiplayerMenuScreen multiplayerMenuScreen = new MultiplayerMenuScreen(windowWidth, windowHeight, this);
         screens.put(GameState.MULTIPLAYER_MENU, multiplayerMenuScreen);
-        
         ConnectingScreen connectingScreen = new ConnectingScreen(windowWidth, windowHeight, this);
         screens.put(GameState.CONNECTING, connectingScreen);
         
         HostingScreen hostingScreen = new HostingScreen(windowWidth, windowHeight, this);
         screens.put(GameState.HOSTING, hostingScreen);
+
+        InventoryScreen inventoryScreen = new InventoryScreen(windowWidth, windowHeight, this);
+        screens.put(GameState.INVENTORY, inventoryScreen);
         
         // HUD
         hudScreen = new HUD(windowWidth, windowHeight, game);
-        
+
         System.out.println("[UIManager] Created " + screens.size() + " screens");
         
         // Set initial state
@@ -207,6 +209,14 @@ public class UIManager {
             UIScreen pauseScreen = screens.get(GameState.PAUSED);
             if (pauseScreen != null) {
                 pauseScreen.render(uiRenderer, fontRenderer);
+            }
+        } else if (currentState == GameState.INVENTORY) {
+            if (hudScreen != null) {
+                hudScreen.render(uiRenderer, fontRenderer);
+            }
+            UIScreen inventoryScreen = screens.get(GameState.INVENTORY);
+            if (inventoryScreen != null) {
+                inventoryScreen.render(uiRenderer, fontRenderer);
             }
         } else {
             // Render menu screen
@@ -319,17 +329,31 @@ public class UIManager {
      * @param mods Key modifiers
      */
     public void onKeyPress(int key, int mods) {
+        int inventoryKey = settings != null && settings.controls != null
+            ? settings.controls.getKeybind("inventory", GLFW_KEY_E)
+            : GLFW_KEY_E;
+
         // Handle global hotkeys
         if (key == GLFW_KEY_F3 && (currentState == GameState.IN_GAME || currentState == GameState.PAUSED)) {
             // Toggle debug info
             if (hudScreen instanceof HUD) {
                 ((HUD) hudScreen).toggleDebug();
             }
+        } else if (key == inventoryKey) {
+            if (currentState == GameState.IN_GAME) {
+                setState(GameState.INVENTORY);
+                return;
+            } else if (currentState == GameState.INVENTORY) {
+                setState(GameState.IN_GAME);
+                return;
+            }
         } else if (key == GLFW_KEY_ESCAPE) {
             // Handle ESC key
             if (currentState == GameState.IN_GAME) {
                 setState(GameState.PAUSED);
             } else if (currentState == GameState.PAUSED) {
+                setState(GameState.IN_GAME);
+            } else if (currentState == GameState.INVENTORY) {
                 setState(GameState.IN_GAME);
             } else if (currentState == GameState.SETTINGS_MENU) {
                 // Return to previous state

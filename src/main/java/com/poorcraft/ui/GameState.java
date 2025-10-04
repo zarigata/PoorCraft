@@ -73,7 +73,13 @@ public enum GameState {
      * Shown when ESC is pressed during gameplay.
      * World is still visible but gameplay is paused.
      */
-    PAUSED;
+    PAUSED,
+
+    /**
+     * Inventory management screen.
+     * Opens over gameplay to manage items.
+     */
+    INVENTORY;
     
     /**
      * Checks if this state is an in-game state.
@@ -81,7 +87,7 @@ public enum GameState {
      * @return True if state is IN_GAME or PAUSED
      */
     public boolean isInGame() {
-        return this == IN_GAME || this == PAUSED;
+        return this == IN_GAME || this == PAUSED || this == INVENTORY;
     }
     
     /**
@@ -90,7 +96,7 @@ public enum GameState {
      * @return True if state needs an active world
      */
     public boolean requiresWorldLoaded() {
-        return this == IN_GAME || this == PAUSED;
+        return this == IN_GAME || this == PAUSED || this == INVENTORY;
     }
     
     /**
