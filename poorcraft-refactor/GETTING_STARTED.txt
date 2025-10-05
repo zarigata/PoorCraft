@@ -1,0 +1,196 @@
+================================================================================
+  PoorCraft Refactor v0.1.2 - Getting Started
+================================================================================
+
+Welcome to PoorCraft Refactor! This file will help you get started quickly.
+
+================================================================================
+  QUICK START (Windows)
+================================================================================
+
+1. PREREQUISITES
+   - Java 17 or later (download from https://adoptium.net/)
+   - For native builds: GraalVM 17+ (https://www.graalvm.org/downloads/)
+
+2. BUILD AND RUN
+   Open PowerShell in this directory and run:
+   
+   .\build-and-run.ps1 run
+   
+   Or use Gradle directly:
+   
+   .\gradlew.bat :launcher:run
+
+3. FIRST RUN
+   The game will create a data directory at:
+   %APPDATA%\PoorCraftRefactor\
+   
+   This contains:
+   - skins/     (block textures - you can edit these!)
+   - mods/      (Lua mods - you can create your own!)
+   - saves/     (world saves)
+   - logs/      (log files)
+   - config.json (engine configuration)
+
+================================================================================
+  AVAILABLE COMMANDS
+================================================================================
+
+.\build-and-run.ps1 run        - Build and run the game
+.\build-and-run.ps1 build      - Build all modules
+.\build-and-run.ps1 test       - Run all tests
+.\build-and-run.ps1 native     - Build native Windows EXE (requires GraalVM)
+.\build-and-run.ps1 dev        - Run in development mode
+.\build-and-run.ps1 clean      - Clean build artifacts
+.\build-and-run.ps1 help       - Show all commands
+
+================================================================================
+  CREATING YOUR FIRST MOD
+================================================================================
+
+1. Navigate to the mods directory:
+   cd %APPDATA%\PoorCraftRefactor\mods
+   mkdir my_mod
+   cd my_mod
+
+2. Create mod.json:
+   {
+     "id": "my_mod",
+     "name": "My First Mod",
+     "version": "1.0.0",
+     "author": "YourName",
+     "main": "main.lua"
+   }
+
+3. Create main.lua:
+   local engine = Engine
+   local log = Logger
+   
+   function onEnable()
+     log:info("My mod is running!")
+     
+     engine:registerEvent("onTick", function(tick)
+       if tick % 20 == 0 then
+         log:info("One second passed!")
+       end
+     end)
+   end
+
+4. Restart the game and check logs\engine.log to see your mod's output!
+
+================================================================================
+  CUSTOMIZING TEXTURES
+================================================================================
+
+1. Navigate to: %APPDATA%\PoorCraftRefactor\skins\default\
+2. Edit any PNG file (keep it 16x16 pixels)
+3. Delete atlas.png and atlas.json
+4. Restart the game (atlas rebuilds automatically)
+
+================================================================================
+  DOCUMENTATION
+================================================================================
+
+README.md           - Complete project documentation
+docs/QUICKSTART.md  - 5-minute quick start guide
+docs/API.md         - Complete Lua API reference
+docs/SKINS.md       - Texture creation guide
+docs/BUILDING.md    - Detailed build instructions
+CONTRIBUTING.md     - How to contribute to the project
+
+================================================================================
+  PROJECT STRUCTURE
+================================================================================
+
+poorcraft-refactor/
+├── engine/              - Core game engine (Kotlin)
+├── launcher/            - Bootstrap and entry point
+├── tools/atlas-packer/  - Texture atlas builder
+├── docs/                - Documentation
+└── build-and-run.ps1    - Convenient build script
+
+================================================================================
+  TROUBLESHOOTING
+================================================================================
+
+PROBLEM: "Java not found"
+SOLUTION: Install JDK 17+ from https://adoptium.net/
+          Set JAVA_HOME environment variable
+
+PROBLEM: Build fails
+SOLUTION: Run: .\gradlew.bat clean build
+          Check logs for specific errors
+
+PROBLEM: Game won't start
+SOLUTION: Check %APPDATA%\PoorCraftRefactor\logs\engine.log
+          Ensure graphics drivers support OpenGL 3.3+
+
+PROBLEM: Mods not loading
+SOLUTION: Verify mod.json is valid JSON
+          Check logs\engine.log for errors
+          Ensure main.lua has no syntax errors
+
+PROBLEM: Black screen
+SOLUTION: Update graphics drivers
+          Try disabling vsync in config.json
+
+================================================================================
+  CONFIGURATION
+================================================================================
+
+Edit %APPDATA%\PoorCraftRefactor\config.json to customize:
+
+- windowWidth/windowHeight - Window size
+- renderDistance - How far to render (higher = slower)
+- fov - Field of view (70-90 recommended)
+- vsync - Enable/disable vertical sync
+
+================================================================================
+  COMMAND LINE OPTIONS
+================================================================================
+
+--portable   - Use portable mode (data folder next to exe)
+--dev-mode   - Enable development mode (verbose logging, console)
+--headless   - Run without window (for testing)
+
+Example:
+PoorCraftRefactor.exe --dev-mode
+
+================================================================================
+  BUILDING NATIVE EXE
+================================================================================
+
+1. Install GraalVM 17+ from https://www.graalvm.org/downloads/
+2. Install native-image: gu install native-image
+3. Run: .\build-and-run.ps1 native
+4. Find exe at: launcher\build\native\nativeCompile\PoorCraftRefactor.exe
+
+Note: This takes 5-10 minutes and requires Visual Studio Build Tools on Windows
+
+================================================================================
+  GETTING HELP
+================================================================================
+
+- Check documentation in docs/ folder
+- Read logs in %APPDATA%\PoorCraftRefactor\logs\
+- Search GitHub issues
+- Join Discord community (link in README.md)
+- Open a GitHub issue for bugs
+
+================================================================================
+  NEXT STEPS
+================================================================================
+
+1. Run the game: .\build-and-run.ps1 run
+2. Create a mod: See "CREATING YOUR FIRST MOD" above
+3. Customize textures: See "CUSTOMIZING TEXTURES" above
+4. Read full docs: See docs/ folder
+5. Contribute: See CONTRIBUTING.md
+
+================================================================================
+
+Happy crafting! 🎮
+
+For more information, see README.md or visit the project repository.
+
+================================================================================
