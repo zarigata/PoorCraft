@@ -13,7 +13,7 @@ A free, open-source Minecraft clone that empowers players to create, modify and 
 - **Texture Atlas**: 16x16 block textures combined into efficient atlas ✅ **IMPLEMENTED**
 - **UI System**: Main menu, settings, world creation, in-game HUD ✅ **IMPLEMENTED**
 - **Configuration**: JSON-based settings with in-game editor ✅ **IMPLEMENTED**
-- **Procedural Textures**: Up to 256 unique block skin variations ✅ **IMPLEMENTED** (Skin Generator mod)
+- **Procedural Textures**: Up to 256 unique block skin variations ✅ **IMPLEMENTED** (Procedural Block Texture Generator mod)
 - **AI NPCs**: Conversational NPCs powered by LLMs ✅ **IMPLEMENTED** (AI NPC mod)
 - **Modding**: Python-based modding system ✅ **IMPLEMENTED**
 
@@ -36,7 +36,7 @@ PoorCraft uses a sophisticated procedural generation system:
 - **Dynamic Loading**: Chunks load/unload automatically based on player position
 {{ ... }}
 - **mods/** - Official and user-created mods
-  - **mods/skin_generator/** - Procedural texture generation mod
+  - **mods/block_texture_generator/** - Procedural texture generation mod
   - **mods/ai_npc/** - AI-powered NPC mod
 - **docs/** - Documentation and modding guides
 
@@ -59,7 +59,7 @@ PoorCraft has a powerful Python-based modding system:
 
 PoorCraft ships with two official mods out of the box:
 
-- **Skin Generator** (`mods/skin_generator/`)
+- **Procedural Block Texture Generator** (`mods/block_texture_generator/`)
   - Generates up to 256 unique 16×16 block textures before rendering starts
   - Uses biome-specific color palettes and pattern toggles from `config.json`
   - Interacts with the Java renderer through `add_procedural_texture()`
@@ -69,7 +69,7 @@ PoorCraft ships with two official mods out of the box:
   - Manages NPC spawn/despawn on player join/leave events
 
 Configuration:
-- Skin Generator: edit `mods/skin_generator/config.json`
+- Procedural Block Texture Generator: edit `mods/block_texture_generator/config.json`
 - AI NPC System: edit `mods/ai_npc/config.json` (set API keys or Ollama URL)
 
 See `docs/OFFICIAL_MODS.md` for the full rundown on both mods.

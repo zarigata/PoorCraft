@@ -52,5 +52,11 @@
     "serverPort": 25565,
     "autoConnect": false,
     "maxPlayers": 10
+  },
+  "player": {
+    "selectedSkin": "steve",
+    "playerName": "Player",
+    "showSkinInFirstPerson": false,
+    "enableSkinAnimations": true
   }
 }

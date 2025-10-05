@@ -1,10 +1,10 @@
 {
-  "id": "skin_generator",
-  "name": "Procedural Skin Generator",
+  "id": "block_texture_generator",
+  "name": "Procedural Block Texture Generator",
   "version": "0.1.0",
-  "description": "Generates up to 256 unique 16x16 block textures with biome-specific color palettes",
+  "description": "Generates up to 256 unique 16x16 block textures with biome-specific color palettes and procedural patterns",
   "author": "PoorCraft Team",
-  "main": "skin_generator.main",
+  "main": "block_texture_generator.main",
   "enabled": true,
   "config": {
     "max_textures": 256,

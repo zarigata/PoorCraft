@@ -204,32 +204,42 @@ public class PauseScreen extends UIScreen {
         addComponent(vsyncLabel);
         
         float buttonY = panelY + panelHeight - 72f;
-        float buttonWidth = (panelWidth - contentPadding * 2f - 30f) / 4f;
         float buttonHeight = Math.max(56f, panelHeight * 0.11f);
         float buttonSpacing = 10f;
+        float buttonCount = 5f;
+        float buttonWidth = (panelWidth - contentPadding * 2f - buttonSpacing * (buttonCount - 1f)) / buttonCount;
         float buttonX = panelX + contentPadding;
-        
+
         MenuButton resumeButton = new MenuButton(buttonX, buttonY, buttonWidth, buttonHeight,
             "RESUME", () -> uiManager.setState(GameState.IN_GAME));
         addComponent(resumeButton);
-        
-        MenuButton settingsButton = new MenuButton(buttonX + buttonWidth + buttonSpacing, buttonY,
+
+        MenuButton settingsButton = new MenuButton(buttonX + (buttonWidth + buttonSpacing) * 1f, buttonY,
             buttonWidth, buttonHeight, "SETTINGS",
             () -> {
                 uiManager.getConfigManager().saveSettings(settings);
                 uiManager.setState(GameState.SETTINGS_MENU);
             });
         addComponent(settingsButton);
-        
-        MenuButton saveButton = new MenuButton(buttonX + (buttonWidth + buttonSpacing) * 2, buttonY,
+
+        MenuButton skinsButton = new MenuButton(buttonX + (buttonWidth + buttonSpacing) * 2f, buttonY,
+            buttonWidth, buttonHeight, "SKINS",
+            () -> {
+                uiManager.getConfigManager().saveSettings(settings);
+                uiManager.setState(GameState.SKIN_MANAGER);
+            });
+        addComponent(skinsButton);
+        skinsButton.setEnabled(uiManager.getCurrentState() != GameState.SKIN_MANAGER);
+
+        MenuButton saveButton = new MenuButton(buttonX + (buttonWidth + buttonSpacing) * 3f, buttonY,
             buttonWidth, buttonHeight, "SAVE",
             () -> {
                 uiManager.getConfigManager().saveSettings(settings);
                 System.out.println("[PauseScreen] Settings saved!");
             });
         addComponent(saveButton);
-        
-        MenuButton quitButton = new MenuButton(buttonX + (buttonWidth + buttonSpacing) * 3, buttonY,
+
+        MenuButton quitButton = new MenuButton(buttonX + (buttonWidth + buttonSpacing) * 4f, buttonY,
             buttonWidth, buttonHeight, "QUIT",
             () -> {
                 uiManager.getConfigManager().saveSettings(settings);

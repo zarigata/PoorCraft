@@ -82,18 +82,18 @@ def init() -> None:
 
     config = _load_config()
     if not config.get("enabled", True):
-        log("[SkinGen] Mod disabled via config.json, skipping generation.")
+        log("[BlockTexGen] Mod disabled via config.json, skipping generation.")
         return
 
     log(
-        f"[SkinGen] Starting texture pass with max={config.get('max_textures')} "
+        f"[BlockTexGen] Starting texture pass with max={config.get('max_textures')} "
         f"and variations={config.get('variations_per_block')}"
     )
 
     if config.get("randomize_on_startup", True):
         generate_textures()
     else:
-        log("[SkinGen] randomize_on_startup is false, retaining previous textures if any.")
+        log("[BlockTexGen] randomize_on_startup is false, retaining previous textures if any.")
 
 
 def generate_textures() -> List[str]:
@@ -104,7 +104,7 @@ def generate_textures() -> List[str]:
 
     texture_size = int(config.get("texture_size", 16))
     if texture_size != 16:
-        log("[SkinGen] Only 16x16 textures are supported right now, forcing 16.")
+        log("[BlockTexGen] Only 16x16 textures are supported right now, forcing 16.")
         texture_size = 16
 
     max_textures = min(256, int(config.get("max_textures", 256)))
@@ -114,7 +114,7 @@ def generate_textures() -> List[str]:
 
     rng = random.Random()
     rng_seed = rng.randint(0, 2**31)
-    log(f"[SkinGen] Using rng seed {rng_seed} for this generation run.")
+    log(f"[BlockTexGen] Using rng seed {rng_seed} for this generation run.")
     rng.seed(rng_seed)
 
     palettes = config.get("biome_palettes", {})
@@ -142,7 +142,7 @@ def generate_textures() -> List[str]:
             textures_created += 1
 
     log(
-        f"[SkinGen] Generated {len(generated_textures)} textures; "
+        f"[BlockTexGen] Generated {len(generated_textures)} textures; "
         "I don't know what is going on here but it's working like 2011 Minecraft magic."
     )
     return generated_textures
@@ -278,7 +278,7 @@ def _load_config() -> Dict[str, object]:
 
     loaded = json.loads(json.dumps(DEFAULT_CONFIG))
 
-    mod_json_config = get_mod_config("skin_generator") or {}
+    mod_json_config = get_mod_config("block_texture_generator") or {}
     _deep_merge(loaded, mod_json_config)
 
     if CONFIG_PATH.exists():
@@ -286,7 +286,7 @@ def _load_config() -> Dict[str, object]:
             file_config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
             _deep_merge(loaded, file_config)
         except Exception as exc:
-            log(f"[SkinGen] Failed to read config.json: {exc}")
+            log(f"[BlockTexGen] Failed to read config.json: {exc}")
 
     return loaded
 

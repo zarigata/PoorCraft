@@ -55,7 +55,7 @@ java -jar target/poorcraft-0.1.0-SNAPSHOT-jar-with-dependencies.jar
 - **Debug Overlay**: `F3`
 
 ## Mods to Try
-- **Skin Generator**: Enable in `mods/skin_generator/mod.json` (`"enabled": true`). Generates procedural textures.
+- **Procedural Block Texture Generator**: Enable in `mods/block_texture_generator/mod.json` (`"enabled": true`). Generates procedural block textures.
 - **AI NPC**: Requires Ollama or an API key. Configure `mods/ai_npc/config.json`.
 
 ## Multiplayer (Experimental)

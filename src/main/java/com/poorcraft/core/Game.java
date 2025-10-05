@@ -7,6 +7,7 @@ import com.poorcraft.discord.DiscordRichPresenceManager;
 import com.poorcraft.input.InputHandler;
 import com.poorcraft.modding.ModLoader;
 import com.poorcraft.inventory.Inventory;
+import com.poorcraft.player.SkinManager;
 import com.poorcraft.render.BlockHighlightRenderer;
 import com.poorcraft.render.ChunkRenderer;
 import com.poorcraft.render.ItemDropRenderer;
@@ -56,6 +57,7 @@ public class Game {
     private DropManager dropManager;
     private ModLoader modLoader;
     private DiscordRichPresenceManager discordRPC;
+    private SkinManager skinManager;
     private GameMode currentGameMode;
     private boolean highlightRendererInitialized;
     private SunLight sunLight;
@@ -98,6 +100,10 @@ public class Game {
         this.hotbarScrollRemainder = 0.0;
         this.sunLight = new SunLight();
         this.timeOfDay = 0.25f; // Start early morning
+    }
+
+    public SkinManager getSkinManager() {
+        return skinManager;
     }
     
     /**
@@ -151,6 +157,10 @@ public class Game {
         modLoader = new ModLoader(this);
         modLoader.init();
         System.out.println("[Game] Mod loader initialized");
+
+        skinManager = SkinManager.getInstance();
+        skinManager.init(settings);
+        System.out.println("[Game] Skin manager initialized with " + skinManager.getAllSkins().size() + " skins");
 
         skyRenderer = new SkyRenderer();
         skyRenderer.init();
@@ -383,6 +393,11 @@ public class Game {
         // Otherwise your friends will think you rage quit
         if (discordRPC != null) {
             discordRPC.shutdown();
+        }
+
+        if (skinManager != null) {
+            skinManager.cleanup();
+            System.out.println("[Game] Skin manager cleaned up");
         }
         
         // Shutdown mod loader
@@ -699,6 +714,13 @@ public class Game {
                 break;
 
             case INVENTORY:
+                if (stateChanged) {
+                    discordRPC.updatePaused();
+                }
+                break;
+
+            case SKIN_MANAGER:
+            case SKIN_EDITOR:
                 if (stateChanged) {
                     discordRPC.updatePaused();
                 }

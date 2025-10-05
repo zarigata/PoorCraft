@@ -1,16 +1,16 @@
 # Official PoorCraft Mods
 
-PoorCraft ships with two showcase mods demonstrating the Python modding workflow: a procedural skin generator and an AI companion system. Both live in the `mods/` directory and can be toggled or customized independently.
+PoorCraft ships with two showcase mods demonstrating the Python modding workflow: a procedural block texture generator and an AI companion system. Both live in the `mods/` directory and can be toggled or customized independently.
 
-## Skin Generator (`mods/skin_generator/`)
+## Procedural Block Texture Generator (`mods/block_texture_generator/`)
 
-- **Purpose**: Generate up to 256 procedural block textures using biome-specific color palettes.
+- **Purpose**: Generate up to 256 procedural block textures using biome-specific color palettes and pattern rules.
 - **Key Features**:
   - Perlin-style noise, palette-driven shading, and pattern overlays (cracks, blades, grain).
   - Texture variations stay compatible with `TextureAtlas.getUVsForFace()` naming conventions.
   - Uses Pillow and numpy; results are pushed to Java via `add_procedural_texture()` before the renderer boots.
-- **Configuration**: `mods/skin_generator/config.json` allows tuning of texture counts, variation intensity, palettes, and pattern toggles.
-- **Docs**: See `mods/skin_generator/README.md` for detailed usage and troubleshooting tips.
+- **Configuration**: `mods/block_texture_generator/config.json` allows tuning of texture counts, variation intensity, palettes, and pattern toggles.
+- **Docs**: See `mods/block_texture_generator/README.md` for detailed usage and troubleshooting tips and notes on block texture generation.
 
 ## AI NPC System (`mods/ai_npc/`)
 

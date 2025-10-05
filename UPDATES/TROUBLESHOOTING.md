@@ -43,7 +43,7 @@ If specific packages fail:
 
 ### "Failed to load textures"
 - Engine uses solid color placeholders
-- Enable `mods/skin_generator/` for procedural textures
+- Enable `mods/block_texture_generator/` for procedural textures
 - Or add 16x16 PNGs under `src/main/resources/textures/blocks/`
 
 ### "OpenGL error" or "Failed to create window"
@@ -72,10 +72,10 @@ If specific packages fail:
 
 ## Mod-Specific Issues
 
-### Skin Generator
+### Procedural Block Texture Generator
 - Install Pillow: `pip install Pillow>=10.0.0`
 - Install NumPy: `pip install numpy>=1.24.0`
-- Validate `mods/skin_generator/config.json`
+- Validate `mods/block_texture_generator/config.json`
 - Lower `max_textures` to 64 if memory is low (creeper-safe!)
 
 ### AI NPC

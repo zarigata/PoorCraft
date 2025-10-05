@@ -79,7 +79,17 @@ public enum GameState {
      * Inventory management screen.
      * Opens over gameplay to manage items.
      */
-    INVENTORY;
+    INVENTORY,
+
+    /**
+     * Skin manager screen for selecting and importing player skins.
+     */
+    SKIN_MANAGER,
+
+    /**
+     * Skin editor screen for creating and editing player skins.
+     */
+    SKIN_EDITOR;
     
     /**
      * Checks if this state is an in-game state.

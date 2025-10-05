@@ -38,6 +38,8 @@ public class UIManager {
     
     private Map<GameState, UIScreen> screens;
     private UIScreen hudScreen;  // Special screen for in-game HUD
+    private SkinManagerScreen skinManagerScreen;
+    private SkinEditorScreen skinEditorScreen;
     
     private Settings settings;
     private ConfigManager configManager;
@@ -113,7 +115,6 @@ public class UIManager {
         MainMenuScreen mainMenuScreen = new MainMenuScreen(windowWidth, windowHeight, this);
         screens.put(GameState.MAIN_MENU, mainMenuScreen);
         
-        // Settings menu
         SettingsScreen settingsScreen = new SettingsScreen(windowWidth, windowHeight, 
             this, settings, configManager);
         screens.put(GameState.SETTINGS_MENU, settingsScreen);
@@ -121,6 +122,13 @@ public class UIManager {
         // World creation
         WorldCreationScreen worldCreationScreen = new WorldCreationScreen(windowWidth, windowHeight, this);
         screens.put(GameState.WORLD_CREATION, worldCreationScreen);
+        
+        // Skin manager
+        skinManagerScreen = new SkinManagerScreen(windowWidth, windowHeight, this);
+        screens.put(GameState.SKIN_MANAGER, skinManagerScreen);
+
+        skinEditorScreen = new SkinEditorScreen(windowWidth, windowHeight, this);
+        screens.put(GameState.SKIN_EDITOR, skinEditorScreen);
         
         // Pause menu
         PauseScreen pauseScreen = new PauseScreen(windowWidth, windowHeight, this);

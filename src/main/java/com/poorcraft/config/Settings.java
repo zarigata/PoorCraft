@@ -20,6 +20,7 @@ public class Settings {
     public AISettings ai;
     public WorldSettings world;
     public MultiplayerSettings multiplayer;
+    public PlayerSettings player;
     
     /**
      * Default constructor required by Gson.
@@ -94,6 +95,12 @@ public class Settings {
         settings.multiplayer.serverPort = 25565;
         settings.multiplayer.autoConnect = false;
         settings.multiplayer.maxPlayers = 10;
+
+        settings.player = new PlayerSettings();
+        settings.player.selectedSkin = "steve";
+        settings.player.playerName = "Player";
+        settings.player.showSkinInFirstPerson = false;
+        settings.player.enableSkinAnimations = true;
         
         return settings;
     }
@@ -202,5 +209,22 @@ public class Settings {
         public int serverPort;           // Default server port when hosting
         public boolean autoConnect;      // Auto-connect to last server on startup
         public int maxPlayers;           // Max players when hosting
+    }
+
+    /**
+     * Player-specific settings for skin selection and presentation.
+     */
+    public static class PlayerSettings {
+        /** Currently selected player skin identifier (e.g., "steve"). */
+        public String selectedSkin;
+
+        /** Player's display name, used in multiplayer contexts. */
+        public String playerName;
+
+        /** Whether to render the player's skin in first-person view (arms/hands). */
+        public boolean showSkinInFirstPerson;
+
+        /** Enables advanced skin animations such as arm swinging. */
+        public boolean enableSkinAnimations;
     }
 }

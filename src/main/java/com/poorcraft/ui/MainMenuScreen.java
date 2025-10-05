@@ -77,6 +77,12 @@ public class MainMenuScreen extends UIScreen {
         addComponent(multiplayerButton);
         currentY += buttonHeight + buttonSpacing;
 
+        MenuButton skinsButton = new MenuButton(buttonX, currentY,
+            buttonWidth, buttonHeight, "SKINS",
+            () -> uiManager.setState(GameState.SKIN_MANAGER));
+        addComponent(skinsButton);
+        currentY += buttonHeight + buttonSpacing;
+
         MenuButton settingsButton = new MenuButton(buttonX, currentY,
             buttonWidth, buttonHeight, "SETTINGS",
             () -> uiManager.setState(GameState.SETTINGS_MENU));
@@ -89,7 +95,8 @@ public class MainMenuScreen extends UIScreen {
         addComponent(quitButton);
 
         Label footerLabel = new Label(centerX, panelY + panelHeight - padding * 0.35f,
-            "Press ENTER to confirm or ESC to exit", 0.7f, 0.75f, 0.85f, 0.85f);
+            "Press ENTER to confirm | ESC to exit | Customize your player in SKINS",
+            0.7f, 0.75f, 0.85f, 0.85f);
         footerLabel.setCentered(true);
         footerLabel.setScale(Math.max(0.92f, panelWidth / 780f));
         addComponent(footerLabel);

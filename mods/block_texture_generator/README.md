@@ -1,4 +1,4 @@
-# Procedural Skin Generator Mod
+# Procedural Block Texture Generator Mod
 
 Generates up to 256 unique 16×16 block textures with biome-specific palettes and noise-based variation. Perfect for making PoorCraft feel a little less like a repeating wallpaper.
 
@@ -11,7 +11,7 @@ Generates up to 256 unique 16×16 block textures with biome-specific palettes an
 
 ## Configuration
 
-Edit `mods/skin_generator/config.json` to adjust generation:
+Edit `mods/block_texture_generator/config.json` to adjust generation:
 
 - `enabled`: Master on/off switch (default: `true`).
 - `max_textures`: Cap on generated textures (1–256, default: 256).
@@ -48,7 +48,8 @@ Example snippet:
 - Additional variants are suffixed: `stone_1`, `stone_2`, etc.
 - Names must match what the renderer expects (`TextureAtlas.getUVsForFace()`).
 
-## Troubleshooting
+## Notes
+- This mod generates block textures for the world renderer, not player skins.
 - **No textures?** Check console logs, make sure Pillow/numpy are installed, verify JSON syntax.
 - **Atlas overflow?** Keep `max_textures` ≤ 256 (engine limit).
 - **Weird colors?** Lower `color_variation` or adjust palettes.
