@@ -22,8 +22,8 @@ layout(std140, binding = 0) uniform SharedUniforms {
     vec4 uAmbientColorBlock;
     vec4 uAmbientParamsBlock;
     vec4 uFogColorBlock;
-    vec4 uFogStartBlock;
-    vec4 uFogEndBlock;
+    vec4 uFogParamsBlock;
+    vec4 uFogParams2Block;
 };
 #else
 uniform mat4 uView;       // View matrix (camera)
@@ -50,7 +50,8 @@ void main() {
     
     // Transform normal to world space (use mat3 to ignore translation)
     // This is important for proper lighting - normals are directions, not positions
-    
+    vNormal = mat3(uModel) * aNormal;
+
     // Pass world position for lighting calculations in fragment shader
     vFragPos = worldPos.xyz;
 
