@@ -55,6 +55,8 @@ public class ChunkRenderer {
     private Frustum frustum;
     private Matrix4f modelMatrix;
     private Matrix4f viewProjectionMatrix;
+    private GPUCapabilities gpuCaps;
+    private PerformanceMonitor perfMon;
     
     // Lighting configuration
     // These values create a nice warm sunlight with cool ambient lighting
@@ -101,6 +103,14 @@ public class ChunkRenderer {
 
     public SunLight getSunLight() {
         return sunLight;
+    }
+
+    public void setGPUCapabilities(GPUCapabilities caps) {
+        this.gpuCaps = caps;
+    }
+
+    public void setPerformanceMonitor(PerformanceMonitor monitor) {
+        this.perfMon = monitor;
     }
 
     /**
@@ -297,7 +307,7 @@ public class ChunkRenderer {
      */
     private ChunkRenderData getOrCreateRenderData(Chunk chunk) {
         ChunkPos pos = chunk.getPosition();
-        return chunkRenderData.computeIfAbsent(pos, ignored -> new ChunkRenderData());
+        return chunkRenderData.computeIfAbsent(pos, ignored -> new ChunkRenderData(gpuCaps, perfMon));
     }
     
     /**

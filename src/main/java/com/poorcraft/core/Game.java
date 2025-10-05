@@ -10,7 +10,9 @@ import com.poorcraft.inventory.Inventory;
 import com.poorcraft.player.SkinManager;
 import com.poorcraft.render.BlockHighlightRenderer;
 import com.poorcraft.render.ChunkRenderer;
+import com.poorcraft.render.GPUCapabilities;
 import com.poorcraft.render.ItemDropRenderer;
+import com.poorcraft.render.PerformanceMonitor;
 import com.poorcraft.render.SkyRenderer;
 import com.poorcraft.render.SunLight;
 import com.poorcraft.render.TextureGenerator;
@@ -63,6 +65,9 @@ public class Game {
     private SunLight sunLight;
     private float timeOfDay;
     private static final float DAY_LENGTH_SECONDS = 600.0f;
+    private GPUCapabilities gpuCapabilities;
+    private PerformanceMonitor performanceMonitor;
+    private boolean chunkRendererInitialized;
     
     private boolean running;
     private boolean worldLoaded;  // Track if world is loaded
@@ -100,6 +105,9 @@ public class Game {
         this.hotbarScrollRemainder = 0.0;
         this.sunLight = new SunLight();
         this.timeOfDay = 0.25f; // Start early morning
+        this.performanceMonitor = null;
+        this.gpuCapabilities = null;
+        this.chunkRendererInitialized = false;
     }
 
     public SkinManager getSkinManager() {
@@ -121,7 +129,17 @@ public class Game {
             settings.window.vsync
         );
         window.create();
-        
+
+        GPUCapabilities caps = GPUCapabilities.detect();
+        this.gpuCapabilities = caps;
+
+        PerformanceMonitor perfMon = new PerformanceMonitor();
+        this.performanceMonitor = perfMon;
+
+        chunkRenderer = new ChunkRenderer();
+        chunkRenderer.setGPUCapabilities(caps);
+        chunkRenderer.setPerformanceMonitor(perfMon);
+
         // Initialize timer
         timer = new Timer();
         
@@ -276,7 +294,16 @@ public class Game {
         }
         
         // Only update gameplay if in IN_GAME state
+        boolean monitorActive = performanceMonitor != null;
+        if (monitorActive) {
+            performanceMonitor.update(deltaTime);
+            performanceMonitor.beginZone("Update");
+        }
+
         if (uiManager.getCurrentState() != GameState.IN_GAME) {
+            if (monitorActive) {
+                performanceMonitor.endZone();
+            }
             return;
         }
         
@@ -305,10 +332,20 @@ public class Game {
         // This handles dynamic chunk loading/unloading as player moves
         // In multiplayer mode, chunk loading is handled by network client, not ChunkManager
         if (worldLoaded && !multiplayerMode && chunkManager != null) {
+            if (monitorActive) {
+                performanceMonitor.beginZone("ChunkUpdate");
+            }
             Vector3f trackingPosition = playerController != null
                 ? playerController.getPosition()
                 : camera.getPosition();
             chunkManager.update(trackingPosition);
+            if (monitorActive) {
+                performanceMonitor.endZone();
+            }
+        }
+
+        if (monitorActive) {
+            performanceMonitor.endZone();
         }
     }
     
@@ -544,14 +581,18 @@ public class Game {
 
         if (chunkRenderer == null) {
             chunkRenderer = new ChunkRenderer();
-            chunkRenderer.setModLoader(modLoader);
-            chunkRenderer.setSettings(settings);
-            chunkRenderer.setSunLight(sunLight);
+        }
+
+        chunkRenderer.setGPUCapabilities(gpuCapabilities);
+        chunkRenderer.setPerformanceMonitor(performanceMonitor);
+        chunkRenderer.setModLoader(modLoader);
+        chunkRenderer.setSettings(settings);
+        chunkRenderer.setSunLight(sunLight);
+
+        if (!chunkRendererInitialized) {
             chunkRenderer.init();
+            chunkRendererInitialized = true;
             System.out.println("[Game] Chunk renderer initialized");
-        } else {
-            chunkRenderer.setSettings(settings);
-            chunkRenderer.setSunLight(sunLight);
         }
 
         if (world != null) {
@@ -748,6 +789,10 @@ public class Game {
      */
     public DiscordRichPresenceManager getDiscordRPC() {
         return discordRPC;
+    }
+
+    public PerformanceMonitor getPerformanceMonitor() {
+        return performanceMonitor;
     }
 
     private void ensureHighlightRendererInitialized() {
