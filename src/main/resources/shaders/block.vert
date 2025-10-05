@@ -15,27 +15,18 @@ uniform mat4 uModel;      // Model matrix (chunk world position)
 
 #ifdef USE_UBO
 layout(std140, binding = 0) uniform SharedUniforms {
-    mat4 uProjectionBlock;
-    mat4 uViewBlock;
-    vec4 uLightDirectionBlock;
-    vec4 uLightColorBlock;
-    vec4 uAmbientColorBlock;
-    vec4 uAmbientParamsBlock;
-    vec4 uFogColorBlock;
-    vec4 uFogStartBlock;
-    vec4 uFogEndBlock;
+    mat4 uProjection;
+    mat4 uView;
+    vec4 uLightDirection;  // dir.xyz, pad
+    vec4 uLightColor;
+    vec4 uAmbientColor;
+    vec4 uAmbientParams;   // x = ambientStrength
+    vec4 uFogColor;
+    vec4 uFogParams;       // x = fogStart, y = fogEnd
 };
 #else
-uniform mat4 uView;       // View matrix (camera)
 uniform mat4 uProjection; // Projection matrix (perspective)
-#endif
-
-#ifdef USE_UBO
-#define VIEW_MATRIX   uViewBlock
-#define PROJ_MATRIX   uProjectionBlock
-#else
-#define VIEW_MATRIX   uView
-#define PROJ_MATRIX   uProjection
+uniform mat4 uView;       // View matrix (camera)
 #endif
 
 void main() {
@@ -43,7 +34,7 @@ void main() {
     vec4 worldPos = uModel * vec4(aPosition, 1.0);
     
     // Transform to clip space (final position)
-    gl_Position = PROJ_MATRIX * VIEW_MATRIX * worldPos;
+    gl_Position = uProjection * uView * worldPos;
     
     // Pass texture coordinates through unchanged
     vTexCoord = aTexCoord;
@@ -56,8 +47,6 @@ void main() {
     vFragPos = worldPos.xyz;
 
     // Distance from camera for fog
-    vec3 viewSpacePos = (VIEW_MATRIX * worldPos).xyz;
+    vec3 viewSpacePos = (uView * worldPos).xyz;
     vFogDistance = length(viewSpacePos);
 }
-#undef VIEW_MATRIX
-#undef PROJ_MATRIX

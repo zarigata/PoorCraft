@@ -24,16 +24,15 @@ public class UniformBufferObject {
     private static final int MAT4_SIZE = 16 * Float.BYTES;
     private static final int FLOAT_SIZE = Float.BYTES;
 
+    private static final int VEC4_SIZE = 4 * Float.BYTES;
     private static final int OFFSET_PROJECTION = 0;
     private static final int OFFSET_VIEW = OFFSET_PROJECTION + MAT4_SIZE;
     private static final int OFFSET_LIGHT_DIRECTION = OFFSET_VIEW + MAT4_SIZE;
-    private static final int OFFSET_LIGHT_COLOR = OFFSET_LIGHT_DIRECTION + alignVec3();
-    private static final int OFFSET_AMBIENT_COLOR = OFFSET_LIGHT_COLOR + alignVec3();
-    private static final int OFFSET_AMBIENT_STRENGTH = OFFSET_AMBIENT_COLOR + alignVec3();
-    private static final int OFFSET_FOG_COLOR = OFFSET_AMBIENT_STRENGTH + 16; // padded to vec4
-    private static final int OFFSET_FOG_START = OFFSET_FOG_COLOR + alignVec3();
-    private static final int OFFSET_FOG_END = OFFSET_FOG_START + 16;
-
+    private static final int OFFSET_LIGHT_COLOR = OFFSET_LIGHT_DIRECTION + VEC4_SIZE;
+    private static final int OFFSET_AMBIENT_COLOR = OFFSET_LIGHT_COLOR + VEC4_SIZE;
+    private static final int OFFSET_AMBIENT_PARAMS = OFFSET_AMBIENT_COLOR + VEC4_SIZE;
+    private static final int OFFSET_FOG_COLOR = OFFSET_AMBIENT_PARAMS + VEC4_SIZE;
+    private static final int OFFSET_FOG_PARAMS = OFFSET_FOG_COLOR + VEC4_SIZE;
     private static final int TOTAL_SIZE = 256;
 
     private final int bindingPoint;
@@ -71,18 +70,17 @@ public class UniformBufferObject {
         putVec3(OFFSET_LIGHT_DIRECTION, direction);
         putVec3(OFFSET_LIGHT_COLOR, color);
         putVec3(OFFSET_AMBIENT_COLOR, ambientColor);
-        stagingBuffer.putFloat(OFFSET_AMBIENT_STRENGTH, ambientStrength);
-        uploadRange(OFFSET_LIGHT_DIRECTION, alignVec3() * 3 + 16);
+        stagingBuffer.putFloat(OFFSET_AMBIENT_PARAMS, ambientStrength);
+        uploadRange(OFFSET_LIGHT_DIRECTION, VEC4_SIZE * 3);
     }
 
     public void updateFog(Vector3f color, float start, float end) {
         ensureAllocated();
         putVec3(OFFSET_FOG_COLOR, color);
-        stagingBuffer.putFloat(OFFSET_FOG_START, start);
-        stagingBuffer.putFloat(OFFSET_FOG_END, end);
-        uploadRange(OFFSET_FOG_COLOR, alignVec3() + 32);
+        stagingBuffer.putFloat(OFFSET_FOG_PARAMS, start);
+        stagingBuffer.putFloat(OFFSET_FOG_PARAMS + Float.BYTES, end);
+        uploadRange(OFFSET_FOG_COLOR, VEC4_SIZE * 2);
     }
-
     public void bind() {
         if (!allocated) {
             return;
@@ -104,7 +102,7 @@ public class UniformBufferObject {
         stagingBuffer.limit(offset + length);
         glBufferSubData(GL_UNIFORM_BUFFER, offset, stagingBuffer);
         stagingBuffer.clear();
-        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+{{ ... }}
     }
 
     private void ensureAllocated() {
@@ -118,9 +116,5 @@ public class UniformBufferObject {
         stagingBuffer.putFloat(offset + FLOAT_SIZE, value.y);
         stagingBuffer.putFloat(offset + FLOAT_SIZE * 2, value.z);
         stagingBuffer.putFloat(offset + FLOAT_SIZE * 3, 0f);
-    }
-
-    private static int alignVec3() {
-        return 4 * Float.BYTES;
     }
 }

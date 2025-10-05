@@ -14,22 +14,22 @@ uniform sampler2D uTexture;        // Texture atlas sampler
 
 #ifdef USE_UBO
 layout(std140, binding = 0) uniform SharedUniforms {
-    mat4 uProjectionShared;
-    mat4 uViewShared;
-    vec4 uLightDirectionShared;
-    vec4 uLightColorShared;
-    vec4 uAmbientColorShared;
-    vec4 uAmbientParamsShared;
-    vec4 uFogColorShared;
-    vec4 uFogParamsShared;
+    mat4 uProjection;
+    mat4 uView;
+    vec4 uLightDirection;  // dir.xyz, pad
+    vec4 uLightColor;
+    vec4 uAmbientColor;
+    vec4 uAmbientParams;   // x = ambientStrength
+    vec4 uFogColor;
+    vec4 uFogParams;       // x = fogStart, y = fogEnd
 };
-#define U_LIGHT_DIRECTION (uLightDirectionShared.xyz)
-#define U_LIGHT_COLOR (uLightColorShared.rgb)
-#define U_AMBIENT_COLOR (uAmbientColorShared.rgb)
-#define U_AMBIENT_STRENGTH (uAmbientParamsShared.x)
-#define U_FOG_COLOR (uFogColorShared.rgb)
-#define U_FOG_START (uFogParamsShared.x)
-#define U_FOG_END (uFogParamsShared.y)
+#define U_LIGHT_DIRECTION (uLightDirection.xyz)
+#define U_LIGHT_COLOR (uLightColor.rgb)
+#define U_AMBIENT_COLOR (uAmbientColor.rgb)
+#define U_AMBIENT_STRENGTH (uAmbientParams.x)
+#define U_FOG_COLOR (uFogColor.rgb)
+#define U_FOG_START (uFogParams.x)
+#define U_FOG_END (uFogParams.y)
 #else
 uniform vec3 uLightDirection;      // Directional light direction (normalized)
 uniform vec3 uLightColor;          // Directional light color
