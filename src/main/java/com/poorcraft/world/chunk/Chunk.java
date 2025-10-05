@@ -3,17 +3,11 @@ package com.poorcraft.world.chunk;
 import com.poorcraft.render.GreedyMeshGenerator;
 import com.poorcraft.world.block.BlockType;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Main Chunk class with block storage and mesh generation.
- * 
- * Chunks are 16x256x16 blocks stored in a flat array for cache efficiency.
+ *
+ * Chunks are 16x256x16 blocks stored in a compressed palette + RLE representation to reduce memory.
  * Mesh generation uses greedy meshing algorithm for optimization.
- * Greedy meshing merges adjacent same-type faces into larger quads, reducing vertex count by 50-90%.
- * 
- * This is where the magic happens. Or where your FPS drops to 2. One of the two.
  */
 public class Chunk {
     
@@ -22,7 +16,7 @@ public class Chunk {
     public static final int CHUNK_VOLUME = CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE;
     
     private final ChunkPos position;
-    private final BlockType[] blocks;
+    private final CompressedChunkData blockData;
     private ChunkMesh mesh;
     private boolean meshDirty;
     private int meshVersion; // Incremented each time mesh is regenerated
@@ -41,15 +35,9 @@ public class Chunk {
      */
     public Chunk(ChunkPos position) {
         this.position = position;
-        this.blocks = new BlockType[CHUNK_VOLUME];
+        this.blockData = new CompressedChunkData(CHUNK_VOLUME);
         this.meshDirty = true;
         this.meshVersion = 0;
-        
-        // Initialize all blocks to AIR
-        // Because uninitialized memory is scary
-        for (int i = 0; i < CHUNK_VOLUME; i++) {
-            blocks[i] = BlockType.AIR;
-        }
     }
     
     /**
@@ -80,7 +68,7 @@ public class Chunk {
      * @return Block type at that position
      */
     public BlockType getBlock(int x, int y, int z) {
-        return blocks[getBlockIndex(x, y, z)];
+        return blockData.get(getBlockIndex(x, y, z));
     }
     
     /**
@@ -93,7 +81,7 @@ public class Chunk {
      * @param type Block type to set
      */
     public void setBlock(int x, int y, int z, BlockType type) {
-        blocks[getBlockIndex(x, y, z)] = type;
+        blockData.set(getBlockIndex(x, y, z), type);
         meshDirty = true;
     }
     
@@ -139,12 +127,12 @@ public class Chunk {
         if (y < 0 || y >= CHUNK_HEIGHT) {
             return BlockType.AIR;
         }
-        
+
         // Check if within this chunk
         if (x >= 0 && x < CHUNK_SIZE && z >= 0 && z < CHUNK_SIZE) {
             return getBlock(x, y, z);
         }
-        
+
         // Check neighbors
         if (x < 0 && westNeighbor != null) {
             return westNeighbor.getBlock(CHUNK_SIZE - 1, y, z);
@@ -158,7 +146,7 @@ public class Chunk {
         if (z >= CHUNK_SIZE && southNeighbor != null) {
             return southNeighbor.getBlock(x, y, 0);
         }
-        
+
         // No neighbor available, assume air
         return BlockType.AIR;
     }
@@ -170,7 +158,7 @@ public class Chunk {
      * @return Generated chunk mesh
      */
     public ChunkMesh generateMesh(com.poorcraft.render.TextureAtlas textureAtlas) {
-        com.poorcraft.render.GreedyMeshGenerator generator = new com.poorcraft.render.GreedyMeshGenerator(this, textureAtlas);
+        GreedyMeshGenerator generator = new GreedyMeshGenerator(this, textureAtlas);
         mesh = generator.generateMesh();
         meshDirty = false;
         meshVersion++; // Increment version when mesh is regenerated
@@ -223,11 +211,36 @@ public class Chunk {
      * @return true if all blocks are air
      */
     public boolean isEmpty() {
-        for (BlockType block : blocks) {
+        blockData.ensureCache();
+        BlockType[] view = blockData.getCacheView();
+        for (BlockType block : view) {
             if (block != BlockType.AIR) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * Ensures the decompressed cache is available for systems that need direct reads.
+     */
+    public void ensureDecompressed() {
+        blockData.ensureCache();
+    }
+
+    /**
+     * Compresses the chunk data and releases the decompressed cache when possible.
+     */
+    public void compressAndDiscardCache() {
+        blockData.compress();
+        blockData.discardCache();
+    }
+
+    public boolean isCacheResident() {
+        return blockData.isCacheResident();
+    }
+
+    public int getCompressedSizeBytes() {
+        return blockData.getCompressedSizeBytes();
     }
 }

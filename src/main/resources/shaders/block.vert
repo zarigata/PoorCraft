@@ -22,8 +22,8 @@ layout(std140, binding = 0) uniform SharedUniforms {
     vec4 uAmbientColorBlock;
     vec4 uAmbientParamsBlock;
     vec4 uFogColorBlock;
-    vec4 uFogParamsBlock;
-    vec4 uFogParams2Block;
+    vec4 uFogStartBlock;
+    vec4 uFogEndBlock;
 };
 #else
 uniform mat4 uView;       // View matrix (camera)

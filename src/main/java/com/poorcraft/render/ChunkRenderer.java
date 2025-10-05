@@ -363,13 +363,16 @@ public class ChunkRenderer {
         if (blockShader != null) {
             blockShader.cleanup();
         }
-        
+
+        if (ubo != null) {
+            ubo.cleanup();
+            ubo = null;
+        }
+
         // Cleanup texture atlas
         if (textureAtlas != null) {
             textureAtlas.cleanup();
         }
-        
-        // Cleanup all chunk render data
         for (ChunkRenderData renderData : chunkRenderData.values()) {
             renderData.cleanup();
         }
