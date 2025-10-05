@@ -400,4 +400,8 @@ public class ChunkRenderer {
     public TextureAtlas getTextureAtlas() {
         return textureAtlas;
     }
+
+    public Frustum getFrustum() {
+        return frustum;
+    }
 }

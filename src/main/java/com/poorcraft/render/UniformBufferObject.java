@@ -71,7 +71,10 @@ public class UniformBufferObject {
         putVec3(OFFSET_LIGHT_COLOR, color);
         putVec3(OFFSET_AMBIENT_COLOR, ambientColor);
         stagingBuffer.putFloat(OFFSET_AMBIENT_PARAMS, ambientStrength);
-        uploadRange(OFFSET_LIGHT_DIRECTION, VEC4_SIZE * 3);
+        stagingBuffer.putFloat(OFFSET_AMBIENT_PARAMS + FLOAT_SIZE, 0f);
+        stagingBuffer.putFloat(OFFSET_AMBIENT_PARAMS + FLOAT_SIZE * 2, 0f);
+        stagingBuffer.putFloat(OFFSET_AMBIENT_PARAMS + FLOAT_SIZE * 3, 0f);
+        uploadRange(OFFSET_LIGHT_DIRECTION, VEC4_SIZE * 4);
     }
 
     public void updateFog(Vector3f color, float start, float end) {
@@ -79,6 +82,8 @@ public class UniformBufferObject {
         putVec3(OFFSET_FOG_COLOR, color);
         stagingBuffer.putFloat(OFFSET_FOG_PARAMS, start);
         stagingBuffer.putFloat(OFFSET_FOG_PARAMS + Float.BYTES, end);
+        stagingBuffer.putFloat(OFFSET_FOG_PARAMS + FLOAT_SIZE * 2, 0f);
+        stagingBuffer.putFloat(OFFSET_FOG_PARAMS + FLOAT_SIZE * 3, 0f);
         uploadRange(OFFSET_FOG_COLOR, VEC4_SIZE * 2);
     }
     public void bind() {
@@ -98,11 +103,14 @@ public class UniformBufferObject {
 
     private void uploadRange(int offset, int length) {
         glBindBuffer(GL_UNIFORM_BUFFER, uboHandle);
+        int previousPosition = stagingBuffer.position();
+        int previousLimit = stagingBuffer.limit();
         stagingBuffer.position(offset);
         stagingBuffer.limit(offset + length);
         glBufferSubData(GL_UNIFORM_BUFFER, offset, stagingBuffer);
-        stagingBuffer.clear();
-{{ ... }}
+        stagingBuffer.position(previousPosition);
+        stagingBuffer.limit(previousLimit);
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
     }
 
     private void ensureAllocated() {

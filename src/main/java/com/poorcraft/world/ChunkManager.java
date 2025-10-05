@@ -1,15 +1,21 @@
 package com.poorcraft.world;
 
+import com.poorcraft.render.Frustum;
+import com.poorcraft.render.PerformanceMonitor;
+import com.poorcraft.world.chunk.Chunk;
 import com.poorcraft.world.chunk.ChunkPos;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
@@ -25,13 +31,20 @@ import java.util.concurrent.TimeUnit;
 public class ChunkManager {
     
     private final World world;
+    private final PerformanceMonitor performanceMonitor;
     private int loadDistance;
     private int unloadDistance;
     private int preloadDistance;
     private ChunkPos lastPlayerChunk;
     private final Set<ChunkPos> loadedChunkPositions;
     private final Set<ChunkPos> pendingChunkLoads;
+    private final ConcurrentMap<ChunkPos, Future<?>> inFlightLoads;
     private final ExecutorService chunkLoadExecutor;
+    private final ChunkLoadPriority prioritySystem;
+    private final Vector3f lastCameraPosition = new Vector3f(Float.NaN, Float.NaN, Float.NaN);
+    private final Vector3f lastViewDirection = new Vector3f(Float.NaN, Float.NaN, Float.NaN);
+    private float timeSinceLastRebuild;
+    private int cancellationsThisFrame;
     
     /**
      * Creates a new chunk manager.
@@ -41,14 +54,21 @@ public class ChunkManager {
      * @param unloadDistance Distance before unloading chunks
      */
     public ChunkManager(World world, int loadDistance, int unloadDistance) {
+        this(world, loadDistance, unloadDistance, null);
+    }
+
+    public ChunkManager(World world, int loadDistance, int unloadDistance, PerformanceMonitor performanceMonitor) {
         this.world = world;
+        this.performanceMonitor = performanceMonitor;
         this.loadDistance = loadDistance;
         this.unloadDistance = unloadDistance;
         this.preloadDistance = Math.max(1, loadDistance / 2);
         this.loadedChunkPositions = ConcurrentHashMap.newKeySet();
         this.pendingChunkLoads = ConcurrentHashMap.newKeySet();
+        this.inFlightLoads = new ConcurrentHashMap<>();
         this.chunkLoadExecutor = createChunkExecutor();
         this.lastPlayerChunk = null;
+        this.prioritySystem = new ChunkLoadPriority();
     }
 
     private ExecutorService createChunkExecutor() {
@@ -68,70 +88,72 @@ public class ChunkManager {
      * 
      * @param cameraPosition Current camera position
      */
-    public void update(Vector3f cameraPosition) {
-        // Convert camera position to chunk coordinates
+    public void update(Vector3f cameraPosition, Vector3f viewDirection, Frustum frustum, float deltaTime) {
+        Objects.requireNonNull(cameraPosition, "cameraPosition");
+        Objects.requireNonNull(viewDirection, "viewDirection");
         ChunkPos currentChunk = ChunkPos.fromWorldPos(cameraPosition);
-        
-        // Early exit if player hasn't moved to a different chunk
-        if (currentChunk.equals(lastPlayerChunk)) {
-            return;
-        }
-        
+        boolean moved = !currentChunk.equals(lastPlayerChunk);
         lastPlayerChunk = currentChunk;
-        
-        // Load chunks around player
-        loadChunksAroundPlayer(currentChunk);
-        
-        // Unload distant chunks
+
         unloadDistantChunks(currentChunk);
-    }
-    
-    /**
-     * Loads chunks in a square around the player.
-     * 
-     * @param centerChunk Center chunk position (player's chunk)
-     */
-    private void loadChunksAroundPlayer(ChunkPos centerChunk) {
-        int maxRadius = loadDistance + preloadDistance;
-        List<ChunkRequest> requests = new ArrayList<>();
 
-        for (int dx = -maxRadius; dx <= maxRadius; dx++) {
-            for (int dz = -maxRadius; dz <= maxRadius; dz++) {
-                ChunkPos pos = new ChunkPos(centerChunk.x + dx, centerChunk.z + dz);
+        float movementDelta = Float.isNaN(lastCameraPosition.x) ? Float.POSITIVE_INFINITY : cameraPosition.distance(lastCameraPosition);
+        float viewDelta = Float.isNaN(lastViewDirection.x) ? Float.POSITIVE_INFINITY : viewDirection.angle(lastViewDirection);
+        timeSinceLastRebuild += deltaTime;
 
-                if (loadedChunkPositions.contains(pos) || pendingChunkLoads.contains(pos)) {
-                    continue;
-                }
+        boolean rebuildPriorities = moved
+            || movementDelta > Chunk.CHUNK_SIZE
+            || viewDelta > 0.15f
+            || timeSinceLastRebuild > 0.5f;
 
-                int manhattan = Math.max(Math.abs(dx), Math.abs(dz));
-                if (manhattan > maxRadius) {
-                    continue;
-                }
-
-                boolean withinActiveView = manhattan <= loadDistance;
-                int distanceSq = dx * dx + dz * dz;
-                requests.add(new ChunkRequest(pos, distanceSq, withinActiveView));
+        if (rebuildPriorities) {
+            prioritySystem.rebuild(
+                cameraPosition,
+                viewDirection,
+                frustum,
+                loadDistance + preloadDistance,
+                world,
+                loadedChunkPositions,
+                pendingChunkLoads
+            );
+            lastCameraPosition.set(cameraPosition);
+            lastViewDirection.set(viewDirection);
+            timeSinceLastRebuild = 0f;
+            if (performanceMonitor != null) {
+                performanceMonitor.setChunkLoadAveragePriority(prioritySystem.getAveragePriority());
+                performanceMonitor.setChunkLoadCandidateCount(prioritySystem.getLastCandidateCount());
             }
         }
 
-        if (requests.isEmpty()) {
-            return;
+        int maxLoadsThisFrame = prioritySystem.computeBudget(deltaTime, performanceMonitor);
+        Collection<ChunkLoadPriority.ChunkCandidate> candidates = prioritySystem.pollCandidates(maxLoadsThisFrame);
+
+        for (ChunkLoadPriority.ChunkCandidate candidate : candidates) {
+            ChunkPos pos = candidate.pos();
+            if (loadedChunkPositions.contains(pos)) {
+                continue;
+            }
+            if (pendingChunkLoads.add(pos)) {
+                Future<?> future = chunkLoadExecutor.submit(() -> {
+                    try {
+                        world.getOrCreateChunk(pos);
+                        loadedChunkPositions.add(pos);
+                    } finally {
+                        pendingChunkLoads.remove(pos);
+                        inFlightLoads.remove(pos);
+                    }
+                });
+                inFlightLoads.put(pos, future);
+            }
         }
 
-        requests.sort(Comparator
-            .comparingInt((ChunkRequest req) -> req.withinActiveView ? 0 : 1)
-            .thenComparingInt(req -> req.distanceSq));
+        cancellationsThisFrame = cancelStaleLoads(cameraPosition);
 
-        for (ChunkRequest request : requests) {
-            pendingChunkLoads.add(request.pos);
-            chunkLoadExecutor.submit(() -> {
-                try {
-                    world.getOrCreateChunk(request.pos);
-                    loadedChunkPositions.add(request.pos);
-                } finally {
-                    pendingChunkLoads.remove(request.pos);
-                }
-            });
+        if (performanceMonitor != null) {
+            performanceMonitor.setPendingChunkLoads(pendingChunkLoads.size());
+            performanceMonitor.setChunkLoadCancellations(cancellationsThisFrame);
+            performanceMonitor.setChunkLoadQueueSize(prioritySystem.getQueuedCount());
+            performanceMonitor.setChunkLoadBudgetLast(prioritySystem.getLastBudget());
         }
     }
     
@@ -141,27 +163,25 @@ public class ChunkManager {
      * @param centerChunk Center chunk position (player's chunk)
      */
     private void unloadDistantChunks(ChunkPos centerChunk) {
-        // Build list of chunks to unload (avoid concurrent modification)
         List<ChunkPos> toUnload = new ArrayList<>();
-        
+
         for (ChunkPos pos : loadedChunkPositions) {
             int dx = Math.abs(pos.x - centerChunk.x);
             int dz = Math.abs(pos.z - centerChunk.z);
-            
-            // Unload if beyond unload distance
+
             if (dx > unloadDistance || dz > unloadDistance) {
                 toUnload.add(pos);
             }
         }
-        
-        // Unload chunks
+
         for (ChunkPos pos : toUnload) {
             world.unloadChunk(pos);
             loadedChunkPositions.remove(pos);
+            Future<?> future = inFlightLoads.remove(pos);
+            if (future != null) {
+                future.cancel(true);
+            }
             pendingChunkLoads.remove(pos);
-            
-            // Optional: Log chunk unloads (can be verbose)
-            // System.out.println("[ChunkManager] Unloaded chunk: " + pos);
         }
     }
     
@@ -223,17 +243,35 @@ public class ChunkManager {
             chunkLoadExecutor.shutdownNow();
             Thread.currentThread().interrupt();
         }
+
+        for (Future<?> future : inFlightLoads.values()) {
+            future.cancel(true);
+        }
+        inFlightLoads.clear();
     }
 
-    private static final class ChunkRequest {
-        private final ChunkPos pos;
-        private final int distanceSq;
-        private final boolean withinActiveView;
-
-        private ChunkRequest(ChunkPos pos, int distanceSq, boolean withinActiveView) {
-            this.pos = pos;
-            this.distanceSq = distanceSq;
-            this.withinActiveView = withinActiveView;
+    private int cancelStaleLoads(Vector3f cameraPosition) {
+        float maxDistance = (loadDistance + preloadDistance + 1) * Chunk.CHUNK_SIZE;
+        List<ChunkPos> toCancel = new ArrayList<>();
+        for (ChunkPos pos : pendingChunkLoads) {
+            Future<?> future = inFlightLoads.get(pos);
+            if (future == null || future.isDone()) {
+                continue;
+            }
+            Vector3f chunkCenter = new Vector3f(
+                pos.x * Chunk.CHUNK_SIZE + Chunk.CHUNK_SIZE * 0.5f,
+                cameraPosition.y,
+                pos.z * Chunk.CHUNK_SIZE + Chunk.CHUNK_SIZE * 0.5f
+            );
+            if (chunkCenter.distance(cameraPosition) > maxDistance) {
+                future.cancel(true);
+                toCancel.add(pos);
+            }
         }
+        for (ChunkPos pos : toCancel) {
+            pendingChunkLoads.remove(pos);
+            inFlightLoads.remove(pos);
+        }
+        return toCancel.size();
     }
 }

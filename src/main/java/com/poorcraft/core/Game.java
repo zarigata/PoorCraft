@@ -10,6 +10,7 @@ import com.poorcraft.inventory.Inventory;
 import com.poorcraft.player.SkinManager;
 import com.poorcraft.render.BlockHighlightRenderer;
 import com.poorcraft.render.ChunkRenderer;
+import com.poorcraft.render.Frustum;
 import com.poorcraft.render.GPUCapabilities;
 import com.poorcraft.render.ItemDropRenderer;
 import com.poorcraft.render.PerformanceMonitor;
@@ -338,7 +339,9 @@ public class Game {
             Vector3f trackingPosition = playerController != null
                 ? playerController.getPosition()
                 : camera.getPosition();
-            chunkManager.update(trackingPosition);
+            Vector3f viewDirection = camera != null ? camera.getFront() : new Vector3f(0, 0, -1);
+            Frustum activeFrustum = chunkRenderer != null ? chunkRenderer.getFrustum() : null;
+            chunkManager.update(trackingPosition, viewDirection, activeFrustum, deltaTime);
             if (monitorActive) {
                 performanceMonitor.endZone();
             }
@@ -563,16 +566,18 @@ public class Game {
         System.out.println("[Game] Creating world with seed: " + seed);
         GameMode mode = gameMode != null ? gameMode : GameMode.SURVIVAL;
         currentGameMode = mode;
-
         if (!multiplayerMode) {
             world = new World(seed, generateStructures);
             world.setEventBus(modLoader.getEventBus());
             chunkManager = new ChunkManager(
                 world,
                 settings.world.chunkLoadDistance,
-                settings.world.chunkUnloadDistance
+                settings.world.chunkUnloadDistance,
+                performanceMonitor
             );
-            chunkManager.update(camera.getPosition());
+            Vector3f initialView = camera != null ? camera.getFront() : new Vector3f(0, 0, -1);
+            Frustum initialFrustum = chunkRenderer != null ? chunkRenderer.getFrustum() : null;
+            chunkManager.update(camera.getPosition(), initialView, initialFrustum, 0f);
             System.out.println("[Game] World initialized with seed: " + world.getSeed());
         } else if (world == null) {
             System.err.println("[Game] Warning: multiplayer world not provided before createWorld call");

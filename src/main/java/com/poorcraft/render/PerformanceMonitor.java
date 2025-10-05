@@ -46,6 +46,11 @@ public class PerformanceMonitor {
     private final AtomicInteger pendingChunkLoads = new AtomicInteger();
     private final AtomicLong chunkMemoryUsage = new AtomicLong();
     private final AtomicLong chunkMemoryBudget = new AtomicLong(512L * 1024L * 1024L);
+    private final AtomicInteger chunkLoadQueueSize = new AtomicInteger();
+    private final AtomicInteger chunkLoadCancellations = new AtomicInteger();
+    private final AtomicInteger chunkLoadBudgetLast = new AtomicInteger();
+    private final AtomicInteger chunkLoadCandidateCount = new AtomicInteger();
+    private volatile float chunkLoadAveragePriority;
 
     private final Map<String, Zone> zones = new ConcurrentHashMap<>();
     private final Deque<ZoneInstance> zoneStack = new ArrayDeque<>();
@@ -157,6 +162,26 @@ public class PerformanceMonitor {
         pendingChunkLoads.set(count);
     }
 
+    public void setChunkLoadQueueSize(int count) {
+        chunkLoadQueueSize.set(count);
+    }
+
+    public void setChunkLoadCancellations(int count) {
+        chunkLoadCancellations.set(count);
+    }
+
+    public void setChunkLoadBudgetLast(int budget) {
+        chunkLoadBudgetLast.set(budget);
+    }
+
+    public void setChunkLoadAveragePriority(float priority) {
+        chunkLoadAveragePriority = priority;
+    }
+
+    public void setChunkLoadCandidateCount(int count) {
+        chunkLoadCandidateCount.set(count);
+    }
+
     public void beginZone(String name) {
         Zone zone = zones.computeIfAbsent(name, Zone::new);
         ZoneInstance instance = new ZoneInstance(zone, System.nanoTime());
@@ -247,6 +272,26 @@ public class PerformanceMonitor {
 
     public long getChunkMemoryBudget() {
         return chunkMemoryBudget.get();
+    }
+
+    public float getChunkLoadAveragePriority() {
+        return chunkLoadAveragePriority;
+    }
+
+    public int getChunkLoadQueueSize() {
+        return chunkLoadQueueSize.get();
+    }
+
+    public int getChunkLoadCancellations() {
+        return chunkLoadCancellations.get();
+    }
+
+    public int getChunkLoadBudgetLast() {
+        return chunkLoadBudgetLast.get();
+    }
+
+    public int getChunkLoadCandidateCount() {
+        return chunkLoadCandidateCount.get();
     }
 
     public List<Zone> getZonesSorted() {
@@ -343,6 +388,26 @@ public class PerformanceMonitor {
 
         public long chunkMemoryBudgetBytes() {
             return PerformanceMonitor.this.getChunkMemoryBudget();
+        }
+
+        public float chunkLoadAveragePriority() {
+            return PerformanceMonitor.this.getChunkLoadAveragePriority();
+        }
+
+        public int chunkLoadQueueSize() {
+            return PerformanceMonitor.this.getChunkLoadQueueSize();
+        }
+
+        public int chunkLoadCancellations() {
+            return PerformanceMonitor.this.getChunkLoadCancellations();
+        }
+
+        public int chunkLoadBudgetLast() {
+            return PerformanceMonitor.this.getChunkLoadBudgetLast();
+        }
+
+        public int chunkLoadCandidateCount() {
+            return PerformanceMonitor.this.getChunkLoadCandidateCount();
         }
 
         public List<Zone> zones() {
