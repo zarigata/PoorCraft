@@ -208,11 +208,42 @@ public class Shader {
      * @throws RuntimeException if resources cannot be loaded or shader compilation fails
      */
     public static Shader loadFromResources(String vertexPath, String fragmentPath) {
-        String vertexSource = com.poorcraft.resources.ResourceManager.getInstance()
-                .loadTextResource(vertexPath);
-        String fragmentSource = com.poorcraft.resources.ResourceManager.getInstance()
-                .loadTextResource(fragmentPath);
-        
+        return loadFromResources(vertexPath, fragmentPath, new String[0]);
+    }
+
+    public static Shader loadFromResources(String vertexPath, String fragmentPath, String... defines) {
+        var resourceManager = com.poorcraft.resources.ResourceManager.getInstance();
+        String vertexSource = resourceManager.loadTextResource(vertexPath);
+        String fragmentSource = resourceManager.loadTextResource(fragmentPath);
+
+        if (defines != null && defines.length > 0) {
+            StringBuilder headerBuilder = new StringBuilder();
+            for (String define : defines) {
+                if (define == null) {
+                    continue;
+                }
+                String trimmed = define.trim();
+                if (!trimmed.isEmpty()) {
+                    headerBuilder.append("#define ").append(trimmed).append('\n');
+                }
+            }
+            String header = headerBuilder.toString();
+            if (!header.isEmpty()) {
+                vertexSource = injectHeader(vertexSource, header);
+                fragmentSource = injectHeader(fragmentSource, header);
+            }
+        }
+
         return new Shader(vertexSource, fragmentSource);
+    }
+
+    private static String injectHeader(String source, String header) {
+        if (source.startsWith("#version")) {
+            int newlineIndex = source.indexOf('\n');
+            if (newlineIndex >= 0) {
+                return source.substring(0, newlineIndex + 1) + header + source.substring(newlineIndex + 1);
+            }
+        }
+        return header + source;
     }
 }

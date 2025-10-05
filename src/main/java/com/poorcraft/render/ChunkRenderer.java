@@ -57,6 +57,8 @@ public class ChunkRenderer {
     private Matrix4f viewProjectionMatrix;
     private GPUCapabilities gpuCaps;
     private PerformanceMonitor perfMon;
+    private UniformBufferObject ubo;
+    private boolean useUBO;
     
     // Lighting configuration
     // These values create a nice warm sunlight with cool ambient lighting
@@ -120,8 +122,22 @@ public class ChunkRenderer {
         System.out.println("[ChunkRenderer] Initializing...");
         
         // Load and compile shaders
-        blockShader = Shader.loadFromResources("/shaders/block.vert", "/shaders/block.frag");
+        boolean supportsUBO = gpuCaps != null && gpuCaps.supportsUniformBufferObjects();
+        useUBO = supportsUBO;
+        blockShader = supportsUBO
+            ? Shader.loadFromResources("/shaders/block.vert", "/shaders/block.frag", "USE_UBO")
+            : Shader.loadFromResources("/shaders/block.vert", "/shaders/block.frag");
         System.out.println("[ChunkRenderer] Shaders compiled successfully");
+
+        ubo = new UniformBufferObject(0);
+        if (supportsUBO) {
+            try {
+                ubo.init();
+            } catch (Exception ex) {
+                System.err.println("[ChunkRenderer] Failed to initialise UBO, falling back to legacy uniforms: " + ex.getMessage());
+                useUBO = false;
+            }
+        }
         
         Map<String, ByteBuffer> generatedTextures = TextureGenerator.ensureDefaultBlockTextures();
         TextureGenerator.ensureAuxiliaryTextures();
@@ -205,8 +221,12 @@ public class ChunkRenderer {
         
         // Bind shader and set global uniforms
         blockShader.bind();
-        blockShader.setUniform("uProjection", projection);
-        blockShader.setUniform("uView", view);
+        if (useUBO && ubo != null) {
+            ubo.updateMatrices(projection, view);
+        } else {
+            blockShader.setUniform("uProjection", projection);
+            blockShader.setUniform("uView", view);
+        }
         
         // Bind texture atlas
         textureAtlas.bind(0);
@@ -219,10 +239,14 @@ public class ChunkRenderer {
             lightColor.mul(sunLight.getColor());
             lightColor.mul(sunLight.getIntensity());
         }
-        blockShader.setUniform("uLightDirection", lightDir);
-        blockShader.setUniform("uLightColor", lightColor);
-        blockShader.setUniform("uAmbientColor", AMBIENT_COLOR);
-        blockShader.setUniform("uAmbientStrength", AMBIENT_STRENGTH);
+        if (useUBO && ubo != null) {
+            ubo.updateLighting(lightDir, lightColor, AMBIENT_COLOR, AMBIENT_STRENGTH);
+        } else {
+            blockShader.setUniform("uLightDirection", lightDir);
+            blockShader.setUniform("uLightColor", lightColor);
+            blockShader.setUniform("uAmbientColor", AMBIENT_COLOR);
+            blockShader.setUniform("uAmbientStrength", AMBIENT_STRENGTH);
+        }
 
         Vector3f fogColor = new Vector3f(DEFAULT_FOG_COLOR);
         float fogStart = DEFAULT_FOG_START;
@@ -252,9 +276,14 @@ public class ChunkRenderer {
             }
         }
 
-        blockShader.setUniform("uFogColor", fogColor);
-        blockShader.setUniform("uFogStart", fogStart);
-        blockShader.setUniform("uFogEnd", fogEnd);
+        if (useUBO && ubo != null) {
+            ubo.updateFog(fogColor, fogStart, fogEnd);
+            ubo.bind();
+        } else {
+            blockShader.setUniform("uFogColor", fogColor);
+            blockShader.setUniform("uFogStart", fogStart);
+            blockShader.setUniform("uFogEnd", fogEnd);
+        }
         
         // Update frustum for culling
         projection.mul(view, viewProjectionMatrix);
