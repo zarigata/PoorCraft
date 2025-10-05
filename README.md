@@ -12,6 +12,8 @@ A free, open-source Minecraft clone that empowers players to create, modify and 
 - **Lighting System**: Ambient + directional lighting with normal-based shading ✅ **IMPLEMENTED**
 - **Texture Atlas**: 16x16 block textures combined into efficient atlas ✅ **IMPLEMENTED**
 - **UI System**: Main menu, settings, world creation, in-game HUD ✅ **IMPLEMENTED**
+- **Animated Menu Backgrounds**: 3D world rendering in menus (Minecraft-style) ✅ **IMPLEMENTED**
+- **Head Bobbing**: Customizable camera bobbing during movement ✅ **IMPLEMENTED**
 - **Configuration**: JSON-based settings with in-game editor ✅ **IMPLEMENTED**
 - **Procedural Textures**: Up to 256 unique block skin variations ✅ **IMPLEMENTED** (Procedural Block Texture Generator mod)
 - **AI NPCs**: Conversational NPCs powered by LLMs ✅ **IMPLEMENTED** (AI NPC mod)
@@ -73,6 +75,77 @@ Configuration:
 - AI NPC System: edit `mods/ai_npc/config.json` (set API keys or Ollama URL)
 
 See `docs/OFFICIAL_MODS.md` for the full rundown on both mods.
+
+## UI Assets
+
+PoorCraft uses a flexible UI asset system that supports both filesystem and classpath loading:
+
+### Directory Structure
+- `UI_FILES/` - UI textures loaded from filesystem (buttons, panels, etc.)
+- `src/main/resources/textures/ui/` - HUD textures in classpath (hotbar, hearts, armor, XP bar)
+
+### Required Textures
+**Button Texture** (`UI_FILES/button.png`):
+- 64x16 pixels, Minecraft-style button texture
+- Scales to any size without quality loss
+- Falls back to procedural rendering if missing
+
+**HUD Textures** (`src/main/resources/textures/ui/`):
+- `hotbar_frame.png` (800x60) - Hotbar background frame
+- `hotbar_slot.png` (48x48) - Individual inventory slot
+- `hotbar_selection.png` (56x56) - Selected slot highlight
+- `heart_full.png` (20x20) - Full health heart
+- `heart_empty.png` (20x20) - Empty health heart
+- `armor_full.png` (20x20) - Full armor icon
+- `armor_empty.png` (20x20) - Empty armor icon
+- `xp_bar_background.png` (360x10) - XP bar background
+- `xp_bar_fill.png` (360x10) - XP bar fill
+
+### Generating Textures
+Run the included Python script to generate placeholder textures:
+```bash
+python scripts/generate_ui_textures.py
+```
+
+This creates simple, Minecraft-style textures that can be customized later.
+
+## UI Customization
+
+PoorCraft offers extensive UI and visual effect customization through the settings menu:
+
+### Graphics Settings
+**Animated Menu Background**
+- Enable/disable 3D world rendering in menu backgrounds
+- Provides a living, Minecraft-style menu experience
+- Can be disabled for better performance on low-end systems
+
+**Menu Animation Speed** (0.5 - 2.0)
+- Controls the speed of camera movement in animated backgrounds
+- Default: 1.0 (normal speed)
+
+**Head Bobbing**
+- Enable/disable camera bobbing during player movement
+- Adds immersion and visual feedback while walking/running
+
+**Head Bobbing Intensity** (0.0 - 2.0)
+- Controls the amplitude of head bobbing effect
+- Default: 1.0 (normal intensity)
+
+**UI Scale** (0.75 - 1.5)
+- Adjusts the size of all UI elements
+- Useful for different screen sizes and accessibility needs
+- Default: 1.0 (100% scale)
+
+**Pause Menu Blur**
+- Enable/disable blur effect on game world when paused
+- Improves menu readability and visual polish
+
+### Performance Tips
+For optimal performance on low-end systems:
+- Disable **Animated Menu Background** to reduce GPU load in menus
+- Set **UI Scale** to 0.75 for slightly better performance
+- Disable **Head Bobbing** if experiencing motion sickness
+- Reduce **Menu Animation Speed** for smoother animations
 
 ## License
 

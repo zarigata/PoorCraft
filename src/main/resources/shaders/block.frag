@@ -13,7 +13,7 @@ out vec4 FragColor;
 uniform sampler2D uTexture;        // Texture atlas sampler
 
 #ifdef USE_UBO
-layout(std140, binding = 0) uniform SharedUniforms {
+layout(std140) uniform SharedUniforms {
     mat4 uProjection;
     mat4 uView;
     vec4 uLightDirection;  // dir.xyz, pad

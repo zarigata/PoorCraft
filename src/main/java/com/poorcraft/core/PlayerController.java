@@ -249,6 +249,24 @@ public class PlayerController {
         if (!onGround && !flying && velocity.y <= 0.0f) {
             onGround = collides(world, position.x, position.y - GROUND_CHECK_DEPTH, position.z);
         }
+        
+        // Update head bobbing
+        boolean isMoving = velocity.x * velocity.x + velocity.z * velocity.z > 0.01f;
+        float currentSpeed = (float)Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+        
+        // Only bob when on ground and not flying
+        if (onGround && !flying && settings.graphics != null) {
+            camera.updateHeadBobbing(
+                deltaTime, 
+                isMoving, 
+                currentSpeed,
+                settings.graphics.headBobbing,
+                settings.graphics.headBobbingIntensity
+            );
+        } else {
+            // Disable bobbing when flying or in air
+            camera.updateHeadBobbing(deltaTime, false, 0.0f, false, 0.0f);
+        }
     }
 
     private void moveAxis(World world, float amount, Axis axis, boolean preventEdgeFall) {

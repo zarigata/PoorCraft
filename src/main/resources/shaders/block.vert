@@ -14,7 +14,7 @@ out float vFogDistance; // Distance for fog calculation
 uniform mat4 uModel;      // Model matrix (chunk world position)
 
 #ifdef USE_UBO
-layout(std140, binding = 0) uniform SharedUniforms {
+layout(std140) uniform SharedUniforms {
     mat4 uProjection;
     mat4 uView;
     vec4 uLightDirection;  // dir.xyz, pad

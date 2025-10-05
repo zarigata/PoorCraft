@@ -343,17 +343,22 @@ public class ChunkRenderData {
     private void uploadDynamic(ChunkMesh mesh) {
         glBindVertexArray(vao);
 
+        float[] vertices = mesh.getVertices();
+        int[] indices = mesh.getIndices();
+        int vertexBytes = vertices.length * Float.BYTES;
+        int indexBytes = indices.length * Integer.BYTES;
+
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, 0L, usageHint);
-        FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(mesh.getVertices().length);
-        vertexBuffer.put(mesh.getVertices()).flip();
-        glBufferData(GL_ARRAY_BUFFER, vertexBuffer, usageHint);
+        glBufferData(GL_ARRAY_BUFFER, vertexBytes, usageHint);
+        FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(vertices.length);
+        vertexBuffer.put(vertices).flip();
+        glBufferSubData(GL_ARRAY_BUFFER, 0L, vertexBuffer);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 0L, usageHint);
-        IntBuffer indexBuffer = BufferUtils.createIntBuffer(mesh.getIndices().length);
-        indexBuffer.put(mesh.getIndices()).flip();
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBuffer, usageHint);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBytes, usageHint);
+        IntBuffer indexBuffer = BufferUtils.createIntBuffer(indices.length);
+        indexBuffer.put(indices).flip();
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0L, indexBuffer);
 
         configureAttributes(0L);
         glBindVertexArray(0);
@@ -405,12 +410,22 @@ public class ChunkRenderData {
     }
 
     private void writeFloats(ByteBuffer target, long offset, float[] values, int length) {
-        int position = (int) offset;
-        target.position(position);
-        for (int i = 0; i < length; i++) {
-            target.putFloat(values[i]);
+        if (length <= 0) {
+            return;
         }
-        target.position(0);
+
+        int originalPosition = target.position();
+        int originalLimit = target.limit();
+
+        ByteBuffer slice = target.duplicate().order(target.order());
+        int start = (int) offset;
+        slice.position(start);
+        slice.limit(Math.min(slice.capacity(), start + length * Float.BYTES));
+        FloatBuffer floatView = slice.slice().order(target.order()).asFloatBuffer();
+        floatView.put(values, 0, length);
+
+        target.position(originalPosition);
+        target.limit(originalLimit);
     }
 
     private void writeInts(ByteBuffer target, long offset, int[] values) {
@@ -418,12 +433,22 @@ public class ChunkRenderData {
     }
 
     private void writeInts(ByteBuffer target, long offset, int[] values, int length) {
-        int position = (int) offset;
-        target.position(position);
-        for (int i = 0; i < length; i++) {
-            target.putInt(values[i]);
+        if (length <= 0) {
+            return;
         }
-        target.position(0);
+
+        int originalPosition = target.position();
+        int originalLimit = target.limit();
+
+        ByteBuffer slice = target.duplicate().order(target.order());
+        int start = (int) offset;
+        slice.position(start);
+        slice.limit(Math.min(slice.capacity(), start + length * Integer.BYTES));
+        IntBuffer intView = slice.slice().order(target.order()).asIntBuffer();
+        intView.put(values, 0, length);
+
+        target.position(originalPosition);
+        target.limit(originalLimit);
     }
 
     private void resetStreamingState() {

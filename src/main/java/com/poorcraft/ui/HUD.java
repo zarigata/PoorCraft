@@ -3,10 +3,16 @@ package com.poorcraft.ui;
 import com.poorcraft.core.Game;
 import com.poorcraft.inventory.Inventory;
 import com.poorcraft.inventory.ItemStack;
+import com.poorcraft.render.PerformanceMonitor;
 import com.poorcraft.render.Texture;
 import com.poorcraft.world.block.BlockType;
 
+import org.joml.Vector3f;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.Locale;
 
 /**
  * In-game HUD overlay.
@@ -321,89 +327,142 @@ public class HUD extends UIScreen {
      * Draws F3 debug information.
      */
     private void drawDebugInfo(UIRenderer renderer, FontRenderer fontRenderer) {
-        // Draw semi-transparent background
-        float bgWidth = 300;
-        float bgHeight = 200;
-        renderer.drawRect(10, 10, bgWidth, bgHeight, 0.0f, 0.0f, 0.0f, 0.6f);
-        
-        // Draw debug text
-        float textX = 20;
-        float textY = 25;
-        float lineHeight = fontRenderer.getTextHeight() + 5;
-        
-        // Try to get game stats via reflection
-        try {
-            var gameClass = game.getClass();
-            
-            // FPS (approximate from delta time)
-            String fpsText = "FPS: ~60"; // Placeholder
-            fontRenderer.drawText(fpsText, textX, textY, 1.0f, 1.0f, 1.0f, 1.0f);
-            textY += lineHeight;
-            
-            // Position
-            try {
-                var cameraField = gameClass.getDeclaredField("camera");
-                cameraField.setAccessible(true);
-                var camera = cameraField.get(game);
-                var posMethod = camera.getClass().getMethod("getPosition");
-                var pos = posMethod.invoke(camera);
-                
-                // Position is a Vector3f
-                var xMethod = pos.getClass().getMethod("x");
-                var yMethod = pos.getClass().getMethod("y");
-                var zMethod = pos.getClass().getMethod("z");
-                
-                float x = (float) xMethod.invoke(pos);
-                float y = (float) yMethod.invoke(pos);
-                float z = (float) zMethod.invoke(pos);
-                
-                String posText = String.format("Position: %.2f, %.2f, %.2f", x, y, z);
-                fontRenderer.drawText(posText, textX, textY, 1.0f, 1.0f, 1.0f, 1.0f);
-                textY += lineHeight;
-                
-                // Chunk coordinates
-                int chunkX = (int) Math.floor(x / 16);
-                int chunkZ = (int) Math.floor(z / 16);
-                String chunkText = String.format("Chunk: %d, %d", chunkX, chunkZ);
-                fontRenderer.drawText(chunkText, textX, textY, 1.0f, 1.0f, 1.0f, 1.0f);
-                textY += lineHeight;
-                
-            } catch (Exception e) {
-                // Couldn't get position
-                fontRenderer.drawText("Position: N/A", textX, textY, 1.0f, 1.0f, 1.0f, 1.0f);
-                textY += lineHeight;
-            }
-            
-            // Loaded chunks
-            try {
-                var chunkManagerField = gameClass.getDeclaredField("chunkManager");
-                chunkManagerField.setAccessible(true);
-                var chunkManager = chunkManagerField.get(game);
-                
-                if (chunkManager != null) {
-                    var loadedChunksMethod = chunkManager.getClass().getMethod("getLoadedChunkCount");
-                    int loadedChunks = (int) loadedChunksMethod.invoke(chunkManager);
-                    
-                    String chunksText = "Loaded chunks: " + loadedChunks;
-                    fontRenderer.drawText(chunksText, textX, textY, 1.0f, 1.0f, 1.0f, 1.0f);
-                    textY += lineHeight;
+        List<String> lines = new ArrayList<>();
+
+        float textScale = 1.0f;
+        float lineHeight = fontRenderer.getTextHeight() * textScale + 5f;
+
+        if (game != null) {
+            PerformanceMonitor pm = game.getPerformanceMonitor();
+            if (pm != null) {
+                PerformanceMonitor.FrameStats stats = pm.getStats();
+                float onePercentLowMs = stats.frameTime1PercentLowMs();
+                float onePercentLowFps = onePercentLowMs > 0f ? 1000f / onePercentLowMs : 0f;
+
+                lines.add(String.format(Locale.US, "FPS: %.0f (1%% low %.0f)", stats.fps(), onePercentLowFps));
+                lines.add(String.format(Locale.US, "Frame Time: %.2f ms (min %.2f / max %.2f)",
+                    stats.frameTimeMs(), stats.frameTimeMinMs(), stats.frameTimeMaxMs()));
+                lines.add(String.format(Locale.US, "Chunks: %s rendered, %s culled, %s total",
+                    formatNumber(stats.chunksRendered()),
+                    formatNumber(stats.chunksCulled()),
+                    formatNumber(stats.chunksTotal())));
+                lines.add(String.format(Locale.US, "Draw Calls: %s, Vertices: %s",
+                    formatNumber(stats.drawCalls()),
+                    formatNumber(stats.verticesRendered())));
+
+                float uploadKB = stats.bufferUploadBytes() / 1024f;
+                lines.add(String.format(Locale.US, "Buffer Uploads: %s (%.1f KB)",
+                    formatNumber(stats.bufferUploads()), uploadKB));
+
+                lines.add(String.format(Locale.US, "Chunk Memory: %s / %s (compressed %s)",
+                    formatBytes(stats.chunkMemoryUsageBytes()),
+                    formatBytes(stats.chunkMemoryBudgetBytes()),
+                    formatNumber(stats.chunksCompressed())));
+
+                List<PerformanceMonitor.Zone> zones = stats.zones();
+                if (!zones.isEmpty()) {
+                    lines.add("Top Zones:");
+                    int zoneCount = Math.min(3, zones.size());
+                    for (int i = 0; i < zoneCount; i++) {
+                        PerformanceMonitor.Zone zone = zones.get(i);
+                        lines.add(String.format(Locale.US, "  %s: %.2f ms", zone.name(), zone.averageMs()));
+                    }
                 }
-            } catch (Exception e) {
-                // Couldn't get chunk count
+            } else {
+                lines.add("Performance stats unavailable");
             }
-            
-            // Facing direction
-            fontRenderer.drawText("Facing: N/A", textX, textY, 1.0f, 1.0f, 1.0f, 1.0f);
-            textY += lineHeight;
-            
-        } catch (Exception e) {
-            // Failed to get debug info
-            fontRenderer.drawText("Debug info unavailable", textX, textY, 1.0f, 0.5f, 0.5f, 1.0f);
+
+            var camera = game.getCamera();
+            if (camera != null) {
+                Vector3f position = camera.getPosition();
+                lines.add(String.format(Locale.US, "Position: %.2f, %.2f, %.2f", position.x, position.y, position.z));
+
+                int chunkX = (int) Math.floor(position.x / 16f);
+                int chunkZ = (int) Math.floor(position.z / 16f);
+                lines.add(String.format(Locale.US, "Chunk: %d, %d", chunkX, chunkZ));
+
+                Vector3f front = camera.getFront();
+                lines.add("Facing: " + describeFacing(front));
+            }
+        } else {
+            lines.add("Debug info unavailable");
         }
-        
-        // Instructions
-        textY += lineHeight;
-        fontRenderer.drawText("F3: Toggle debug", textX, textY, 0.7f, 0.7f, 0.7f, 1.0f);
+
+        lines.add("F3: Toggle debug");
+
+        float padding = 10f;
+        float maxLineWidth = 0f;
+        for (String line : lines) {
+            float width = fontRenderer.getTextWidth(line) * textScale;
+            if (width > maxLineWidth) {
+                maxLineWidth = width;
+            }
+        }
+
+        float bgWidth = maxLineWidth + padding * 2f;
+        float bgHeight = lines.size() * lineHeight + padding * 2f;
+        float bgX = 10f;
+        float bgY = 10f;
+
+        renderer.drawRect(bgX, bgY, bgWidth, bgHeight, 0.0f, 0.0f, 0.0f, 0.6f);
+
+        float textX = bgX + padding;
+        float textY = bgY + padding;
+        for (String line : lines) {
+            fontRenderer.drawText(line, textX, textY, textScale, 1.0f, 1.0f, 1.0f, 1.0f);
+            textY += lineHeight;
+        }
+    }
+
+    private String describeFacing(Vector3f direction) {
+        if (direction == null) {
+            return "N/A";
+        }
+        float absX = Math.abs(direction.x);
+        float absZ = Math.abs(direction.z);
+        if (absX < 1e-3f && absZ < 1e-3f) {
+            return "N/A";
+        }
+        if (absX > absZ) {
+            return direction.x > 0 ? "East" : "West";
+        } else if (absZ > absX) {
+            return direction.z > 0 ? "South" : "North";
+        } else {
+            String horizontal = direction.x > 0 ? "East" : "West";
+            String vertical = direction.z > 0 ? "South" : "North";
+            return horizontal + "-" + vertical;
+        }
+    }
+
+    private String formatNumber(long value) {
+        long abs = Math.abs(value);
+        if (abs >= 1_000_000_000L) {
+            return String.format(Locale.US, "%.1fB", value / 1_000_000_000f);
+        }
+        if (abs >= 1_000_000L) {
+            return String.format(Locale.US, "%.1fM", value / 1_000_000f);
+        }
+        if (abs >= 1_000L) {
+            return String.format(Locale.US, "%.1fk", value / 1_000f);
+        }
+        return Long.toString(value);
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes <= 0) {
+            return "0 B";
+        }
+        final String[] units = {"B", "KB", "MB", "GB", "TB"};
+        double value = bytes;
+        int unitIndex = 0;
+        while (value >= 1024 && unitIndex < units.length - 1) {
+            value /= 1024;
+            unitIndex++;
+        }
+        if (unitIndex == 0) {
+            return String.format(Locale.US, "%.0f %s", value, units[unitIndex]);
+        }
+        return String.format(Locale.US, "%.2f %s", value, units[unitIndex]);
     }
     
     /**

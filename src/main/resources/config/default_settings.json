@@ -9,7 +9,21 @@
   "graphics": {
     "fov": 100.0,
     "renderDistance": 8,
-    "maxFps": 255
+    "maxFps": 255,
+    "chunkLoadRate": 4,
+    "useChunkCompression": true,
+    "memoryBudgetMB": 512,
+    "useUBOs": true,
+    "renderQuality": "high",
+    "aggressiveCulling": true,
+    "adaptiveLoading": true,
+    "targetFPS": 60,
+    "animatedMenuBackground": true,
+    "menuBackgroundSpeed": 1.0,
+    "headBobbing": true,
+    "headBobbingIntensity": 1.0,
+    "uiScale": 1.0,
+    "pauseMenuBlur": true
   },
   "audio": {
     "masterVolume": 1.0,

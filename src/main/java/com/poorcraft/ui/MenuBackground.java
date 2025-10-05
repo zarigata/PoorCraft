@@ -17,6 +17,10 @@ public class MenuBackground {
     private int currentTextureIndex;
     private static final float TILE_SIZE = 64.0f;  // Size of each texture tile in pixels
     private static final float OPACITY = 0.20f;     // 20% opacity - subtle but visible
+    private float scrollOffsetX = 0.0f;
+    private float scrollOffsetY = 0.0f;
+    private static final float SCROLL_SPEED_X = 5.0f;  // Pixels per second
+    private static final float SCROLL_SPEED_Y = 3.0f;  // Pixels per second
     
     /**
      * Creates a new menu background.
@@ -52,7 +56,25 @@ public class MenuBackground {
     }
     
     /**
-     * Renders the tiled background across the entire window.
+     * Updates the scrolling animation.
+     * 
+     * @param deltaTime Time since last frame in seconds
+     */
+    public void update(float deltaTime) {
+        scrollOffsetX += SCROLL_SPEED_X * deltaTime;
+        scrollOffsetY += SCROLL_SPEED_Y * deltaTime;
+        
+        // Wrap offsets to prevent overflow
+        if (scrollOffsetX >= TILE_SIZE) {
+            scrollOffsetX -= TILE_SIZE;
+        }
+        if (scrollOffsetY >= TILE_SIZE) {
+            scrollOffsetY -= TILE_SIZE;
+        }
+    }
+    
+    /**
+     * Renders the tiled background across the entire window with parallax scrolling.
      * 
      * @param renderer UI renderer
      * @param windowWidth Window width in pixels
@@ -78,11 +100,11 @@ public class MenuBackground {
         Texture texture = textures[currentTextureIndex % textures.length];
         int textureId = texture.getId();
         
-        // Render tiled texture across the screen
-        for (int y = 0; y < tilesY; y++) {
-            for (int x = 0; x < tilesX; x++) {
-                float tileX = x * TILE_SIZE;
-                float tileY = y * TILE_SIZE;
+        // Render tiled texture across the screen with scrolling offset
+        for (int y = -1; y < tilesY; y++) {
+            for (int x = -1; x < tilesX; x++) {
+                float tileX = x * TILE_SIZE - scrollOffsetX;
+                float tileY = y * TILE_SIZE - scrollOffsetY;
                 
                 // Draw textured tile with low opacity
                 renderer.drawTexturedRect(

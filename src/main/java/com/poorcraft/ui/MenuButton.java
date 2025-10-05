@@ -18,6 +18,7 @@ public class MenuButton extends UIComponent {
 
     private static Texture buttonTexture;
     private static boolean textureLoadAttempted;
+    private static boolean textureLoadFailed;
 
     private String text;
     private Runnable onClick;
@@ -54,29 +55,56 @@ public class MenuButton extends UIComponent {
         ensureTextureLoaded();
 
         float disabledMul = enabled ? 1.0f : 0.4f;
-        renderer.drawRect(x, y, width, height,
-            0.07f * disabledMul, 0.11f * disabledMul, 0.14f * disabledMul, 0.92f);
+        
+        // Improved fallback rendering when texture is missing
+        if (buttonTexture == null && textureLoadFailed) {
+            // Draw gradient background for depth
+            float topBrightness = 0.18f + 0.08f * hoverBlend;
+            float bottomBrightness = 0.11f + 0.05f * hoverBlend;
+            
+            if (pressed) {
+                topBrightness *= 0.7f;
+                bottomBrightness *= 0.7f;
+            }
+            
+            // Main button body with gradient effect (simulated with two rects)
+            renderer.drawRect(x, y, width, height / 2,
+                topBrightness * disabledMul, topBrightness * disabledMul, topBrightness * disabledMul, 0.95f);
+            renderer.drawRect(x, y + height / 2, width, height / 2,
+                bottomBrightness * disabledMul, bottomBrightness * disabledMul, bottomBrightness * disabledMul, 0.95f);
+        } else {
+            // Original rendering with texture
+            renderer.drawRect(x, y, width, height,
+                0.07f * disabledMul, 0.11f * disabledMul, 0.14f * disabledMul, 0.92f);
 
-        if (buttonTexture != null) {
-            renderer.drawTexturedRect(x, y, width, height, buttonTexture.getId());
+            if (buttonTexture != null) {
+                renderer.drawTexturedRect(x, y, width, height, buttonTexture.getId());
+            }
+
+            float overlayAlpha = 0.18f + 0.25f * hoverBlend + (pressed ? 0.15f : 0f);
+            renderer.drawRect(x, y, width, height,
+                0.06f + 0.18f * hoverBlend,
+                0.26f + 0.2f * hoverBlend,
+                0.32f + 0.22f * hoverBlend,
+                overlayAlpha * disabledMul);
         }
 
-        float overlayAlpha = 0.18f + 0.25f * hoverBlend + (pressed ? 0.15f : 0f);
-        renderer.drawRect(x, y, width, height,
-            0.06f + 0.18f * hoverBlend,
-            0.26f + 0.2f * hoverBlend,
-            0.32f + 0.22f * hoverBlend,
-            overlayAlpha * disabledMul);
-
+        // Enhanced border with 3D effect
         float border = clamp(Math.min(width, height) * 0.085f, 3f, 10f);
+        float highlightMul = pressed ? 0.6f : 1.0f;
+        float shadowMul = pressed ? 1.2f : 1.0f;
+        
+        // Top and left borders (highlights)
         renderer.drawRect(x, y, width, border,
-            0.0f, 0.93f * disabledMul, 0.93f * disabledMul, 0.86f);
-        renderer.drawRect(x, y + height - border, width, border,
-            0.0f, 0.82f * disabledMul, 0.82f * disabledMul, 0.72f);
+            0.0f, 0.93f * disabledMul * highlightMul, 0.93f * disabledMul * highlightMul, 0.86f);
         renderer.drawRect(x, y, border, height,
-            0.02f, 0.78f * disabledMul, 0.82f * disabledMul, 0.78f);
+            0.02f, 0.88f * disabledMul * highlightMul, 0.92f * disabledMul * highlightMul, 0.82f);
+        
+        // Bottom and right borders (shadows)
+        renderer.drawRect(x, y + height - border, width, border,
+            0.0f, 0.72f * disabledMul * shadowMul, 0.72f * disabledMul * shadowMul, 0.72f);
         renderer.drawRect(x + width - border, y, border, height,
-            0.02f, 0.78f * disabledMul, 0.82f * disabledMul, 0.78f);
+            0.02f, 0.68f * disabledMul * shadowMul, 0.72f * disabledMul * shadowMul, 0.72f);
 
         if (text == null || text.isEmpty()) {
             return;
@@ -142,6 +170,9 @@ public class MenuButton extends UIComponent {
         }
 
         textureLoadAttempted = true;
+        textureLoadFailed = false;
+        
+        // Try loading from filesystem first (UI_FILES/button.png)
         ResourceManager resourceManager = ResourceManager.getInstance();
         String absolutePath = resourceManager.getResourcePath(BUTTON_TEXTURE_PATH);
         try {
@@ -149,15 +180,18 @@ public class MenuButton extends UIComponent {
             System.out.println("[MenuButton] Loaded textured button from " + absolutePath);
             return;
         } catch (Exception diskFailure) {
-            System.err.println("[MenuButton] Disk load failed for button texture: " + diskFailure.getMessage());
+            // Not an error - file might not exist yet
         }
 
+        // Try loading from classpath as fallback
         try {
             buttonTexture = Texture.loadFromResource("/" + BUTTON_TEXTURE_PATH);
             System.out.println("[MenuButton] Loaded textured button from classpath fallback");
         } catch (Exception fallbackFailure) {
-            System.err.println("[MenuButton] Failed to load button texture: " + fallbackFailure.getMessage());
+            // Use procedural fallback rendering
+            System.out.println("[MenuButton] Button texture not found, using procedural rendering");
             buttonTexture = null;
+            textureLoadFailed = true;
         }
     }
 }

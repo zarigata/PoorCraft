@@ -1,6 +1,7 @@
 package com.poorcraft.render;
 
 import org.joml.Matrix4f;
+import org.joml.Vector2f;
 import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 
@@ -157,6 +158,16 @@ public class Shader {
      */
     public void setUniform(String name, float value) {
         glUniform1f(getUniformLocation(name), value);
+    }
+    
+    /**
+     * Sets a vec2 uniform variable.
+     * 
+     * @param name Uniform name
+     * @param value Vector2f value
+     */
+    public void setUniform(String name, Vector2f value) {
+        glUniform2f(getUniformLocation(name), value.x, value.y);
     }
     
     /**

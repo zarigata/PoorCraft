@@ -8,6 +8,7 @@ import com.poorcraft.input.InputHandler;
 import com.poorcraft.modding.ModLoader;
 import com.poorcraft.inventory.Inventory;
 import com.poorcraft.player.SkinManager;
+import com.poorcraft.render.BlurRenderer;
 import com.poorcraft.render.BlockHighlightRenderer;
 import com.poorcraft.render.ChunkRenderer;
 import com.poorcraft.render.Frustum;
@@ -32,6 +33,7 @@ import java.util.Collection;
 import java.util.Map;
 
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL30.*;
 
 /**
  * Main game class that orchestrates the game loop and all subsystems.
@@ -69,6 +71,16 @@ public class Game {
     private GPUCapabilities gpuCapabilities;
     private PerformanceMonitor performanceMonitor;
     private boolean chunkRendererInitialized;
+    
+    // Blur effect resources
+    private BlurRenderer blurRenderer;
+    private int blurFbo;
+    private int blurTexture;
+    private int blurFbo2;
+    private int blurTexture2;
+    private int blurWidth;
+    private int blurHeight;
+    private boolean blurSupported;
     
     private boolean running;
     private boolean worldLoaded;  // Track if world is loaded
@@ -109,6 +121,12 @@ public class Game {
         this.performanceMonitor = null;
         this.gpuCapabilities = null;
         this.chunkRendererInitialized = false;
+        this.blurRenderer = null;
+        this.blurFbo = 0;
+        this.blurTexture = 0;
+        this.blurFbo2 = 0;
+        this.blurTexture2 = 0;
+        this.blurSupported = false;
     }
 
     public SkinManager getSkinManager() {
@@ -140,6 +158,9 @@ public class Game {
         chunkRenderer = new ChunkRenderer();
         chunkRenderer.setGPUCapabilities(caps);
         chunkRenderer.setPerformanceMonitor(perfMon);
+        chunkRenderer.init();
+        chunkRendererInitialized = true;
+        System.out.println("[Game] Chunk renderer initialized early for menu rendering");
 
         // Initialize timer
         timer = new Timer();
@@ -168,6 +189,7 @@ public class Game {
         window.setResizeCallback((width, height) -> {
             System.out.println("[Game] Window resized to: " + width + "x" + height);
             uiManager.onResize(width, height);
+            resizeBlurTargets(width, height);
         });
         
         System.out.println("[Game] UI Manager initialized");
@@ -183,6 +205,9 @@ public class Game {
 
         skyRenderer = new SkyRenderer();
         skyRenderer.init();
+        
+        // Initialize blur effect resources
+        initBlurResources(window.getWidth(), window.getHeight());
 
         // Generate baseline textures before mods start tinkering with them
         Map<String, ByteBuffer> generatedTextures = TextureGenerator.ensureDefaultBlockTextures();
@@ -371,12 +396,20 @@ public class Game {
      * Renders all loaded chunks with frustum culling and lighting.
      */
     private void render() {
+        boolean isPaused = uiManager.getCurrentState() == GameState.PAUSED;
+        boolean shouldBlur = isPaused && settings.graphics.pauseMenuBlur && blurSupported && blurRenderer != null;
+        
+        if (shouldBlur) {
+            // Bind first FBO for world rendering
+            glBindFramebuffer(GL_FRAMEBUFFER, blurFbo);
+            glViewport(0, 0, blurWidth, blurHeight);
+        }
+        
         // Clear color and depth buffers
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         // Render world if loaded and in appropriate state
-        if (worldLoaded && (uiManager.getCurrentState() == GameState.IN_GAME || 
-                           uiManager.getCurrentState() == GameState.PAUSED)) {
+        if (worldLoaded && (uiManager.getCurrentState() == GameState.IN_GAME || isPaused)) {
             // Enable depth testing for 3D world rendering
             glEnable(GL_DEPTH_TEST);
             glDepthFunc(GL_LESS);
@@ -408,6 +441,19 @@ public class Game {
             if (itemDropRenderer != null && dropManager != null) {
                 itemDropRenderer.render(dropManager.getDrops(), camera, view, projection);
             }
+        }
+        
+        // Apply blur if paused
+        if (shouldBlur) {
+            // Horizontal blur pass: blurTexture -> blurFbo2
+            blurRenderer.renderBlurPass(blurTexture, blurFbo2, true, blurWidth, blurHeight);
+            
+            // Vertical blur pass: blurTexture2 -> screen
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, window.getWidth(), window.getHeight());
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            
+            blurRenderer.renderBlurPass(blurTexture2, 0, false, window.getWidth(), window.getHeight());
         }
         
         // Reset OpenGL state before UI rendering
@@ -470,6 +516,13 @@ public class Game {
         if (highlightRendererInitialized && blockHighlightRenderer != null) {
             blockHighlightRenderer.cleanup();
             highlightRendererInitialized = false;
+        }
+        
+        // Cleanup blur resources
+        cleanupBlurResources();
+        if (blurRenderer != null) {
+            blurRenderer.cleanup();
+            blurRenderer = null;
         }
         
         window.destroy();
@@ -629,6 +682,33 @@ public class Game {
 
     public SunLight getSunLight() {
         return sunLight;
+    }
+    
+    /**
+     * Gets the sky renderer instance.
+     * 
+     * @return Sky renderer
+     */
+    public SkyRenderer getSkyRenderer() {
+        return skyRenderer;
+    }
+    
+    /**
+     * Gets the GPU capabilities.
+     * 
+     * @return GPU capabilities
+     */
+    public GPUCapabilities getGPUCapabilities() {
+        return gpuCapabilities;
+    }
+    
+    /**
+     * Gets the window instance.
+     * 
+     * @return Window
+     */
+    public Window getWindow() {
+        return window;
     }
 
     /**
@@ -804,6 +884,115 @@ public class Game {
         if (!highlightRendererInitialized && blockHighlightRenderer != null) {
             blockHighlightRenderer.init();
             highlightRendererInitialized = true;
+        }
+    }
+    
+    /**
+     * Initializes blur effect resources (FBOs and textures).
+     * Called during init() and on window resize.
+     * 
+     * @param width Blur buffer width
+     * @param height Blur buffer height
+     */
+    private void initBlurResources(int width, int height) {
+        try {
+            // Use half-resolution for performance
+            blurWidth = Math.max(1, width / 2);
+            blurHeight = Math.max(1, height / 2);
+            
+            // Initialize blur renderer if needed
+            if (blurRenderer == null) {
+                blurRenderer = new BlurRenderer();
+                blurRenderer.init();
+            }
+            
+            // Create first FBO and texture
+            blurFbo = glGenFramebuffers();
+            blurTexture = glGenTextures();
+            
+            glBindTexture(GL_TEXTURE_2D, blurTexture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, blurWidth, blurHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, (ByteBuffer) null);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            
+            glBindFramebuffer(GL_FRAMEBUFFER, blurFbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, blurTexture, 0);
+            
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+                System.err.println("[Game] Blur FBO 1 is not complete!");
+                cleanupBlurResources();
+                blurSupported = false;
+                return;
+            }
+            
+            // Create second FBO and texture
+            blurFbo2 = glGenFramebuffers();
+            blurTexture2 = glGenTextures();
+            
+            glBindTexture(GL_TEXTURE_2D, blurTexture2);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, blurWidth, blurHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, (ByteBuffer) null);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            
+            glBindFramebuffer(GL_FRAMEBUFFER, blurFbo2);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, blurTexture2, 0);
+            
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+                System.err.println("[Game] Blur FBO 2 is not complete!");
+                cleanupBlurResources();
+                blurSupported = false;
+                return;
+            }
+            
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            
+            blurSupported = true;
+            System.out.println("[Game] Blur resources initialized at " + blurWidth + "x" + blurHeight);
+            
+        } catch (Exception e) {
+            System.err.println("[Game] Failed to initialize blur resources: " + e.getMessage());
+            cleanupBlurResources();
+            blurSupported = false;
+        }
+    }
+    
+    /**
+     * Resizes blur FBOs when window is resized.
+     * 
+     * @param width New window width
+     * @param height New window height
+     */
+    private void resizeBlurTargets(int width, int height) {
+        if (blurSupported || blurRenderer != null) {
+            cleanupBlurResources();
+            initBlurResources(width, height);
+        }
+    }
+    
+    /**
+     * Cleans up blur effect resources.
+     */
+    private void cleanupBlurResources() {
+        if (blurFbo != 0) {
+            glDeleteFramebuffers(blurFbo);
+            blurFbo = 0;
+        }
+        if (blurTexture != 0) {
+            glDeleteTextures(blurTexture);
+            blurTexture = 0;
+        }
+        if (blurFbo2 != 0) {
+            glDeleteFramebuffers(blurFbo2);
+            blurFbo2 = 0;
+        }
+        if (blurTexture2 != 0) {
+            glDeleteTextures(blurTexture2);
+            blurTexture2 = 0;
         }
     }
 }

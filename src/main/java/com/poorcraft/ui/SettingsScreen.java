@@ -6,6 +6,7 @@ import com.poorcraft.config.ConfigManager;
 import com.poorcraft.config.Settings;
 
 import java.util.Arrays;
+import java.util.Locale;
 
 /**
  * Settings menu screen with tabbed interface.
@@ -59,17 +60,19 @@ public class SettingsScreen extends UIScreen {
         clearComponents();
         
         float centerX = windowWidth / 2.0f;
+        float uiScale = workingSettings.graphics.uiScale;
         
         // Title
-        Label titleLabel = new Label(centerX, 30, "Settings", 1.0f, 1.0f, 1.0f, 1.0f);
+        Label titleLabel = new Label(centerX, 30 * uiScale, "Settings", 1.0f, 1.0f, 1.0f, 1.0f);
         titleLabel.setCentered(true);
+        titleLabel.setScale(uiScale);
         addComponent(titleLabel);
         
         // Tab buttons
-        float tabY = 70;
-        float tabWidth = 120;
-        float tabHeight = 35;
-        float tabSpacing = 5;
+        float tabY = 70 * uiScale;
+        float tabWidth = 120 * uiScale;
+        float tabHeight = 35 * uiScale;
+        float tabSpacing = 5 * uiScale;
         float tabStartX = centerX - (tabWidth * 4 + tabSpacing * 3) / 2;
         
         String[] tabNames = {"Graphics", "Audio", "Controls", "AI"};
@@ -93,10 +96,10 @@ public class SettingsScreen extends UIScreen {
         buildTabComponents();
         
         // Bottom buttons
-        float buttonY = windowHeight - 60;
-        float buttonWidth = 100;
-        float buttonHeight = 40;
-        float buttonSpacing = 10;
+        float buttonY = windowHeight - 60 * uiScale;
+        float buttonWidth = 100 * uiScale;
+        float buttonHeight = 40 * uiScale;
+        float buttonSpacing = 10 * uiScale;
         
         Button applyButton = new Button(
             centerX - buttonWidth - buttonSpacing / 2, buttonY,
@@ -127,11 +130,12 @@ public class SettingsScreen extends UIScreen {
      * Builds components for the current tab.
      */
     private void buildTabComponents() {
-        float contentY = 130;
-        float contentX = windowWidth / 2.0f - 200;
-        float controlWidth = 400;
-        float controlHeight = 35;
-        float spacing = 50;
+        float uiScale = workingSettings.graphics.uiScale;
+        float contentY = 130 * uiScale;
+        float contentX = windowWidth / 2.0f - 200 * uiScale;
+        float controlWidth = 400 * uiScale;
+        float controlHeight = 35 * uiScale;
+        float spacing = 50 * uiScale;
         
         switch (currentTab) {
             case TAB_GRAPHICS:
@@ -154,7 +158,7 @@ public class SettingsScreen extends UIScreen {
      */
     private void buildGraphicsTab(float x, float y, float width, float height, float spacing) {
         float currentY = y;
-        
+
         // FOV slider
         Slider fovSlider = new Slider(x, currentY, width, height,
             "Field of View", 60, 110, workingSettings.graphics.fov,
@@ -162,7 +166,7 @@ public class SettingsScreen extends UIScreen {
         fovSlider.setDecimalPlaces(0);
         addComponent(fovSlider);
         currentY += spacing;
-        
+
         // Render distance slider
         Slider renderDistanceSlider = new Slider(x, currentY, width, height,
             "Render Distance (chunks)", 4, 16, workingSettings.graphics.renderDistance,
@@ -170,7 +174,7 @@ public class SettingsScreen extends UIScreen {
         renderDistanceSlider.setDecimalPlaces(0);
         addComponent(renderDistanceSlider);
         currentY += spacing;
-        
+
         // Max FPS slider
         Slider maxFpsSlider = new Slider(x, currentY, width, height,
             "Max FPS", 30, 240, workingSettings.graphics.maxFps,
@@ -178,19 +182,143 @@ public class SettingsScreen extends UIScreen {
         maxFpsSlider.setDecimalPlaces(0);
         addComponent(maxFpsSlider);
         currentY += spacing;
-        
+
+        // Target FPS slider
+        Slider targetFpsSlider = new Slider(x, currentY, width, height,
+            "Target FPS", 30, 144, workingSettings.graphics.targetFPS,
+            value -> workingSettings.graphics.targetFPS = (int) value.floatValue());
+        targetFpsSlider.setDecimalPlaces(0);
+        addComponent(targetFpsSlider);
+        currentY += spacing;
+
+        // Chunk load rate slider
+        Slider chunkLoadSlider = new Slider(x, currentY, width, height,
+            "Chunk Load Rate", 1, 8, workingSettings.graphics.chunkLoadRate,
+            value -> workingSettings.graphics.chunkLoadRate = (int) value.floatValue());
+        chunkLoadSlider.setDecimalPlaces(0);
+        addComponent(chunkLoadSlider);
+        currentY += spacing;
+
+        // Memory budget slider
+        Slider memoryBudgetSlider = new Slider(x, currentY, width, height,
+            "Memory Budget (MB)", 256, 2048, workingSettings.graphics.memoryBudgetMB,
+            value -> workingSettings.graphics.memoryBudgetMB = (int) value.floatValue());
+        memoryBudgetSlider.setDecimalPlaces(0);
+        addComponent(memoryBudgetSlider);
+        currentY += spacing;
+
+        // Render quality dropdown
+        Label qualityLabel = new Label(x, currentY, "Terrain Quality:");
+        addComponent(qualityLabel);
+        currentY += 25;
+
+        java.util.List<String> qualityOptions = java.util.Arrays.asList("Low", "Medium", "High");
+        int currentQualityIndex = qualityOptions.indexOf(capitalize(workingSettings.graphics.renderQuality));
+        if (currentQualityIndex < 0) {
+            currentQualityIndex = 2; // default High
+        }
+        Dropdown qualityDropdown = new Dropdown(x, currentY, width, height,
+            qualityOptions,
+            currentQualityIndex,
+            index -> {
+                String[] keys = {"low", "medium", "high"};
+                workingSettings.graphics.renderQuality = keys[Math.max(0, Math.min(index, keys.length - 1))];
+            });
+        addComponent(qualityDropdown);
+        currentY += spacing;
+
         // VSync checkbox
         Checkbox vsyncCheckbox = new Checkbox(x, currentY, 20,
             "VSync", workingSettings.window.vsync,
             checked -> workingSettings.window.vsync = checked);
         addComponent(vsyncCheckbox);
         currentY += spacing;
-        
+
         // Fullscreen checkbox
         Checkbox fullscreenCheckbox = new Checkbox(x, currentY, 20,
             "Fullscreen", workingSettings.window.fullscreen,
             checked -> workingSettings.window.fullscreen = checked);
         addComponent(fullscreenCheckbox);
+        currentY += spacing;
+
+        // Chunk compression checkbox
+        Checkbox compressionCheckbox = new Checkbox(x, currentY, 20,
+            "Chunk Compression", workingSettings.graphics.useChunkCompression,
+            checked -> workingSettings.graphics.useChunkCompression = checked);
+        addComponent(compressionCheckbox);
+        currentY += spacing;
+
+        // Adaptive loading checkbox
+        Checkbox adaptiveLoadingCheckbox = new Checkbox(x, currentY, 20,
+            "Adaptive Loading", workingSettings.graphics.adaptiveLoading,
+            checked -> workingSettings.graphics.adaptiveLoading = checked);
+        addComponent(adaptiveLoadingCheckbox);
+        currentY += spacing;
+
+        // Use UBOs checkbox
+        Checkbox ubosCheckbox = new Checkbox(x, currentY, 20,
+            "Use UBOs", workingSettings.graphics.useUBOs,
+            checked -> workingSettings.graphics.useUBOs = checked);
+        addComponent(ubosCheckbox);
+        currentY += spacing;
+
+        // Aggressive culling checkbox
+        Checkbox aggressiveCullingCheckbox = new Checkbox(x, currentY, 20,
+            "Aggressive Culling", workingSettings.graphics.aggressiveCulling,
+            checked -> workingSettings.graphics.aggressiveCulling = checked);
+        addComponent(aggressiveCullingCheckbox);
+        currentY += spacing;
+        
+        // UI & Visual Effects section header
+        Label uiEffectsLabel = new Label(x, currentY, "UI & Visual Effects", 0.9f, 0.9f, 0.7f, 1.0f);
+        addComponent(uiEffectsLabel);
+        currentY += 30;
+        
+        // Animated Menu Background checkbox
+        Checkbox animatedBgCheckbox = new Checkbox(x, currentY, 20,
+            "Animated Menu Background", workingSettings.graphics.animatedMenuBackground,
+            checked -> workingSettings.graphics.animatedMenuBackground = checked);
+        addComponent(animatedBgCheckbox);
+        currentY += spacing;
+        
+        // Menu Animation Speed slider
+        Slider menuSpeedSlider = new Slider(x, currentY, width, height,
+            "Menu Animation Speed", 0.5f, 2.0f, workingSettings.graphics.menuBackgroundSpeed,
+            value -> workingSettings.graphics.menuBackgroundSpeed = value);
+        menuSpeedSlider.setDecimalPlaces(1);
+        menuSpeedSlider.setEnabled(workingSettings.graphics.animatedMenuBackground);
+        addComponent(menuSpeedSlider);
+        currentY += spacing;
+        
+        // Head Bobbing checkbox
+        Checkbox headBobbingCheckbox = new Checkbox(x, currentY, 20,
+            "Head Bobbing", workingSettings.graphics.headBobbing,
+            checked -> workingSettings.graphics.headBobbing = checked);
+        addComponent(headBobbingCheckbox);
+        currentY += spacing;
+        
+        // Head Bobbing Intensity slider
+        Slider bobbingIntensitySlider = new Slider(x, currentY, width, height,
+            "Head Bobbing Intensity", 0.0f, 2.0f, workingSettings.graphics.headBobbingIntensity,
+            value -> workingSettings.graphics.headBobbingIntensity = value);
+        bobbingIntensitySlider.setDecimalPlaces(1);
+        bobbingIntensitySlider.setEnabled(workingSettings.graphics.headBobbing);
+        addComponent(bobbingIntensitySlider);
+        currentY += spacing;
+        
+        // UI Scale slider
+        Slider uiScaleSlider = new Slider(x, currentY, width, height,
+            "UI Scale", 0.75f, 1.5f, workingSettings.graphics.uiScale,
+            value -> workingSettings.graphics.uiScale = value);
+        uiScaleSlider.setDecimalPlaces(2);
+        addComponent(uiScaleSlider);
+        currentY += spacing;
+        
+        // Pause Menu Blur checkbox
+        Checkbox pauseBlurCheckbox = new Checkbox(x, currentY, 20,
+            "Pause Menu Blur", workingSettings.graphics.pauseMenuBlur,
+            checked -> workingSettings.graphics.pauseMenuBlur = checked);
+        addComponent(pauseBlurCheckbox);
     }
     
     /**
@@ -284,6 +412,13 @@ public class SettingsScreen extends UIScreen {
             "AI features only available in multiplayer", 
             0.7f, 0.7f, 0.7f, 1.0f);
         addComponent(aiNote);
+    }
+
+    private String capitalize(String value) {
+        if (value == null || value.isEmpty()) {
+            return "";
+        }
+        return Character.toUpperCase(value.charAt(0)) + value.substring(1).toLowerCase(Locale.ROOT);
     }
     
     /**

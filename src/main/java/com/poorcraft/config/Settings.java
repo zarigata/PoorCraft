@@ -54,6 +54,14 @@ public class Settings {
         settings.graphics.fogStart = 48.0f;
         settings.graphics.fogEnd = 96.0f;
         settings.graphics.fogColor = new float[]{0.74f, 0.84f, 0.93f};
+        settings.graphics.chunkLoadRate = 4;
+        settings.graphics.useChunkCompression = true;
+        settings.graphics.memoryBudgetMB = 512;
+        settings.graphics.useUBOs = true;
+        settings.graphics.renderQuality = "high";
+        settings.graphics.aggressiveCulling = true;
+        settings.graphics.adaptiveLoading = true;
+        settings.graphics.targetFPS = 60;
         
         settings.audio = new AudioSettings();
         settings.audio.masterVolume = 1.0f;
@@ -128,6 +136,22 @@ public class Settings {
         public float fogStart;      // Distance where fog starts (world units)
         public float fogEnd;        // Distance where fog is fully opaque (world units)
         public float[] fogColor;    // Fog color RGB
+        public int chunkLoadRate;           // 1-8, default 4
+        public boolean useChunkCompression; // default true
+        public int memoryBudgetMB;          // default 512
+        public boolean useUBOs;             // default true
+        public String renderQuality;        // "low","medium","high" (default "high")
+        public boolean aggressiveCulling;   // default true
+        public boolean adaptiveLoading;     // default true
+        public int targetFPS;               // default 60
+        
+        // UI and visual effects settings
+        public boolean animatedMenuBackground = true;  // Enable/disable animated 3D world background in menus
+        public float menuBackgroundSpeed = 1.0f;       // Speed multiplier for menu background animation
+        public boolean headBobbing = true;             // Enable/disable head bobbing animation
+        public float headBobbingIntensity = 1.0f;      // Intensity of head bobbing effect
+        public float uiScale = 1.0f;                   // UI scale multiplier for accessibility
+        public boolean pauseMenuBlur = true;           // Enable/disable blur effect on pause menu
     }
     
     /**

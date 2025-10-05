@@ -11,13 +11,17 @@ package com.poorcraft.ui;
  */
 public class Button extends UIComponent {
     
-    // Color constants
-    private static final float[] NORMAL_COLOR = {0.2f, 0.2f, 0.2f, 0.8f};
-    private static final float[] HOVER_COLOR = {0.3f, 0.3f, 0.3f, 0.9f};
-    private static final float[] PRESSED_COLOR = {0.15f, 0.15f, 0.15f, 0.9f};
+    // Improved color constants with better contrast and depth
+    private static final float[] NORMAL_TOP = {0.25f, 0.25f, 0.25f, 0.9f};
+    private static final float[] NORMAL_BOTTOM = {0.15f, 0.15f, 0.15f, 0.9f};
+    private static final float[] HOVER_TOP = {0.35f, 0.35f, 0.38f, 0.95f};
+    private static final float[] HOVER_BOTTOM = {0.22f, 0.22f, 0.25f, 0.95f};
+    private static final float[] PRESSED_TOP = {0.12f, 0.12f, 0.12f, 0.95f};
+    private static final float[] PRESSED_BOTTOM = {0.18f, 0.18f, 0.18f, 0.95f};
     private static final float[] DISABLED_COLOR = {0.1f, 0.1f, 0.1f, 0.5f};
     private static final float[] TEXT_COLOR = {1.0f, 1.0f, 1.0f, 1.0f};
     private static final float[] DISABLED_TEXT_COLOR = {0.5f, 0.5f, 0.5f, 0.5f};
+    private static final float[] TEXT_SHADOW_COLOR = {0.0f, 0.0f, 0.0f, 0.6f};
     
     private String text;
     private Runnable onClick;
@@ -46,53 +50,74 @@ public class Button extends UIComponent {
     public void render(UIRenderer renderer, FontRenderer fontRenderer) {
         if (!visible) return;
         
-        // Choose color based on state
-        float[] bgColor;
+        // Choose colors based on state with gradient
+        float[] topColor;
+        float[] bottomColor;
         float[] textColor;
         
         if (!enabled) {
-            bgColor = DISABLED_COLOR;
+            topColor = DISABLED_COLOR;
+            bottomColor = DISABLED_COLOR;
             textColor = DISABLED_TEXT_COLOR;
         } else if (pressed) {
-            bgColor = PRESSED_COLOR;
+            topColor = PRESSED_TOP;
+            bottomColor = PRESSED_BOTTOM;
             textColor = TEXT_COLOR;
         } else if (hovered) {
-            // Interpolate between normal and hover color
-            bgColor = new float[4];
+            // Interpolate between normal and hover colors
+            topColor = new float[4];
+            bottomColor = new float[4];
             for (int i = 0; i < 4; i++) {
-                bgColor[i] = NORMAL_COLOR[i] + (HOVER_COLOR[i] - NORMAL_COLOR[i]) * hoverAlpha;
+                topColor[i] = NORMAL_TOP[i] + (HOVER_TOP[i] - NORMAL_TOP[i]) * hoverAlpha;
+                bottomColor[i] = NORMAL_BOTTOM[i] + (HOVER_BOTTOM[i] - NORMAL_BOTTOM[i]) * hoverAlpha;
             }
             textColor = TEXT_COLOR;
         } else {
-            bgColor = NORMAL_COLOR;
+            topColor = NORMAL_TOP;
+            bottomColor = NORMAL_BOTTOM;
             textColor = TEXT_COLOR;
         }
         
-        // Draw background
-        renderer.drawRect(x, y, width, height, bgColor[0], bgColor[1], bgColor[2], bgColor[3]);
+        // Draw gradient background (top half lighter, bottom half darker)
+        renderer.drawRect(x, y, width, height / 2, 
+            topColor[0], topColor[1], topColor[2], topColor[3]);
+        renderer.drawRect(x, y + height / 2, width, height / 2, 
+            bottomColor[0], bottomColor[1], bottomColor[2], bottomColor[3]);
         
-        // Draw border (slightly lighter)
-        float borderBrightness = 0.1f;
-        renderer.drawRect(x, y, width, 2, 
-            bgColor[0] + borderBrightness, bgColor[1] + borderBrightness, 
-            bgColor[2] + borderBrightness, bgColor[3]);
-        renderer.drawRect(x, y + height - 2, width, 2, 
-            bgColor[0] + borderBrightness, bgColor[1] + borderBrightness, 
-            bgColor[2] + borderBrightness, bgColor[3]);
-        renderer.drawRect(x, y, 2, height, 
-            bgColor[0] + borderBrightness, bgColor[1] + borderBrightness, 
-            bgColor[2] + borderBrightness, bgColor[3]);
-        renderer.drawRect(x + width - 2, y, 2, height, 
-            bgColor[0] + borderBrightness, bgColor[1] + borderBrightness, 
-            bgColor[2] + borderBrightness, bgColor[3]);
+        // Draw 3D borders
+        float borderWidth = 2.0f;
+        float highlightMul = pressed ? 0.5f : 1.0f;
+        float shadowMul = pressed ? 1.3f : 1.0f;
         
-        // Draw text (centered)
+        // Top border (highlight)
+        renderer.drawRect(x, y, width, borderWidth, 
+            topColor[0] + 0.15f * highlightMul, topColor[1] + 0.15f * highlightMul, 
+            topColor[2] + 0.15f * highlightMul, topColor[3]);
+        // Left border (highlight)
+        renderer.drawRect(x, y, borderWidth, height, 
+            topColor[0] + 0.12f * highlightMul, topColor[1] + 0.12f * highlightMul, 
+            topColor[2] + 0.12f * highlightMul, topColor[3]);
+        // Bottom border (shadow)
+        renderer.drawRect(x, y + height - borderWidth, width, borderWidth, 
+            bottomColor[0] - 0.08f * shadowMul, bottomColor[1] - 0.08f * shadowMul, 
+            bottomColor[2] - 0.08f * shadowMul, bottomColor[3]);
+        // Right border (shadow)
+        renderer.drawRect(x + width - borderWidth, y, borderWidth, height, 
+            bottomColor[0] - 0.08f * shadowMul, bottomColor[1] - 0.08f * shadowMul, 
+            bottomColor[2] - 0.08f * shadowMul, bottomColor[3]);
+        
+        // Draw text (centered) with shadow
         if (text != null && !text.isEmpty()) {
             float textWidth = fontRenderer.getTextWidth(text);
             float textHeight = fontRenderer.getTextHeight();
             float textX = x + (width - textWidth) / 2;
             float textY = y + (height - textHeight) / 2 + textHeight * 0.7f; // Adjust for baseline
             
+            // Draw shadow
+            fontRenderer.drawText(text, textX + 1.5f, textY + 1.5f, 
+                TEXT_SHADOW_COLOR[0], TEXT_SHADOW_COLOR[1], TEXT_SHADOW_COLOR[2], TEXT_SHADOW_COLOR[3]);
+            
+            // Draw main text
             fontRenderer.drawText(text, textX, textY, 
                 textColor[0], textColor[1], textColor[2], textColor[3]);
         }

@@ -35,6 +35,11 @@ public class Camera {
     private final Matrix4f projectionMatrix;
     private boolean viewMatrixDirty;
     
+    // Head bobbing state
+    private float bobbingTimer = 0.0f;
+    private float bobbingOffset = 0.0f;
+    private boolean isMoving = false;
+    
     /**
      * Creates a new first-person camera.
      * 
@@ -142,13 +147,16 @@ public class Camera {
     /**
      * Returns the view matrix for rendering.
      * Recalculates only if camera has moved/rotated since last call.
+     * Applies head bobbing offset to Y position.
      * 
      * @return View matrix
      */
     public Matrix4f getViewMatrix() {
         if (viewMatrixDirty) {
-            Vector3f target = new Vector3f(position).add(front);
-            viewMatrix.identity().lookAt(position, target, up);
+            // Apply bobbing offset to position
+            Vector3f bobbedPosition = new Vector3f(position.x, position.y + bobbingOffset, position.z);
+            Vector3f target = new Vector3f(bobbedPosition).add(front);
+            viewMatrix.identity().lookAt(bobbedPosition, target, up);
             viewMatrixDirty = false;
         }
         return viewMatrix;
@@ -244,5 +252,104 @@ public class Camera {
      */
     public float getPitch() {
         return pitch;
+    }
+    
+    /**
+     * Updates head bobbing animation based on player movement.
+     * 
+     * @param deltaTime Time since last frame
+     * @param moving Whether the player is currently moving
+     * @param movementSpeed Current movement speed magnitude
+     * @param headBobbingEnabled Whether head bobbing is enabled in settings
+     * @param intensity Head bobbing intensity multiplier from settings
+     */
+    public void updateHeadBobbing(float deltaTime, boolean moving, float movementSpeed, 
+                                 boolean headBobbingEnabled, float intensity) {
+        if (!headBobbingEnabled || intensity <= 0.0f) {
+            // Smoothly return to zero if disabled
+            if (Math.abs(bobbingOffset) > 0.001f) {
+                bobbingOffset *= (1.0f - deltaTime * 5.0f);
+                if (Math.abs(bobbingOffset) < 0.001f) {
+                    bobbingOffset = 0.0f;
+                }
+                viewMatrixDirty = true;
+            }
+            return;
+        }
+        
+        this.isMoving = moving;
+        
+        if (moving && movementSpeed > 0.1f) {
+            // Calculate bobbing frequency based on movement speed
+            float frequency = 4.0f + (movementSpeed * 0.5f);
+            bobbingTimer += deltaTime * frequency;
+            
+            // Keep timer in reasonable range
+            if (bobbingTimer > Math.PI * 2) {
+                bobbingTimer -= (float)(Math.PI * 2);
+            }
+            
+            // Calculate bobbing offset using sine wave
+            float amplitude = 0.08f * intensity;
+            bobbingOffset = (float)(Math.sin(bobbingTimer) * amplitude);
+            viewMatrixDirty = true;
+        } else {
+            // Smoothly return to zero when not moving
+            if (Math.abs(bobbingOffset) > 0.001f) {
+                bobbingOffset *= (1.0f - deltaTime * 8.0f);
+                if (Math.abs(bobbingOffset) < 0.001f) {
+                    bobbingOffset = 0.0f;
+                    bobbingTimer = 0.0f;
+                }
+                viewMatrixDirty = true;
+            }
+        }
+    }
+    
+    /**
+     * Gets the current head bobbing offset.
+     * 
+     * @return Vertical offset from head bobbing
+     */
+    public float getBobbingOffset() {
+        return bobbingOffset;
+    }
+    
+    /**
+     * Sets the camera yaw rotation directly.
+     * 
+     * @param yaw Yaw angle in degrees
+     */
+    public void setYaw(float yaw) {
+        this.yaw = yaw;
+        viewMatrixDirty = true;
+        updateCameraVectors();
+    }
+    
+    /**
+     * Sets the camera pitch rotation directly.
+     * 
+     * @param pitch Pitch angle in degrees (clamped to -89 to 89)
+     */
+    public void setPitch(float pitch) {
+        this.pitch = Math.max(-89.0f, Math.min(89.0f, pitch));
+        viewMatrixDirty = true;
+        updateCameraVectors();
+    }
+    
+    /**
+     * Makes the camera look at a target position.
+     * 
+     * @param target Target position to look at
+     */
+    public void lookAt(Vector3f target) {
+        Vector3f direction = new Vector3f(target).sub(position).normalize();
+        
+        // Calculate yaw and pitch from direction vector
+        float yaw = (float)Math.toDegrees(Math.atan2(direction.z, direction.x));
+        float pitch = (float)Math.toDegrees(Math.asin(-direction.y));
+        
+        setYaw(yaw);
+        setPitch(pitch);
     }
 }

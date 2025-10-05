@@ -737,6 +737,29 @@ public class UIManager {
     }
     
     /**
+     * Gets rendering components needed by MenuWorldRenderer.
+     * 
+     * @return Array containing [ChunkRenderer, SkyRenderer, SunLight] or nulls if unavailable
+     */
+    public Object[] getMenuRenderingComponents() {
+        try {
+            var gameClass = game.getClass();
+            var chunkRendererMethod = gameClass.getMethod("getChunkRenderer");
+            var skyRendererMethod = gameClass.getMethod("getSkyRenderer");
+            var sunLightMethod = gameClass.getMethod("getSunLight");
+            
+            Object chunkRenderer = chunkRendererMethod.invoke(game);
+            Object skyRenderer = skyRendererMethod.invoke(game);
+            Object sunLight = sunLightMethod.invoke(game);
+            
+            return new Object[]{chunkRenderer, skyRenderer, sunLight};
+        } catch (Exception e) {
+            System.err.println("[UIManager] Failed to get rendering components: " + e.getMessage());
+            return new Object[]{null, null, null};
+        }
+    }
+    
+    /**
      * Cleans up UI resources.
      */
     public void cleanup() {
