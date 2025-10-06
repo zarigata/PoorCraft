@@ -68,6 +68,7 @@ public class Game {
     private SunLight sunLight;
     private float timeOfDay;
     private static final float DAY_LENGTH_SECONDS = 600.0f;
+    private boolean externalTimeControlEnabled;
     private GPUCapabilities gpuCapabilities;
     private PerformanceMonitor performanceMonitor;
     private boolean chunkRendererInitialized;
@@ -118,6 +119,7 @@ public class Game {
         this.hotbarScrollRemainder = 0.0;
         this.sunLight = new SunLight();
         this.timeOfDay = 0.25f; // Start early morning
+        this.externalTimeControlEnabled = false;
         this.performanceMonitor = null;
         this.gpuCapabilities = null;
         this.chunkRendererInitialized = false;
@@ -297,9 +299,17 @@ public class Game {
     private void update(float deltaTime) {
         // Update UI
         uiManager.update(deltaTime);
-
-        timeOfDay = (timeOfDay + (deltaTime / DAY_LENGTH_SECONDS)) % 1.0f;
+        
+        // Update time of day (unless external control is enabled)
+        if (!externalTimeControlEnabled) {
+            timeOfDay = (timeOfDay + (deltaTime / DAY_LENGTH_SECONDS)) % 1.0f;
+        }
         updateSkyLighting(timeOfDay);
+        
+        // Update mods after time advancement so they can override time each frame
+        if (modLoader != null) {
+            modLoader.update(deltaTime);
+        }
 
         if (skyRenderer != null) {
             skyRenderer.update(deltaTime);
@@ -786,6 +796,69 @@ public class Game {
      */
     public LuaModLoader getModLoader() {
         return modLoader;
+    }
+    
+    /**
+     * Gets the current game time of day.
+     * 
+     * @return Time of day value (0.0-1.0 range)
+     */
+    public float getTimeOfDay() {
+        return timeOfDay;
+    }
+    
+    /**
+     * Sets the game time of day and updates lighting.
+     * 
+     * @param time Time of day (0.0-1.0 range, clamped)
+     */
+    public void setTimeOfDay(float time) {
+        // Clamp to 0.0-1.0 range
+        this.timeOfDay = Math.max(0.0f, Math.min(1.0f, time));
+        // Update lighting to match new time
+        updateSkyLighting(this.timeOfDay);
+    }
+    
+    /**
+     * Gets the player's current position in the world.
+     * 
+     * @return Player position, or null if player controller is null
+     */
+    public Vector3f getPlayerPosition() {
+        if (playerController != null) {
+            return playerController.getPosition();
+        }
+        return null;
+    }
+    
+    /**
+     * Gets the player controller instance.
+     * 
+     * @return Player controller, or null if not initialized
+     */
+    public PlayerController getPlayerController() {
+        return playerController;
+    }
+    
+    /**
+     * Checks if external time control is enabled.
+     * When enabled, the game will not advance time automatically.
+     * 
+     * @return true if external time control is enabled
+     */
+    public boolean isExternalTimeControlEnabled() {
+        return externalTimeControlEnabled;
+    }
+    
+    /**
+     * Sets whether external time control is enabled.
+     * When enabled, the game will not advance time automatically,
+     * allowing mods to manage time progression.
+     * 
+     * @param enabled true to disable automatic time progression
+     */
+    public void setExternalTimeControlEnabled(boolean enabled) {
+        this.externalTimeControlEnabled = enabled;
     }
     
     /**

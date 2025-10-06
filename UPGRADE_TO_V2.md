@@ -131,7 +131,7 @@ These will be fully implemented in future updates as we integrate necessary Lua 
 
 **"Missing textures"**
 - Check `assets/ui/` has your UI textures
-- Run `python assets/scripts/generate_ui_textures.py` if needed
+- Create UI textures manually (see README 'Required Textures') or use bundled textures. Python scripts were removed in the Lua-only migration.
 
 ### Getting Help
 - Check documentation in `docs/`

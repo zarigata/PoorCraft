@@ -1,5 +1,8 @@
 # Procedural Block Texture Generator Mod
 
+> **⚠️ DEPRECATION NOTICE:**
+> This README documents a prior Python implementation. The current mod is a Lua placeholder; features described here are not implemented yet.
+
 Generates up to 256 unique 16×16 block textures with biome-specific palettes and noise-based variation. Perfect for making PoorCraft feel a little less like a repeating wallpaper.
 
 ## Features

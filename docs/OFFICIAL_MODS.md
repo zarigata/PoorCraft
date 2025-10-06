@@ -1,29 +1,53 @@
 # Official PoorCraft Mods
 
-PoorCraft ships with two showcase mods demonstrating the Python modding workflow: a procedural block texture generator and an AI companion system. Both live in the `mods/` directory and can be toggled or customized independently.
+PoorCraft ships with two showcase mods demonstrating the Lua modding workflow: a procedural block texture generator and an AI companion system. Both live in the `gamedata/mods/` directory and can be toggled or customized independently.
 
-## Procedural Block Texture Generator (`mods/block_texture_generator/`)
+## Procedural Block Texture Generator (`gamedata/mods/block_texture_generator/`)
 
-- **Purpose**: Generate up to 256 procedural block textures using biome-specific color palettes and pattern rules.
+- **Purpose**: Placeholder for future procedural texture generation system.
+- **Current Status**: This mod serves as a Lua implementation placeholder demonstrating mod structure and configuration. Full procedural texture generation requires image processing libraries not available in standard Lua. Future versions may implement this through Java-side image processing with Lua configuration.
 - **Key Features**:
-  - Perlin-style noise, palette-driven shading, and pattern overlays (cracks, blades, grain).
-  - Texture variations stay compatible with `TextureAtlas.getUVsForFace()` naming conventions.
-  - Uses Pillow and numpy; results are pushed to Java via `add_procedural_texture()` before the renderer boots.
-- **Configuration**: `mods/block_texture_generator/config.json` allows tuning of texture counts, variation intensity, palettes, and pattern toggles.
-- **Docs**: See `mods/block_texture_generator/README.md` for detailed usage and troubleshooting tips and notes on block texture generation.
+  - Demonstrates Lua mod lifecycle (`init()`, `enable()`, `disable()`)
+  - Shows configuration loading via `api.get_mod_config()`
+  - Template for future texture generation features
+- **Configuration**: `gamedata/mods/block_texture_generator/mod.json` contains mod metadata and settings.
+- **Docs**: See `gamedata/mods/block_texture_generator/README.md` for notes. Note that the README may reference the old Python implementation.
 
-## AI NPC System (`mods/ai_npc/`)
+## AI NPC System (`gamedata/mods/ai_npc/`)
 
-- **Purpose**: Spawn conversational NPC companions that respond using LLM providers.
+- **Purpose**: Placeholder for AI-powered NPC companion system.
+- **Current Status**: This mod serves as a Lua implementation placeholder demonstrating NPC spawning and management. Full AI integration requires HTTP libraries not available in standard Lua. Future versions may implement this through Java-side HTTP handling with Lua scripting for NPC behavior.
 - **Key Features**:
-  - Provider detection for Ollama, Gemini, OpenRouter, and OpenAI with graceful fallback.
-  - Personality-aware prompts, conversation memoization, and async worker thread for API calls.
-  - Hooks into player join/leave events to manage NPC lifecycle.
-- **Configuration**: `mods/ai_npc/config.json` defines provider credentials, spawn behavior, response timeouts, and personality list.
-- **Docs**: `mods/ai_npc/README.md` covers setup, provider notes, and integration guidelines.
+  - Demonstrates NPC spawning via `api.spawn_npc()`
+  - Shows NPC lifecycle management and cleanup
+  - Example of Lua mod initialization and configuration loading
+  - Table-based state management for tracking spawned NPCs
+- **Configuration**: `gamedata/mods/ai_npc/mod.json` defines mod metadata, spawn behavior, and personality settings.
+- **Docs**: `gamedata/mods/ai_npc/README.md` covers the vision for this mod. Note that the README may reference the old Python implementation.
+
+## Real-Time Synchronization (`gamedata/mods/realtime_sync/`)
+
+- **Purpose**: Synchronizes in-game time with real-world time based on system clock.
+- **Current Status**: Fully functional. Uses the new mod update mechanism to continuously sync game time with real-world time.
+- **Key Features**:
+  - Real-time synchronization using system clock
+  - Configurable time scale multiplier (speed up or slow down time)
+  - Adjustable sync interval for performance tuning
+  - Debug logging for troubleshooting
+  - Demonstrates the new `update(deltaTime)` lifecycle function
+  - Placeholder configuration for future location-based and weather sync features
+- **Configuration**: `gamedata/mods/realtime_sync/mod.json` contains sync settings:
+  - `sync_enabled` - master toggle for time synchronization
+  - `time_scale` - speed multiplier (1.0 = real-time, 2.0 = double speed)
+  - `sync_interval` - seconds between sync updates (default: 60)
+  - `debug_logging` - enable verbose logging
+  - Future: `use_player_location`, `weather_sync_enabled`
+- **Docs**: See `gamedata/mods/realtime_sync/README.md` for detailed information.
+- **Technical Note**: This mod uses the new continuous update mechanism (`mod.update(deltaTime)`) introduced for mods that need per-frame execution.
 
 ## Managing Mods
 
-- **Enable/Disable**: Set `enabled` to `false` in a mod's `config.json` or `mod.json`.
-- **Customization**: Adjust JSON configs or extend the Python modules for deeper changes.
-- **Learning**: These mods double as reference implementations for procedural content and external API integration through the PoorCraft ModAPI.
+- **Enable/Disable**: Set `enabled` to `false` in a mod's `mod.json`.
+- **Customization**: Adjust JSON configs or extend the Lua modules for deeper changes.
+- **Performance**: Some mods (like realtime_sync) use continuous updates and may have performance impact if configured with very low update intervals. Adjust `sync_interval` or similar settings if experiencing performance issues.
+- **Learning**: These mods double as reference implementations for Lua mod structure and demonstrate how to integrate with the PoorCraft ModAPI using Lua.

@@ -1,6 +1,6 @@
 # PoorCraft Modding API Reference
 
-Complete reference for the PoorCraft Python modding API.
+Complete reference for the PoorCraft Lua modding API.
 
 ## Table of Contents
 
@@ -12,338 +12,487 @@ Complete reference for the PoorCraft Python modding API.
 
 ## Core API
 
-### poorcraft.api
+### api (Global Lua Object)
 
-Main API module for accessing game functionality.
+The global `api` object provides all mod functionality. All functions are called as `api.function_name()`.
 
 #### Functions
 
-**`get_mod_api()`**
-- Returns: ModAPI instance
-- Description: Get the main API object (rarely needed, use helper functions instead)
-
-**`get_block(x, y, z)`**
+**`api.get_block(x, y, z)`**
 - Parameters:
-  - `x` (int): X coordinate
-  - `y` (int): Y coordinate
-  - `z` (int): Z coordinate
-- Returns: int (block type ID, 0-255)
+  - `x` (number): X coordinate
+  - `y` (number): Y coordinate
+  - `z` (number): Z coordinate
+- Returns: number (block type ID, 0-255)
 - Description: Get block type at world coordinates
+- Example: `local block = api.get_block(100, 64, 200)`
 
-**`set_block(x, y, z, block_type_id)`**
+**`api.set_block(x, y, z, block_type_id)`**
 - Parameters:
-  - `x` (int): X coordinate
-  - `y` (int): Y coordinate
-  - `z` (int): Z coordinate
-  - `block_type_id` (int): Block type to set (0-255)
-- Returns: None
+  - `x` (number): X coordinate
+  - `y` (number): Y coordinate
+  - `z` (number): Z coordinate
+  - `block_type_id` (number): Block type to set (0-255)
+- Returns: nil
 - Description: Set block type at world coordinates
+- Example: `api.set_block(100, 64, 200, 2)  -- Set to STONE`
 
-**`get_biome(x, z)`**
+**`api.get_biome(x, z)`**
 - Parameters:
-  - `x` (int): X coordinate
-  - `z` (int): Z coordinate
-- Returns: str ("Desert", "Snow", "Jungle", or "Plains")
+  - `x` (number): X coordinate
+  - `z` (number): Z coordinate
+- Returns: string ("Desert", "Snow", "Jungle", or "Plains")
 - Description: Get biome at coordinates
+- Example: `local biome = api.get_biome(100, 200)`
 
-**`get_height_at(x, z)`**
+**`api.get_height_at(x, z)`**
 - Parameters:
-  - `x` (int): X coordinate
-  - `z` (int): Z coordinate
-- Returns: int (Y coordinate of surface)
+  - `x` (number): X coordinate
+  - `z` (number): Z coordinate
+- Returns: number (Y coordinate of surface)
 - Description: Get terrain height at coordinates
+- Example: `local height = api.get_height_at(100, 200)`
 
-**`log(message)`**
+**`api.log(message)`**
 - Parameters:
-  - `message` (str): Message to log
-- Returns: None
+  - `message` (string): Message to log
+- Returns: nil
 - Description: Log message to console with [MOD] prefix
+- Example: `api.log("Hello from my mod!")`
 
-**`is_server()`**
-- Returns: bool
+**`api.is_server()`**
+- Returns: boolean
 - Description: Check if running on server side
+- Example: `if api.is_server() then ... end`
 
-**`set_shared_data(key, value)`**
+**`api.set_shared_data(key, value)`**
 - Parameters:
-  - `key` (str): Data key
-  - `value` (any): Data value
-- Returns: None
+  - `key` (string): Data key
+  - `value` (any): Data value (string, number, table, etc.)
+- Returns: nil
 - Description: Store data accessible to all mods
+- Example: `api.set_shared_data("my_mod.counter", 42)`
 
-**`get_shared_data(key)`**
+**`api.get_shared_data(key)`**
 - Parameters:
-  - `key` (str): Data key
-- Returns: any (stored value or None)
+  - `key` (string): Data key
+- Returns: any (stored value or nil)
 - Description: Retrieve shared data
+- Example: `local counter = api.get_shared_data("my_mod.counter")`
+
+**`api.get_mod_config(mod_id)`**
+- Parameters:
+  - `mod_id` (string): Mod identifier
+- Returns: string (JSON config) or nil
+- Description: Get mod configuration from mod.json as JSON string (legacy)
+- Example: `local config = api.get_mod_config("my_mod")`
+- **Note**: Consider using `api.get_mod_config_table()` for easier access
+
+**`api.get_mod_config_table(mod_id)`**
+- Parameters:
+  - `mod_id` (string): Mod identifier
+- Returns: table (parsed config) or empty table
+- Description: Get mod configuration as a Lua table with direct field access. Automatically handles nested objects and arrays.
+- Example:
+```lua
+local config = api.get_mod_config_table("realtime_sync")
+if config.sync_enabled then
+    api.log("Sync interval: " .. config.sync_interval)
+end
+```
+
+**`api.get_player_position()`**
+- Parameters: none
+- Returns: table with `x`, `y`, `z` fields (numbers), or nil if player not available
+- Description: Get the current player's position in world coordinates. Returns nil when the player controller is not initialized (e.g., before world load).
+- Example:
+```lua
+local pos = api.get_player_position()
+if pos then
+    api.log("Player at: " .. pos.x .. ", " .. pos.y .. ", " .. pos.z)
+else
+    api.log("Player not available")
+end
+```
+
+**`api.get_game_time()`**
+- Parameters: none
+- Returns: number (0.0-1.0 representing time of day), or -1 if not available
+- Description: Get current in-game time (0.0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset, 1.0 = midnight)
+- Example:
+```lua
+local time = api.get_game_time()
+api.log("Game time: " .. time)
+```
+
+**`api.set_game_time(time)`**
+- Parameters:
+  - `time` (number): Time of day (0.0-1.0)
+- Returns: nil
+- Description: Set the in-game time of day. Updates lighting automatically.
+- Example:
+```lua
+api.set_game_time(0.5)  -- Set to noon
+```
+
+**`api.set_time_control_enabled(enabled)`**
+- Parameters:
+  - `enabled` (boolean): true to disable automatic time progression, false to enable
+- Returns: nil
+- Description: Controls whether the game automatically advances time each frame. When enabled (true), automatic time progression stops, allowing mods to fully control time. When disabled (false), normal time progression resumes. Useful for mods that sync game time with real-world time or custom time systems.
+- Example:
+```lua
+-- In mod enable():
+api.set_time_control_enabled(true)  -- Take control of time
+
+-- In mod disable():
+api.set_time_control_enabled(false)  -- Restore auto progression
+```
+
+**`api.get_real_time()`**
+- Parameters: none
+- Returns: number (milliseconds since Unix epoch)
+- Description: Get current real-world system time for synchronization purposes
+- Example:
+```lua
+local millis = api.get_real_time()
+api.log("Real time: " .. millis)
+```
+
+**`api.get_weather()`**
+- Parameters: none
+- Returns: string (weather status), currently always "clear"
+- Description: Get current weather status. Placeholder for future weather system.
+- Example:
+```lua
+local weather = api.get_weather()
+api.log("Weather: " .. weather)
+```
 
 ## Event System
 
-### poorcraft.events
+### Event Registration
 
-Event decorators and registration functions.
+Use `api.register_event()` to listen for game events. Events are identified by string names.
 
-#### Decorators
+#### Available Events
 
-**`@on_block_place`**
-- Event: BlockPlaceEvent
+**`block_place`**
+- Event Object: BlockPlaceEvent
 - Description: Called when a block is placed
 - Cancellable: Yes
+- Example:
+```lua
+api.register_event('block_place', function(event)
+    api.log("Block placed at " .. event.x .. ", " .. event.y .. ", " .. event.z)
+end)
+```
 
-**`@on_block_break`**
-- Event: BlockBreakEvent
+**`block_break`**
+- Event Object: BlockBreakEvent
 - Description: Called when a block is broken
 - Cancellable: Yes
+- Example:
+```lua
+api.register_event('block_break', function(event)
+    api.log("Block broken!")
+end)
+```
 
-**`@on_player_join`**
-- Event: PlayerJoinEvent
+**`player_join`**
+- Event Object: PlayerJoinEvent
 - Description: Called when a player joins
 - Cancellable: No
+- Example:
+```lua
+api.register_event('player_join', function(event)
+    api.log(event.username .. " joined the game")
+end)
+```
 
-**`@on_player_leave`**
-- Event: PlayerLeaveEvent
+**`player_leave`**
+- Event Object: PlayerLeaveEvent
 - Description: Called when a player leaves
 - Cancellable: No
 
-**`@on_chunk_generate`**
-- Event: ChunkGenerateEvent
+**`chunk_generate`**
+- Event Object: ChunkGenerateEvent
 - Description: Called when a chunk is generated
 - Cancellable: No
 
-**`@on_world_load`**
-- Event: WorldLoadEvent
+**`world_load`**
+- Event Object: WorldLoadEvent
 - Description: Called when a world is loaded
 - Cancellable: No
 
 #### Functions
 
-**`register_event(event_name, callback)`**
+**`api.register_event(event_name, callback)`**
 - Parameters:
-  - `event_name` (str): Event name
-  - `callback` (callable): Function to call
-- Returns: None
-- Description: Register event handler manually
+  - `event_name` (string): Event name (see list above)
+  - `callback` (function): Function to call when event fires
+- Returns: nil
+- Description: Register event handler
+- Example:
+```lua
+api.register_event('block_place', function(event)
+    if event.block_type_id == 1 then
+        api.log("Dirt placed!")
+    end
+end)
+```
 
-**`unregister_event(event_name, callback)`**
+**`api.unregister_event(event_name, callback)`**
 - Parameters:
-  - `event_name` (str): Event name
-  - `callback` (callable): Function to unregister
-- Returns: None
-- Description: Unregister event handler
+  - `event_name` (string): Event name
+  - `callback` (function): Function to unregister
+- Returns: nil
+- Description: Unregister event handler (rarely needed)
 
 ## World Access
 
-### poorcraft.world
+### Block Types
 
-World, chunk, and block access.
+Block types are identified by numeric IDs. Define constants in your mod for readability:
 
-#### Classes
+```lua
+local BlockType = {
+    AIR = 0,
+    DIRT = 1,
+    STONE = 2,
+    GRASS = 3,
+    SAND = 4,
+    SANDSTONE = 5,
+    SNOW_BLOCK = 6,
+    ICE = 7,
+    JUNGLE_GRASS = 8,
+    JUNGLE_DIRT = 9,
+    WOOD = 10,
+    LEAVES = 11,
+    CACTUS = 12,
+    SNOW_LAYER = 13,
+    BEDROCK = 14
+}
 
-**`BlockType`**
+-- Usage
+api.set_block(100, 64, 200, BlockType.STONE)
+```
 
-Block type constants:
-- `AIR = 0`
-- `DIRT = 1`
-- `STONE = 2`
-- `GRASS = 3`
-- `SAND = 4`
-- `SANDSTONE = 5`
-- `SNOW_BLOCK = 6`
-- `ICE = 7`
-- `JUNGLE_GRASS = 8`
-- `JUNGLE_DIRT = 9`
-- `WOOD = 10`
-- `LEAVES = 11`
-- `CACTUS = 12`
-- `SNOW_LAYER = 13`
-- `BEDROCK = 14`
+### World Functions
 
-Methods:
-- `from_id(id)`: Convert ID to name
-- `to_id(name)`: Convert name to ID
+All world access is done through the global `api` object:
 
-**`World`**
+**Getting Blocks:**
+```lua
+local block_id = api.get_block(x, y, z)
+if block_id == 2 then
+    api.log("Found stone!")
+end
+```
 
-Represents the game world.
+**Setting Blocks:**
+```lua
+api.set_block(x, y, z, 1)  -- Place dirt
+```
 
-Methods:
-- `get_block(x, y, z)`: Get block at coordinates
-- `set_block(x, y, z, type_id)`: Set block at coordinates
-- `get_biome(x, z)`: Get biome at coordinates
-- `get_height_at(x, z)`: Get terrain height
-- `get_chunk(chunk_x, chunk_z)`: Get chunk object
+**Biome Information:**
+```lua
+local biome = api.get_biome(x, z)
+api.log("Biome: " .. biome)
+```
 
-**`Chunk`**
+**Terrain Height:**
+```lua
+local surface_y = api.get_height_at(x, z)
+api.log("Surface at Y: " .. surface_y)
+```
 
-Represents a 16×256×16 chunk.
+### Chunk Access
 
-Properties:
-- `chunk_x` (int): Chunk X coordinate
-- `chunk_z` (int): Chunk Z coordinate
-
-Methods:
-- `get_block(local_x, local_y, local_z)`: Get block in chunk
-- `set_block(local_x, local_y, local_z, type_id)`: Set block in chunk
-- `fill(type_id)`: Fill entire chunk
-- `fill_layer(y, type_id)`: Fill horizontal layer
-
-#### Functions
-
-**`get_world()`**
-- Returns: World instance
-- Description: Get world singleton
+Chunk manipulation is primarily done through events (see `chunk_generate` event). Direct chunk access methods may be added in future versions.
 
 ## Entity Management
 
-### poorcraft.entity
+### NPC Functions
 
-Entity access and management (placeholder for future expansion).
+NPC management is handled through the API. Entity system is primarily Java-side with Lua hooks.
 
-#### Classes
-
-**`Entity`**
-
-Base entity class.
-
-Properties:
-- `entity_id` (int): Unique entity ID
-- `x`, `y`, `z` (float): Position
-- `yaw`, `pitch` (float): Rotation
-
-Methods:
-- `get_position()`: Return (x, y, z) tuple
-- `set_position(x, y, z)`: Set position
-- `get_rotation()`: Return (yaw, pitch) tuple
-- `set_rotation(yaw, pitch)`: Set rotation
-
-**`Player(Entity)`**
-
-Player entity.
-
-Additional properties:
-- `username` (str): Player username
-- `player_id` (int): Player ID
-
-Methods:
-- `teleport(x, y, z)`: Teleport player
-
-**`NPC(Entity)`**
-
-AI NPC entity.
-
-Additional properties:
-- `personality` (str): NPC personality
-- `conversation_context` (dict): Conversation state
-
-Methods:
-- `spawn(x, y, z)`: Spawn NPC
-- `despawn()`: Remove NPC
-- `say(message)`: Make NPC say something
-
-#### Functions
-
-**`get_players()`**
-- Returns: list[Player]
-- Description: Get all online players
-
-**`get_player_by_id(player_id)`**
+**`api.spawn_npc(npc_id, name, x, y, z, personality)`**
 - Parameters:
-  - `player_id` (int): Player ID
-- Returns: Player or None
-- Description: Get player by ID
+  - `npc_id` (number): Unique NPC identifier
+  - `name` (string): NPC display name
+  - `x`, `y`, `z` (number): Spawn position
+  - `personality` (string): NPC personality/behavior type
+- Returns: nil
+- Description: Spawn an NPC at the specified position
+- Example:
+```lua
+api.spawn_npc(1, "Steve", 100.0, 65.0, 100.0, "friendly villager")
+```
 
-**`spawn_entity(entity_type, x, y, z)`**
+**`api.despawn_npc(npc_id)`**
 - Parameters:
-  - `entity_type` (str): Entity type
-  - `x`, `y`, `z` (float): Position
-- Returns: Entity
-- Description: Spawn entity at position
+  - `npc_id` (number): NPC identifier to remove
+- Returns: nil
+- Description: Remove an NPC from the world
+- Example:
+```lua
+api.despawn_npc(1)
+```
 
-## Utility Functions
+### Player Information
 
-### poorcraft.mod
+Player data is accessible through events. See `player_join` and `player_leave` events for player information.
 
-Base mod class and utilities.
+### Future Expansion
 
-#### Classes
+Additional entity management functions (teleportation, inventory access, etc.) may be added in future versions. Check the event system for entity-related events.
 
-**`BaseMod`**
+## Mod Structure
 
-Base class for mods.
+### Lua Mod Pattern
 
-Constructor:
-- `__init__(mod_id, mod_name, mod_version, config)`
+All Lua mods should follow this structure:
 
-Methods:
-- `init()`: Initialize mod (override)
-- `enable()`: Enable mod (override)
-- `disable()`: Disable mod (override)
-- `get_config(key, default=None)`: Get config value
-- `log(message)`: Log with mod name prefix
+```lua
+-- Create mod table
+local mod = {}
 
-Example:
-```python
-from poorcraft import BaseMod
-
-class MyMod(BaseMod):
-    def init(self):
-        self.log("Initializing")
+-- Initialize function (called when mod loads)
+function mod.init()
+    api.log("Initializing mod...")
     
-    def enable(self):
-        self.log("Enabled")
+    -- Load config
+    local config = api.get_mod_config("my_mod")
     
-    def disable(self):
-        self.log("Disabled")
+    -- Register events
+    api.register_event('block_place', function(event)
+        api.log("Block placed!")
+    end)
+end
+
+-- Enable function (called when mod is enabled)
+function mod.enable()
+    api.log("Mod enabled")
+end
+
+-- Disable function (called when mod is disabled)
+function mod.disable()
+    api.log("Mod disabled")
+    -- Cleanup code here
+end
+
+-- Update function (optional, called every frame)
+function mod.update(deltaTime)
+    -- deltaTime is in seconds (e.g., 0.016 for 60 FPS)
+    -- Use this for continuous logic like animations or time sync
+end
+
+-- Return mod table so functions can be called
+return mod
+```
+
+### Lifecycle Methods
+
+- **`mod.init()`**: Called once when the mod is first loaded. Use this to register events and load configuration.
+- **`mod.enable()`**: Called when the mod is enabled. Use this to start mod functionality.
+- **`mod.disable()`**: Called when the mod is disabled. Use this for cleanup (despawning entities, etc.).
+- **`mod.update(deltaTime)`** (Optional): Called every frame if defined. The `deltaTime` parameter is the time since last frame in seconds (typically ~0.016 for 60 FPS). Use this for continuous mod logic that needs per-frame execution (animations, time synchronization, etc.). Keep update functions lightweight to avoid performance issues. Mods without an update function have zero performance overhead.
+
+**Update Function Example**:
+```lua
+local timer = 0
+function mod.update(deltaTime)
+    timer = timer + deltaTime
+    if timer >= 1.0 then  -- Run every second
+        api.log("One second passed")
+        timer = 0
+    end
+end
+```
+
+### Module Organization
+
+For larger mods, you can organize code into multiple files:
+
+```lua
+-- main.lua
+local helpers = require("my_mod.helpers")
+local mod = {}
+
+function mod.init()
+    helpers.setup()
+end
+
+return mod
 ```
 
 ## Event Objects
 
 ### BlockPlaceEvent
 
-Properties:
-- `x`, `y`, `z` (int): Block coordinates
-- `block_type_id` (int): Block type being placed
-- `player_id` (int): Player placing block (-1 if not player)
+Accessed in Lua as a table with these fields:
 
-Methods:
-- `cancel()`: Prevent block placement
-- `is_cancelled()`: Check if cancelled
+- `event.x`, `event.y`, `event.z` (number): Block coordinates
+- `event.block_type_id` (number): Block type being placed (0-255)
+- `event.player_id` (number): Player placing block (-1 if not player)
+- `event.cancel()` (function): Call to prevent block placement
+
+Example:
+```lua
+api.register_event('block_place', function(event)
+    if event.block_type_id == 1 then  -- Dirt
+        event.cancel()
+        api.log("Dirt placement prevented!")
+    end
+end)
+```
 
 ### BlockBreakEvent
 
-Properties:
-- `x`, `y`, `z` (int): Block coordinates
-- `block_type_id` (int): Block type being broken
-- `player_id` (int): Player breaking block (-1 if not player)
+Accessed in Lua as a table with these fields:
 
-Methods:
-- `cancel()`: Prevent block breaking
-- `is_cancelled()`: Check if cancelled
+- `event.x`, `event.y`, `event.z` (number): Block coordinates
+- `event.block_type_id` (number): Block type being broken (0-255)
+- `event.player_id` (number): Player breaking block (-1 if not player)
+- `event.cancel()` (function): Call to prevent block breaking
 
 ### PlayerJoinEvent
 
-Properties:
-- `player_id` (int): Player ID
-- `username` (str): Player username
-- `x`, `y`, `z` (float): Spawn position
+Accessed in Lua as a table with these fields:
+
+- `event.player_id` (number): Player ID
+- `event.username` (string): Player username
+- `event.x`, `event.y`, `event.z` (number): Spawn position
+
+Example:
+```lua
+api.register_event('player_join', function(event)
+    api.log(event.username .. " joined at " .. event.x .. ", " .. event.y .. ", " .. event.z)
+end)
+```
 
 ### PlayerLeaveEvent
 
-Properties:
-- `player_id` (int): Player ID
-- `username` (str): Player username
-- `reason` (str): Disconnect reason
+Accessed in Lua as a table with these fields:
+
+- `event.player_id` (number): Player ID
+- `event.username` (string): Player username
+- `event.reason` (string): Disconnect reason
 
 ### ChunkGenerateEvent
 
-Properties:
-- `chunk_x`, `chunk_z` (int): Chunk coordinates
-- `chunk` (Chunk): Chunk object (can modify)
+Accessed in Lua as a table with these fields:
+
+- `event.chunk_x`, `event.chunk_z` (number): Chunk coordinates
+- `event.chunk` (userdata): Chunk object (advanced usage)
 
 ### WorldLoadEvent
 
-Properties:
-- `seed` (long): World seed
-- `generate_structures` (bool): Whether structures are enabled
+Accessed in Lua as a table with these fields:
+
+- `event.seed` (number): World seed
+- `event.generate_structures` (boolean): Whether structures are enabled
 
 ## Type Reference
 

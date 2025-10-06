@@ -15,8 +15,8 @@ A free, open-source Minecraft clone that empowers players to create, modify and 
 - **Animated Menu Backgrounds**: 3D world rendering in menus (Minecraft-style) ✅ **IMPLEMENTED**
 - **Head Bobbing**: Customizable camera bobbing during movement ✅ **IMPLEMENTED**
 - **Configuration**: JSON-based settings with in-game editor ✅ **IMPLEMENTED**
-- **Procedural Textures**: Up to 256 unique block skin variations ✅ **IMPLEMENTED** (Procedural Block Texture Generator mod)
-- **AI NPCs**: Conversational NPCs powered by LLMs ✅ **IMPLEMENTED** (AI NPC mod)
+- **Procedural Textures**: Up to 256 unique block skin variations ⚠️ **PLACEHOLDER/EXPERIMENTAL** (Procedural Block Texture Generator mod - Lua placeholder, requires image processing library integration)
+- **AI NPCs**: Conversational NPCs powered by LLMs ⚠️ **PLACEHOLDER/EXPERIMENTAL** (AI NPC mod - Lua placeholder, requires HTTP library integration)
 - **Modding**: Lua-based modding system ✅ **IMPLEMENTED**
 
 ## Requirements
@@ -74,11 +74,11 @@ PoorCraft ships with example mods to demonstrate the Lua modding system:
   - Simple demonstration of Lua mod structure
   - Shows basic API usage and mod lifecycle
 - **Procedural Block Texture Generator** (`gamedata/mods/block_texture_generator/`)
-  - Placeholder for procedural texture generation (requires image processing library)
-  - Demonstrates mod structure and configuration
+  - Placeholder for procedural texture generation (requires image processing library integration with Java)
+  - Demonstrates Lua mod structure and configuration
 - **AI NPC System** (`gamedata/mods/ai_npc/`)
-  - Placeholder for AI-powered NPCs (requires HTTP library integration)
-  - Shows NPC spawning and management API
+  - Placeholder for AI-powered NPCs (requires HTTP library integration with Java)
+  - Shows NPC spawning and management using Lua API
 
 Configuration:
 - Edit each mod's `mod.json` to configure settings
@@ -112,12 +112,7 @@ PoorCraft uses a flexible UI asset system that supports both filesystem and clas
 - `xp_bar_fill.png` (360x10) - XP bar fill
 
 ### Generating Textures
-Run the included Python script to generate placeholder textures:
-```bash
-python assets/scripts/generate_ui_textures.py
-```
-
-This creates simple, Minecraft-style textures that can be customized later.
+UI textures should be created manually using image editing software or are already included in the project. The texture generation scripts have been removed as part of the migration to a Lua-only modding system. See the **Required Textures** section above for texture specifications.
 
 ## UI Customization
 

@@ -1,5 +1,8 @@
 # AI NPC System Mod
 
+> **⚠️ DEPRECATION NOTICE:**
+> This README documents a prior Python implementation. The current mod is a Lua placeholder; features described here are not implemented yet.
+
 Conversational NPCs for PoorCraft powered by multiple LLM providers. Spawns buddies when players join and keeps the chat flowing using a background worker thread.
 
 ## Features

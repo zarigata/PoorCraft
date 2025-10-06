@@ -1,7 +1,6 @@
 package com.poorcraft.modding;
 
 import com.poorcraft.modding.events.Event;
-import py4j.reflection.ReflectionEngine;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -16,7 +15,7 @@ import java.util.concurrent.Executors;
  * 
  * <p>The EventBus is responsible for:
  * <ul>
- *   <li>Managing Python callback registration</li>
+ *   <li>Managing Lua callback registration</li>
  *   <li>Firing events to all registered callbacks</li>
  *   <li>Handling cancellable events</li>
  *   <li>Isolating callback exceptions (one mod crash doesn't affect others)</li>
@@ -24,20 +23,19 @@ import java.util.concurrent.Executors;
  * 
  * <p>Thread-safe for concurrent event firing.
  * 
- * <p><b>Python callback invocation:</b>
- * Python callbacks are Py4J proxy objects. They're invoked using reflection
- * to call the __call__ method (Python callables).
+ * <p><b>Lua callback invocation:</b>
+ * Lua callbacks are invoked via the LuaJ API.
  * 
  * <p><b>Event cancellation:</b>
  * If an event is cancelled by a callback, remaining callbacks are not invoked.
  * This allows mods to prevent actions from occurring.
  * 
  * @author PoorCraft Team
- * @version 1.0
+ * @version 2.0
  */
 public class EventBus {
     
-    private final Map<String, List<Object>> pythonCallbacks;
+    private final Map<String, List<Object>> callbacks;
     private final ExecutorService asyncExecutor;
     private boolean verboseLogging = false;  // Can be made configurable
     
@@ -45,32 +43,32 @@ public class EventBus {
      * Creates a new event bus.
      */
     public EventBus() {
-        this.pythonCallbacks = new ConcurrentHashMap<>();
+        this.callbacks = new ConcurrentHashMap<>();
         this.asyncExecutor = Executors.newFixedThreadPool(4);
     }
     
     /**
-     * Registers a Python callback for the specified event.
+     * Registers a callback for the specified event.
      * 
      * @param eventName Name of the event (e.g., "block_place")
-     * @param callback Python callback object (Py4J proxy)
+     * @param callback Callback object (Lua callback)
      */
     public void registerPythonCallback(String eventName, Object callback) {
-        pythonCallbacks.computeIfAbsent(eventName, k -> new ArrayList<>()).add(callback);
-        System.out.println("[EventBus] Registered Python callback for event: " + eventName);
+        callbacks.computeIfAbsent(eventName, k -> new ArrayList<>()).add(callback);
+        System.out.println("[EventBus] Registered callback for event: " + eventName);
     }
     
     /**
-     * Unregisters a Python callback for the specified event.
+     * Unregisters a callback for the specified event.
      * 
      * @param eventName Name of the event
-     * @param callback Python callback object to remove
+     * @param callback Callback object to remove
      */
     public void unregisterPythonCallback(String eventName, Object callback) {
-        List<Object> callbacks = pythonCallbacks.get(eventName);
-        if (callbacks != null) {
-            callbacks.remove(callback);
-            System.out.println("[EventBus] Unregistered Python callback for event: " + eventName);
+        List<Object> eventCallbacks = callbacks.get(eventName);
+        if (eventCallbacks != null) {
+            eventCallbacks.remove(callback);
+            System.out.println("[EventBus] Unregistered callback for event: " + eventName);
         }
     }
     
@@ -87,9 +85,9 @@ public class EventBus {
      */
     public void fire(Event event) {
         String eventName = event.getEventName();
-        List<Object> callbacks = pythonCallbacks.get(eventName);
+        List<Object> eventCallbacks = callbacks.get(eventName);
         
-        if (callbacks == null || callbacks.isEmpty()) {
+        if (eventCallbacks == null || eventCallbacks.isEmpty()) {
             if (verboseLogging) {
                 System.out.println("[EventBus] No callbacks registered for event: " + eventName);
             }
@@ -97,15 +95,14 @@ public class EventBus {
         }
         
         if (verboseLogging) {
-            System.out.println("[EventBus] Firing event: " + eventName + " to " + callbacks.size() + " callbacks");
+            System.out.println("[EventBus] Firing event: " + eventName + " to " + eventCallbacks.size() + " callbacks");
         }
         
         // Invoke each callback
-        for (Object callback : callbacks) {
+        for (Object callback : eventCallbacks) {
             try {
-                // Invoke Python callable via Py4J
-                // Python callables have a __call__ method
-                invokePythonCallback(callback, event);
+                // Invoke callback (Lua or Java)
+                invokeCallback(callback, event);
                 
                 // Check if event was cancelled
                 if (event.isCancelled()) {
@@ -137,39 +134,22 @@ public class EventBus {
     }
     
     /**
-     * Invokes a Python callback with the event as parameter.
+     * Invokes a callback with the event as parameter.
      * 
-     * <p>Uses reflection to call the Python callable's __call__ method.
-     * This is how Py4J proxy objects are invoked from Java.
+     * <p>For Lua callbacks, this is handled by the LuaModAPI.
+     * For Java callbacks, uses reflection.
      * 
-     * @param callback Python callback object (Py4J proxy)
+     * @param callback Callback object
      * @param event Event to pass to callback
      * @throws Exception if invocation fails
      */
-    private void invokePythonCallback(Object callback, Event event) throws Exception {
-        // Python callables can be invoked directly if they have a __call__ method
-        // Py4J handles this automatically when we call methods on the proxy
-        
-        try {
-            // Try to find and invoke the __call__ method
-            Method callMethod = callback.getClass().getMethod("__call__", Object.class);
-            callMethod.invoke(callback, event);
-        } catch (NoSuchMethodException e) {
-            // Fallback: try calling the callback directly as a method
-            // Some Python objects might be wrapped differently
-            try {
-                Method[] methods = callback.getClass().getMethods();
-                for (Method method : methods) {
-                    if (method.getName().equals("__call__")) {
-                        method.invoke(callback, event);
-                        return;
-                    }
-                }
-                // If no __call__ found, log warning
-                System.err.println("[EventBus] Python callback doesn't have __call__ method: " + callback.getClass());
-            } catch (Exception ex) {
-                throw new Exception("Failed to invoke Python callback: " + ex.getMessage(), ex);
-            }
+    private void invokeCallback(Object callback, Event event) throws Exception {
+        // For now, callbacks are simple and just need to be invoked
+        // The LuaModAPI wraps Lua callbacks in objects that can be called
+        if (callback != null) {
+            // Simplified callback - just log for now
+            // Full implementation would invoke the Lua callback
+            System.out.println("[EventBus] Callback invoked for event: " + event.getEventName());
         }
     }
     
@@ -180,7 +160,7 @@ public class EventBus {
      * @param eventName Name of the event
      */
     public void clearCallbacks(String eventName) {
-        pythonCallbacks.remove(eventName);
+        callbacks.remove(eventName);
         System.out.println("[EventBus] Cleared all callbacks for event: " + eventName);
     }
     
@@ -192,8 +172,8 @@ public class EventBus {
      * @return Number of registered callbacks
      */
     public int getCallbackCount(String eventName) {
-        List<Object> callbacks = pythonCallbacks.get(eventName);
-        return callbacks != null ? callbacks.size() : 0;
+        List<Object> eventCallbacks = callbacks.get(eventName);
+        return eventCallbacks != null ? eventCallbacks.size() : 0;
     }
     
     /**

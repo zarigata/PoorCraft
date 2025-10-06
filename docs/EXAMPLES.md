@@ -18,8 +18,8 @@ The simplest possible mod.
 ### Step 1: Create Directory
 
 ```bash
-mkdir mods/hello_world
-cd mods/hello_world
+mkdir gamedata/mods/hello_world
+cd gamedata/mods/hello_world
 ```
 
 ### Step 2: Create mod.json
@@ -31,25 +31,24 @@ cd mods/hello_world
   "version": "1.0.0",
   "description": "My first mod",
   "author": "Your Name",
-  "main": "hello_world.main",
+  "main": "main.lua",
   "enabled": true
 }
 ```
 
-### Step 3: Create main.py
+### Step 3: Create main.lua
 
-```python
-from poorcraft import log
+```lua
+local mod = {}
 
-def init():
-    log("Hello, PoorCraft!")
+function mod.init()
+    api.log("Hello, PoorCraft!")
+end
+
+return mod
 ```
 
-### Step 4: Create __init__.py
-
-Create empty file.
-
-### Step 5: Run
+### Step 4: Run
 
 Start PoorCraft and check console for "Hello, PoorCraft!" message.
 
@@ -69,7 +68,7 @@ Logs all block placements and breaks.
   "version": "1.0.0",
   "description": "Logs all block changes",
   "author": "Your Name",
-  "main": "block_logger.main",
+  "main": "main.lua",
   "enabled": true,
   "config": {
     "log_to_file": false
@@ -77,27 +76,32 @@ Logs all block placements and breaks.
 }
 ```
 
-**main.py**:
-```python
-from poorcraft import log, on_block_place, on_block_break
-from poorcraft.world import BlockType
+**main.lua**:
+```lua
+local mod = {}
 
-def init():
-    log("Block Logger initialized")
+function mod.init()
+    api.log("Block Logger initialized")
+    
+    -- Register event handlers
+    api.register_event("block_place", function(event)
+        local block_name = event.block_type_id  -- Block type ID
+        api.log("[PLACE] Block " .. block_name .. " at (" .. event.x .. ", " .. event.y .. ", " .. event.z .. ")")
+        if event.player_id ~= -1 then
+            api.log("  by player " .. event.player_id)
+        end
+    end)
+    
+    api.register_event("block_break", function(event)
+        local block_name = event.block_type_id  -- Block type ID
+        api.log("[BREAK] Block " .. block_name .. " at (" .. event.x .. ", " .. event.y .. ", " .. event.z .. ")")
+        if event.player_id ~= -1 then
+            api.log("  by player " .. event.player_id)
+        end
+    end)
+end
 
-@on_block_place
-def log_placement(event):
-    block_name = BlockType.from_id(event.block_type_id)
-    log(f"[PLACE] {block_name} at ({event.x}, {event.y}, {event.z})")
-    if event.player_id != -1:
-        log(f"  by player {event.player_id}")
-
-@on_block_break
-def log_break(event):
-    block_name = BlockType.from_id(event.block_type_id)
-    log(f"[BREAK] {block_name} at ({event.x}, {event.y}, {event.z})")
-    if event.player_id != -1:
-        log(f"  by player {event.player_id}")
+return mod
 ```
 
 ### What It Does
@@ -105,7 +109,7 @@ def log_break(event):
 - Logs every block placement with coordinates and block type
 - Logs every block break with coordinates and block type
 - Shows player ID if player-initiated
-- Uses BlockType.from_id() to convert ID to readable name
+- Uses Lua event registration with `api.register_event()`
 
 ---
 
@@ -123,7 +127,7 @@ Adds custom ore veins during chunk generation.
   "version": "1.0.0",
   "description": "Adds custom ore veins",
   "author": "Your Name",
-  "main": "ore_generator.main",
+  "main": "main.lua",
   "enabled": true,
   "config": {
     "ore_type": 2,
@@ -135,48 +139,50 @@ Adds custom ore veins during chunk generation.
 }
 ```
 
-**main.py**:
-```python
-from poorcraft import log, on_chunk_generate
-from poorcraft.world import BlockType
-import random
+**main.lua**:
+```lua
+local mod = {}
+local config = {}
 
-config = {}
-
-def init():
-    global config
-    # Config is passed by mod loader
-    log("Ore Generator initialized")
-
-@on_chunk_generate
-def generate_ore_veins(event):
-    chunk = event.chunk
+function mod.init()
+    config = api.get_mod_config() or {}
+    api.log("Ore Generator initialized")
     
-    # Generate multiple ore veins
-    for _ in range(config.get('veins_per_chunk', 5)):
-        # Random starting position
-        start_x = random.randint(0, 15)
-        start_y = random.randint(
-            config.get('min_height', 5),
-            config.get('max_height', 50)
-        )
-        start_z = random.randint(0, 15)
+    -- Register chunk generation event
+    api.register_event("chunk_generate", function(event)
+        local veins_per_chunk = config.veins_per_chunk or 5
         
-        # Generate vein
-        vein_size = config.get('vein_size', 8)
-        ore_type = config.get('ore_type', BlockType.STONE)
-        
-        for i in range(vein_size):
-            # Random walk from starting position
-            x = start_x + random.randint(-2, 2)
-            y = start_y + random.randint(-1, 1)
-            z = start_z + random.randint(-2, 2)
+        -- Generate multiple ore veins
+        for i = 1, veins_per_chunk do
+            -- Random starting position
+            local start_x = math.random(0, 15)
+            local start_y = math.random(config.min_height or 5, config.max_height or 50)
+            local start_z = math.random(0, 15)
             
-            # Bounds check
-            if 0 <= x < 16 and 0 <= y < 256 and 0 <= z < 16:
-                # Only replace stone
-                if chunk.get_block(x, y, z) == BlockType.STONE:
-                    chunk.set_block(x, y, z, ore_type)
+            -- Generate vein
+            local vein_size = config.vein_size or 8
+            local ore_type = config.ore_type or 1  -- STONE type
+            
+            for j = 1, vein_size do
+                -- Random walk from starting position
+                local x = start_x + math.random(-2, 2)
+                local y = start_y + math.random(-1, 1)
+                local z = start_z + math.random(-2, 2)
+                
+                -- Bounds check
+                if x >= 0 and x < 16 and y >= 0 and y < 256 and z >= 0 and z < 16 then
+                    -- Only replace stone (type 1)
+                    local current_block = api.get_block(event.chunk_x * 16 + x, y, event.chunk_z * 16 + z)
+                    if current_block == 1 then
+                        api.set_block(event.chunk_x * 16 + x, y, event.chunk_z * 16 + z, ore_type)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+return mod
 ```
 
 ### What It Does
@@ -202,58 +208,71 @@ Tracks player join/leave and maintains online player list.
   "version": "1.0.0",
   "description": "Tracks online players",
   "author": "Your Name",
-  "main": "player_tracker.main",
+  "main": "main.lua",
   "enabled": true,
   "server_only": true
 }
 ```
 
-**main.py**:
-```python
-from poorcraft import log, on_player_join, on_player_leave, is_server
-from datetime import datetime
+**main.lua**:
+```lua
+local mod = {}
+local online_players = {}
 
-online_players = {}
-
-def init():
-    if not is_server():
-        return
-    log("Player Tracker initialized (server-only)")
-
-@on_player_join
-def track_join(event):
-    player_data = {
-        'username': event.username,
-        'join_time': datetime.now(),
-        'spawn_pos': (event.x, event.y, event.z)
-    }
-    online_players[event.player_id] = player_data
+function mod.init()
+    api.log("Player Tracker initialized")
     
-    log(f"Player {event.username} joined")
-    log(f"  ID: {event.player_id}")
-    log(f"  Spawn: ({event.x:.1f}, {event.y:.1f}, {event.z:.1f})")
-    log(f"  Online players: {len(online_players)}")
-
-@on_player_leave
-def track_leave(event):
-    if event.player_id in online_players:
-        player_data = online_players[event.player_id]
-        join_time = player_data['join_time']
-        session_duration = datetime.now() - join_time
+    -- Register player join event
+    api.register_event("player_join", function(event)
+        local player_data = {
+            username = event.username,
+            join_time = os.time(),
+            spawn_pos = {x = event.x, y = event.y, z = event.z}
+        }
+        online_players[event.player_id] = player_data
         
-        log(f"Player {event.username} left")
-        log(f"  Reason: {event.reason}")
-        log(f"  Session duration: {session_duration}")
+        api.log("Player " .. event.username .. " joined")
+        api.log("  ID: " .. event.player_id)
+        api.log("  Spawn: (" .. event.x .. ", " .. event.y .. ", " .. event.z .. ")")
         
-        del online_players[event.player_id]
+        local count = 0
+        for _ in pairs(online_players) do count = count + 1 end
+        api.log("  Online players: " .. count)
+    end)
     
-    log(f"  Online players: {len(online_players)}")
+    -- Register player leave event
+    api.register_event("player_leave", function(event)
+        if online_players[event.player_id] then
+            local player_data = online_players[event.player_id]
+            local session_duration = os.time() - player_data.join_time
+            
+            api.log("Player " .. event.username .. " left")
+            api.log("  Session duration: " .. session_duration .. " seconds")
+            
+            online_players[event.player_id] = nil
+        end
+        
+        local count = 0
+        for _ in pairs(online_players) do count = count + 1 end
+        api.log("  Online players: " .. count)
+    end)
+end
 
-def get_online_count():
-    return len(online_players)
+function mod.get_online_count()
+    local count = 0
+    for _ in pairs(online_players) do count = count + 1 end
+    return count
+end
 
-def get_online_players():
-    return [p['username'] for p in online_players.values()]
+function mod.get_online_players()
+    local players = {}
+    for _, data in pairs(online_players) do
+        table.insert(players, data.username)
+    end
+    return players
+end
+
+return mod
 ```
 
 ### What It Does
@@ -280,7 +299,7 @@ Modifies terrain during generation to create custom features.
   "version": "1.0.0",
   "description": "Adds custom terrain features",
   "author": "Your Name",
-  "main": "terrain_modifier.main",
+  "main": "main.lua",
   "enabled": true,
   "config": {
     "add_pillars": true,
@@ -290,70 +309,90 @@ Modifies terrain during generation to create custom features.
 }
 ```
 
-**main.py**:
-```python
-from poorcraft import log, on_chunk_generate, on_world_load
-from poorcraft.world import BlockType
-import random
+**main.lua**:
+```lua
+local mod = {}
+local config = {}
+local world_spawn = {x = 0, z = 0}
 
-config = {}
-world_spawn = (0, 0)
-
-def init():
-    global config
-    log("Terrain Modifier initialized")
-
-@on_world_load
-def save_spawn(event):
-    global world_spawn
-    world_spawn = (0, 0)  # Default spawn
-    log(f"World spawn: {world_spawn}")
-
-@on_chunk_generate
-def modify_terrain(event):
-    chunk = event.chunk
-    chunk_x, chunk_z = event.chunk_x, event.chunk_z
+function mod.init()
+    config = api.get_mod_config() or {}
+    api.log("Terrain Modifier initialized")
     
-    # Flatten spawn area
-    if config.get('flatten_spawn', True):
-        if chunk_x == 0 and chunk_z == 0:
-            flatten_spawn_area(chunk)
+    -- Register world load event
+    api.register_event("world_load", function(event)
+        world_spawn = {x = 0, z = 0}  -- Default spawn
+        api.log("World spawn set")
+    end)
     
-    # Add random stone pillars
-    if config.get('add_pillars', True):
-        if random.random() < config.get('pillar_chance', 0.1):
-            add_pillar(chunk)
+    -- Register chunk generation event
+    api.register_event("chunk_generate", function(event)
+        local chunk_x = event.chunk_x
+        local chunk_z = event.chunk_z
+        
+        -- Flatten spawn area
+        if config.flatten_spawn ~= false then
+            if chunk_x == 0 and chunk_z == 0 then
+                flatten_spawn_area(event)
+            end
+        end
+        
+        -- Add random stone pillars
+        if config.add_pillars ~= false then
+            if math.random() < (config.pillar_chance or 0.1) then
+                add_pillar(event)
+            end
+        end
+    end)
+end
 
-def flatten_spawn_area(chunk):
-    """Flatten center of spawn chunk"""
-    for x in range(6, 10):
-        for z in range(6, 10):
-            # Set to grass at Y=70
-            for y in range(256):
-                if y < 70:
-                    chunk.set_block(x, y, z, BlockType.STONE)
-                elif y == 70:
-                    chunk.set_block(x, y, z, BlockType.GRASS)
-                else:
-                    chunk.set_block(x, y, z, BlockType.AIR)
+function flatten_spawn_area(event)
+    -- Flatten center of spawn chunk
+    for x = 6, 9 do
+        for z = 6, 9 do
+            local world_x = event.chunk_x * 16 + x
+            local world_z = event.chunk_z * 16 + z
+            
+            -- Set to grass at Y=70
+            for y = 0, 255 do
+                if y < 70 then
+                    api.set_block(world_x, y, world_z, 1)  -- STONE
+                elseif y == 70 then
+                    api.set_block(world_x, y, world_z, 2)  -- GRASS
+                else
+                    api.set_block(world_x, y, world_z, 0)  -- AIR
+                end
+            end
+        end
+    end
+end
 
-def add_pillar(chunk):
-    """Add a stone pillar at random position"""
-    x = random.randint(0, 15)
-    z = random.randint(0, 15)
+function add_pillar(event)
+    -- Add a stone pillar at random position
+    local x = math.random(0, 15)
+    local z = math.random(0, 15)
+    local world_x = event.chunk_x * 16 + x
+    local world_z = event.chunk_z * 16 + z
     
-    # Find surface
-    surface_y = 70  # Default
-    for y in range(255, 0, -1):
-        if chunk.get_block(x, y, z) != BlockType.AIR:
+    -- Find surface
+    local surface_y = 70  -- Default
+    for y = 255, 1, -1 do
+        if api.get_block(world_x, y, world_z) ~= 0 then  -- Not AIR
             surface_y = y
             break
+        end
+    end
     
-    # Build pillar
-    height = random.randint(10, 30)
-    for y in range(surface_y + 1, surface_y + height + 1):
-        if y < 256:
-            chunk.set_block(x, y, z, BlockType.STONE)
+    -- Build pillar
+    local height = math.random(10, 30)
+    for y = surface_y + 1, surface_y + height do
+        if y < 256 then
+            api.set_block(world_x, y, world_z, 1)  -- STONE
+        end
+    end
+end
+
+return mod
 ```
 
 ### What It Does
@@ -380,7 +419,7 @@ Prevents certain destructive actions.
   "version": "1.0.0",
   "description": "Prevents griefing",
   "author": "Your Name",
-  "main": "anti_grief.main",
+  "main": "main.lua",
   "enabled": true,
   "server_only": true,
   "config": {
@@ -391,53 +430,62 @@ Prevents certain destructive actions.
 }
 ```
 
-**main.py**:
-```python
-from poorcraft import log, on_block_place, on_block_break, is_server
-from poorcraft.world import BlockType
-import math
+**main.lua**:
+```lua
+local mod = {}
+local config = {}
+local world_spawn = {x = 0, y = 70, z = 0}
 
-config = {}
-world_spawn = (0, 70, 0)
-
-def init():
-    global config
-    if not is_server():
-        return
-    log("Anti-Grief Protection initialized")
-
-@on_block_break
-def prevent_bedrock_break(event):
-    # Protect bedrock
-    if config.get('protect_bedrock', True):
-        if event.block_type_id == BlockType.BEDROCK:
-            event.cancel()
-            log(f"Prevented bedrock break at ({event.x}, {event.y}, {event.z})")
-            return
+function mod.init()
+    config = api.get_mod_config() or {}
+    api.log("Anti-Grief Protection initialized")
     
-    # Protect spawn area
-    if is_in_spawn_protection(event.x, event.z):
-        event.cancel()
-        log(f"Prevented block break in spawn protection")
-
-@on_block_place
-def prevent_dangerous_blocks(event):
-    # Prevent lava placement (if configured)
-    if config.get('prevent_lava', False):
-        # Placeholder: check for lava block type
-        pass
+    -- Register block break event
+    api.register_event("block_break", function(event)
+        -- Protect bedrock
+        if config.protect_bedrock ~= false then
+            if event.block_type_id == 7 then  -- BEDROCK type ID
+                event.cancelled = true
+                api.log("Prevented bedrock break at (" .. event.x .. ", " .. event.y .. ", " .. event.z .. ")")
+                return
+            end
+        end
+        
+        -- Protect spawn area
+        if is_in_spawn_protection(event.x, event.z) then
+            event.cancelled = true
+            api.log("Prevented block break in spawn protection")
+        end
+    end)
     
-    # Protect spawn area
-    if is_in_spawn_protection(event.x, event.z):
-        event.cancel()
-        log(f"Prevented block place in spawn protection")
+    -- Register block place event
+    api.register_event("block_place", function(event)
+        -- Prevent lava placement (if configured)
+        if config.prevent_lava then
+            -- Check for lava block type (example)
+            -- if event.block_type_id == LAVA_TYPE then
+            --     event.cancelled = true
+            -- end
+        end
+        
+        -- Protect spawn area
+        if is_in_spawn_protection(event.x, event.z) then
+            event.cancelled = true
+            api.log("Prevented block place in spawn protection")
+        end
+    end)
+end
 
-def is_in_spawn_protection(x, z):
-    """Check if coordinates are in spawn protection radius"""
-    radius = config.get('protect_spawn_radius', 50)
-    spawn_x, spawn_y, spawn_z = world_spawn
-    distance = math.sqrt((x - spawn_x)**2 + (z - spawn_z)**2)
+function is_in_spawn_protection(x, z)
+    -- Check if coordinates are in spawn protection radius
+    local radius = config.protect_spawn_radius or 50
+    local dx = x - world_spawn.x
+    local dz = z - world_spawn.z
+    local distance = math.sqrt(dx * dx + dz * dz)
     return distance < radius
+end
+
+return mod
 ```
 
 ### What It Does
@@ -452,7 +500,7 @@ def is_in_spawn_protection(x, z):
 
 ## Next Steps
 
-- Study the official mods (`skin_generator`, `ai_npc`) for advanced examples
+- Study the official mods (`block_texture_generator`, `ai_npc`) for advanced examples
 - Read the [API Reference](API_REFERENCE.md) for complete API documentation
 - Check the [Event Catalog](EVENT_CATALOG.md) for all available events
 - Experiment with combining multiple events and features

@@ -113,21 +113,11 @@ PoorCraft/
 ```
 
 ### Mod Format Change
-**Before (Python):**
+**After (Lua):**
 ```
 mods/my_mod/
 ├── mod.json
-├── main.py
-├── __init__.py
-└── config.json
-```
-
-**After (Lua):**
-```
-gamedata/mods/my_mod/
-├── mod.json
-├── main.lua
-└── config.json
+└── main.lua
 ```
 
 ### API Exposure Pattern

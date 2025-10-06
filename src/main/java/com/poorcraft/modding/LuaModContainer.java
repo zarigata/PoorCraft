@@ -33,6 +33,7 @@ public class LuaModContainer {
     private final JsonObject modJson;
     private final Globals luaGlobals;
     private LuaValue modTable;
+    private LuaValue updateFunc;
     private ModState state;
     
     /**
@@ -47,6 +48,7 @@ public class LuaModContainer {
         this.modJson = modJson;
         this.luaGlobals = luaGlobals;
         this.state = ModState.DISCOVERED;
+        this.updateFunc = null;
     }
     
     /**
@@ -69,6 +71,9 @@ public class LuaModContainer {
             if (modTable.isnil()) {
                 modTable = luaGlobals;
             }
+            
+            // Cache update function if present
+            cacheUpdateFunction();
             
             state = ModState.LOADED;
         }
@@ -126,6 +131,56 @@ public class LuaModContainer {
             System.out.println("[LuaModContainer] Disabled mod: " + getName());
         } catch (LuaError e) {
             System.err.println("[LuaModContainer] Error disabling mod " + getName() + ": " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Caches the update function reference if present.
+     */
+    private void cacheUpdateFunction() {
+        if (modTable != null && !modTable.isnil()) {
+            LuaValue func = modTable.get("update");
+            if (!func.isnil() && func.isfunction()) {
+                updateFunc = func;
+            } else {
+                updateFunc = null;
+            }
+        } else {
+            updateFunc = null;
+        }
+    }
+    
+    /**
+     * Checks if the mod has an update() function.
+     * 
+     * @return true if the mod table contains an update function
+     */
+    public boolean hasUpdateFunction() {
+        return updateFunc != null && updateFunc.isfunction();
+    }
+    
+    /**
+     * Calls the mod's update(deltaTime) function if it exists and mod is enabled.
+     * 
+     * @param deltaTime Time since last frame in seconds
+     */
+    public void update(float deltaTime) {
+        // Only update if mod is enabled
+        if (state != ModState.ENABLED) {
+            return;
+        }
+        
+        // Check if mod has an update function (using cached reference)
+        if (updateFunc == null || !updateFunc.isfunction()) {
+            return;
+        }
+        
+        try {
+            // Call cached update function without table lookup
+            updateFunc.call(LuaValue.valueOf(deltaTime));
+        } catch (LuaError e) {
+            System.err.println("[LuaModContainer] Error updating mod " + getName() + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
     

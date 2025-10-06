@@ -271,4 +271,23 @@ public class LuaModLoader {
     public ModAPI getModAPI() {
         return modAPI;
     }
+    
+    /**
+     * Updates all loaded mods by calling their update(deltaTime) function if they have one.
+     * Called every frame from Game.update().
+     * 
+     * @param deltaTime Time since last frame in seconds
+     */
+    public void update(float deltaTime) {
+        for (LuaModContainer container : loadedMods) {
+            try {
+                if (container.getState() == LuaModContainer.ModState.ENABLED) {
+                    container.update(deltaTime);
+                }
+            } catch (Exception e) {
+                System.err.println("[LuaModLoader] Error updating mod " + container.getName() + ": " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+    }
 }

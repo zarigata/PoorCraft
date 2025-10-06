@@ -115,6 +115,55 @@ public class LuaModAPI {
             }
         });
         
+        // Player position API
+        api.set("get_player_position", new VarArgFunction() {
+            @Override
+            public LuaValue invoke(org.luaj.vm2.Varargs args) {
+                double[] position = modAPI.getPlayerPosition();
+                if (position == null) {
+                    return LuaValue.NIL;
+                }
+                LuaTable posTable = new LuaTable();
+                posTable.set("x", LuaValue.valueOf(position[0]));
+                posTable.set("y", LuaValue.valueOf(position[1]));
+                posTable.set("z", LuaValue.valueOf(position[2]));
+                return posTable;
+            }
+        });
+        
+        // Game time API
+        api.set("get_game_time", new VarArgFunction() {
+            @Override
+            public LuaValue invoke(org.luaj.vm2.Varargs args) {
+                return LuaValue.valueOf(modAPI.getGameTime());
+            }
+        });
+        
+        api.set("set_game_time", new OneArgFunction() {
+            @Override
+            public LuaValue call(LuaValue time) {
+                modAPI.setGameTime((float) time.checkdouble());
+                return LuaValue.NIL;
+            }
+        });
+        
+        // Real-world time API
+        api.set("get_real_time", new VarArgFunction() {
+            @Override
+            public LuaValue invoke(org.luaj.vm2.Varargs args) {
+                return LuaValue.valueOf(modAPI.getRealTime());
+            }
+        });
+        
+        // Weather API
+        api.set("get_weather", new VarArgFunction() {
+            @Override
+            public LuaValue invoke(org.luaj.vm2.Varargs args) {
+                String weather = modAPI.getWeather();
+                return weather != null ? LuaValue.valueOf(weather) : LuaValue.NIL;
+            }
+        });
+        
         // Texture API
         api.set("add_procedural_texture", new TwoArgFunction() {
             @Override
@@ -168,6 +217,24 @@ public class LuaModAPI {
             }
         });
         
+        // Time control API
+        api.set("set_time_control_enabled", new OneArgFunction() {
+            @Override
+            public LuaValue call(LuaValue enabled) {
+                modAPI.setTimeControlEnabled(enabled.checkboolean());
+                return LuaValue.NIL;
+            }
+        });
+        
+        // Config table API
+        api.set("get_mod_config_table", new OneArgFunction() {
+            @Override
+            public LuaValue call(LuaValue modId) {
+                java.util.Map<String, Object> config = modAPI.getModConfigTable(modId.checkjstring());
+                return javaMapToLuaTable(config);
+            }
+        });
+        
         return api;
     }
     
@@ -211,9 +278,47 @@ public class LuaModAPI {
             return LuaValue.valueOf((String) obj);
         } else if (obj instanceof LuaValue) {
             return (LuaValue) obj;
+        } else if (obj instanceof java.util.Map) {
+            return javaMapToLuaTable((java.util.Map<?, ?>) obj);
+        } else if (obj instanceof Object[]) {
+            return javaArrayToLuaTable((Object[]) obj);
         } else {
             return LuaValue.NIL;
         }
+    }
+    
+    /**
+     * Converts a Java Map to a Lua table recursively.
+     */
+    private LuaTable javaMapToLuaTable(java.util.Map<?, ?> map) {
+        LuaTable table = new LuaTable();
+        if (map == null) {
+            return table;
+        }
+        
+        for (java.util.Map.Entry<?, ?> entry : map.entrySet()) {
+            String key = entry.getKey().toString();
+            Object value = entry.getValue();
+            table.set(key, javaToLua(value));
+        }
+        
+        return table;
+    }
+    
+    /**
+     * Converts a Java array to a Lua table (1-indexed).
+     */
+    private LuaTable javaArrayToLuaTable(Object[] array) {
+        LuaTable table = new LuaTable();
+        if (array == null) {
+            return table;
+        }
+        
+        for (int i = 0; i < array.length; i++) {
+            table.set(i + 1, javaToLua(array[i]));  // Lua uses 1-based indexing
+        }
+        
+        return table;
     }
     
     /**

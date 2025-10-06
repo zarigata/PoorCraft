@@ -93,36 +93,42 @@ Create `gamedata/mods/hello_world/mod.json`:
   "id": "hello_world",
   "name": "Hello World",
   "version": "1.0.0",
-  "description": "Prints hello when blocks are placed",
+  "description": "Logs messages when blocks are placed",
   "author": "You",
-  "main": "hello_world.main",
+  "main": "main.lua",
   "enabled": true
 }
 ```
 
-### Step 2: Create main.py
+### Step 2: Create main.lua
 
-Create `mods/hello_world/main.py`:
+Create `gamedata/mods/hello_world/main.lua`:
 
-```python
-from poorcraft import log, on_block_place
+```lua
+local mod = {}
 
-def init():
-    """Called when mod is loaded"""
-    log("Hello World mod initialized!")
+function mod.init()
+    api.log("Hello World mod initialized!")
+    
+    -- Register event handler for block placement
+    api.register_event('block_place', function(event)
+        api.log("Block placed at " .. event.x .. ", " .. event.y .. ", " .. event.z)
+        api.log("Block type: " .. event.block_type_id)
+    end)
+end
 
-@on_block_place
-def handle_block_place(event):
-    """Called when a block is placed"""
-    log(f"Block placed at {event.x}, {event.y}, {event.z}")
-    log(f"Block type: {event.block_type_id}")
+function mod.enable()
+    api.log("Hello World mod enabled!")
+end
+
+function mod.disable()
+    api.log("Hello World mod disabled")
+end
+
+return mod
 ```
 
-### Step 3: Create __init__.py
-
-Create empty `mods/hello_world/__init__.py`
-
-### Step 4: Run the game
+### Step 3: Run the game
 
 Start PoorCraft and your mod will load automatically!
 
@@ -131,16 +137,26 @@ Start PoorCraft and your mod will load automatically!
 ### Available Events
 
 **Block Events**:
-- `@on_block_place` - When a block is placed
-- `@on_block_break` - When a block is broken
+- `block_place` - When a block is placed
+- `block_break` - When a block is broken
 
 **Player Events**:
-- `@on_player_join` - When a player joins the server
-- `@on_player_leave` - When a player leaves the server
+- `player_join` - When a player joins the server
+- `player_leave` - When a player leaves the server
 
 **World Events**:
-- `@on_chunk_generate` - When a chunk is generated
-- `@on_world_load` - When a world is loaded
+- `chunk_generate` - When a chunk is generated
+- `world_load` - When a world is loaded
+
+### Registering Event Handlers
+
+Use `api.register_event()` to listen for events:
+
+```lua
+api.register_event('block_place', function(event)
+    api.log("Block placed!")
+end)
+```
 
 ### Event Properties
 
@@ -168,177 +184,228 @@ Start PoorCraft and your mod will load automatically!
 
 Some events can be cancelled to prevent the action:
 
-```python
-@on_block_place
-def prevent_dirt_placement(event):
-    if event.block_type_id == 1:  # Dirt
+```lua
+api.register_event('block_place', function(event)
+    if event.block_type_id == 1 then  -- Dirt
         event.cancel()
-        log("Dirt placement prevented!")
+        api.log("Dirt placement prevented!")
+    end
+end)
 ```
 
 ## World Access
 
 ### Getting/Setting Blocks
 
-```python
-from poorcraft import get_block, set_block, BlockType
+```lua
+-- Get block at position
+local block_id = api.get_block(100, 64, 200)
 
-# Get block at position
-block_id = get_block(100, 64, 200)
-
-# Set block at position
-set_block(100, 64, 200, BlockType.STONE)
+-- Set block at position
+api.set_block(100, 64, 200, 2)  -- 2 = STONE
 ```
 
 ### Block Types
 
-```python
-from poorcraft.world import BlockType
+Block types are identified by numeric IDs:
 
-BlockType.AIR = 0
-BlockType.DIRT = 1
-BlockType.STONE = 2
-BlockType.GRASS = 3
-BlockType.SAND = 4
-# ... see API reference for full list
+```lua
+local AIR = 0
+local DIRT = 1
+local STONE = 2
+local GRASS = 3
+local SAND = 4
+-- ... see API reference for full list
 ```
 
 ### Biome Access
 
-```python
-from poorcraft import api
-
-biome = api.get_biome(100, 200)  # Returns "Desert", "Snow", "Jungle", or "Plains"
+```lua
+local biome = api.get_biome(100, 200)  -- Returns "Desert", "Snow", "Jungle", or "Plains"
 ```
 
 ### Terrain Height
 
-```python
-from poorcraft import api
-
-height = api.get_height_at(100, 200)  # Returns Y coordinate of surface
+```lua
+local height = api.get_height_at(100, 200)  -- Returns Y coordinate of surface
 ```
 
 ## Configuration
 
 ### Accessing Config
 
-```python
-# Or use BaseMod class:
-from poorcraft import BaseMod
+Access your mod's configuration from `mod.json`:
 
-class MyMod(BaseMod):
-    def init(self):
-        setting = self.get_config("custom_setting", "default_value")
-        self.log(f"Setting: {setting}")
+```lua
+function mod.init()
+    -- Get mod config as JSON string
+    local config_json = api.get_mod_config("my_mod")
+    
+    if config_json then
+        api.log("Config loaded successfully")
+        -- Parse JSON manually or use config values directly
+    end
+end
 ```
 
 ### Shared Data
 
 Mods can share data with each other:
 
-```python
-from poorcraft import api
-
-# Store data
+```lua
+-- Store data
 api.set_shared_data("my_mod.counter", 42)
 
-# Retrieve data
-counter = api.get_shared_data("my_mod.counter")  # Returns 42
+-- Retrieve data
+local counter = api.get_shared_data("my_mod.counter")  -- Returns 42
 ```
 
 ## Best Practices
 
 ### 1. Use Descriptive Names
 
-```python
-# Good
-@on_block_place
-def log_block_placement(event):
-    pass
+```lua
+-- Good
+api.register_event('block_place', function(event)
+    -- Clear handler purpose
+end)
 
-# Bad
-@on_block_place
-def func1(event):
-    pass
+-- Bad
+api.register_event('block_place', function(e)
+    -- Unclear purpose
+end)
 ```
 
 ### 2. Handle Errors Gracefully
 
-```python
-@on_block_place
-def safe_handler(event):
-    try:
-        # Your code here
-        pass
-    except Exception as e:
-        log(f"Error in handler: {e}")
+```lua
+api.register_event('block_place', function(event)
+    local success, err = pcall(function()
+        -- Your code here
+    end)
+    
+    if not success then
+        api.log("Error in handler: " .. tostring(err))
+    end
+end)
 ```
 
 ### 3. Check Server/Client Side
 
-```python
-from poorcraft import is_server
-
-def init():
-    if is_server():
-        log("Running on server")
-        # Server-only code
-    else:
-        log("Running on client")
-        # Client-only code
+```lua
+function mod.init()
+    if api.is_server() then
+        api.log("Running on server")
+        -- Server-only code
+    else
+        api.log("Running on client")
+        -- Client-only code
+    end
+end
 ```
 
 ### 4. Use Lifecycle Methods
 
-```python
-def init():
-    """Setup: register events, load resources"""
-    pass
+**Standard lifecycle:**
+- `init()` - called once on mod load
+- `enable()` - called when mod is enabled
+- `disable()` - called when mod is disabled
 
-def enable():
-    """Start: begin mod functionality"""
-    pass
+**Optional continuous update:**
+- `update(deltaTime)` - called every frame (optional)
 
-def disable():
-    """Stop: cleanup, unregister events"""
-    pass
+```lua
+function mod.init()
+    -- Setup: register events, load resources
+    api.log("Initializing...")
+end
+
+function mod.enable()
+    -- Start: begin mod functionality
+    api.log("Enabled")
+end
+
+function mod.disable()
+    -- Stop: cleanup, unregister events
+    api.log("Disabled")
+end
+
+-- Optional: for continuous execution
+function mod.update(deltaTime)
+    -- Called every frame
+    -- deltaTime is in seconds (e.g., 0.016 for 60 FPS)
+    -- Use for animations, time sync, periodic checks
+end
 ```
+
+**Update function notes:**
+- Only define `update()` if you need continuous execution
+- Keep it lightweight - runs every frame!
+- Use timers to limit expensive operations:
+
+```lua
+local timer = 0
+function mod.update(deltaTime)
+    timer = timer + deltaTime
+    if timer >= 1.0 then  -- Run every second
+        -- Do something expensive
+        timer = 0
+    end
+end
+```
+
+- Mods without `update()` have zero performance overhead
+- See `gamedata/mods/realtime_sync/` for a complete example
 
 ### 5. Log Important Events
 
-```python
-from poorcraft import log
-
-log("Mod initialized")
-log(f"Config loaded: {config}")
-log(f"Event triggered: {event}")
+```lua
+api.log("Mod initialized")
+api.log("Config loaded: " .. tostring(config))
+api.log("Event triggered: " .. event.x .. ", " .. event.y)
 ```
 
 ## Examples
 
 See the official mods for complete examples:
 
-- **Skin Generator** (`mods/skin_generator/`) - Procedural texture generation
-- **AI NPC** (`mods/ai_npc/`) - AI-powered NPCs with LLM integration
+- **Example Mod** (`gamedata/mods/example_mod/`) - Basic Lua mod structure
+- **Real-Time Sync** (`gamedata/mods/realtime_sync/`) - Time synchronization with update lifecycle
+- **Block Texture Generator** (`gamedata/mods/block_texture_generator/`) - Procedural texture generation placeholder
+- **AI NPC** (`gamedata/mods/ai_npc/`) - AI-powered NPCs placeholder
 
 ### Example: Block Logger
 
 Logs all block placements and breaks:
 
-```python
-from poorcraft import log, on_block_place, on_block_break
+```lua
+local mod = {}
 
-def init():
-    log("Block Logger initialized")
+function mod.init()
+    api.log("Block Logger initialized")
+    
+    -- Register block place handler
+    api.register_event('block_place', function(event)
+        api.log("Block " .. event.block_type_id .. " placed at (" .. 
+                event.x .. ", " .. event.y .. ", " .. event.z .. ")")
+    end)
+    
+    -- Register block break handler
+    api.register_event('block_break', function(event)
+        api.log("Block " .. event.block_type_id .. " broken at (" .. 
+                event.x .. ", " .. event.y .. ", " .. event.z .. ")")
+    end)
+end
 
-@on_block_place
-def log_place(event):
-    log(f"Block {event.block_type_id} placed at ({event.x}, {event.y}, {event.z})")
+function mod.enable()
+    api.log("Block Logger enabled")
+end
 
-@on_block_break
-def log_break(event):
-    log(f"Block {event.block_type_id} broken at ({event.x}, {event.y}, {event.z})")
+function mod.disable()
+    api.log("Block Logger disabled")
+end
+
+return mod
 ```
 
 ## Next Steps
@@ -352,20 +419,27 @@ def log_break(event):
 
 **Mod not loading?**
 - Check mod.json syntax (use JSON validator)
-- Verify main module path matches directory structure
+- Verify `"main": "main.lua"` in mod.json
 - Check console for error messages
+- Ensure mod.lua returns the mod table
 
 **Events not firing?**
-- Ensure event decorator is used correctly
-- Check if mod is enabled in mod.json
-- Verify init() function is called
+- Ensure `api.register_event()` is called in `mod.init()`
+- Check if mod is enabled in mod.json (`"enabled": true`)
+- Verify event names are correct (lowercase, underscore-separated)
 
-**Import errors?**
-- Ensure py4j is installed: `pip install py4j==0.10.9.7`
-- Check Python version (3.8+ required)
-- Verify poorcraft package is in python/ directory
+**Lua syntax errors?**
+- Check for missing `end` statements
+- Verify string concatenation uses `..` not `+`
+- Use `local` for variables to avoid global scope pollution
+- Remember Lua arrays start at index 1, not 0
+
+**API not working?**
+- Ensure you're calling `api.function_name()` not `function_name()`
+- Check the API_REFERENCE.md for correct function signatures
+- Verify the API function exists in your PoorCraft version
 
 **Need help?**
-- Check console logs for error messages
+- Check console logs for Lua error messages
 - Read the API reference documentation
-- Study the official mod examples
+- Study the official mod examples in `gamedata/mods/`

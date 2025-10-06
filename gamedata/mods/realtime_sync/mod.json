@@ -1,0 +1,18 @@
+{
+  "id": "realtime_sync",
+  "name": "Real-Time Synchronization",
+  "version": "1.0.0",
+  "description": "Synchronizes in-game time with real-world time based on player location",
+  "author": "PoorCraft Team",
+  "main": "main.lua",
+  "enabled": true,
+  "server_only": false,
+  "config": {
+    "sync_enabled": true,
+    "time_scale": 1.0,
+    "sync_interval": 60.0,
+    "use_player_location": false,
+    "weather_sync_enabled": false,
+    "debug_logging": false
+  }
+}

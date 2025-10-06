@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.poorcraft.core.Game;
 import com.poorcraft.world.World;
 import com.poorcraft.world.block.BlockType;
+import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 
 import java.nio.ByteBuffer;
@@ -159,6 +160,93 @@ public class ModAPI {
             System.err.println("[ModAPI] Error getting height at (" + x + ", " + z + "): " + e.getMessage());
             return -1;
         }
+    }
+    
+    /**
+     * Gets the player's position in the world.
+     * 
+     * @return double array [x, y, z] with player position, or null if player not available
+     */
+    public double[] getPlayerPosition() {
+        try {
+            if (game == null || game.getPlayerController() == null) {
+                return null;
+            }
+            
+            Vector3f position = game.getPlayerPosition();
+            if (position == null) {
+                return null;
+            }
+            
+            return new double[] { position.x, position.y, position.z };
+            
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error getting player position: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Gets the current game time of day.
+     * 
+     * @return Time of day (0.0-1.0), or -1.0f if game not available
+     */
+    public float getGameTime() {
+        try {
+            if (game == null) {
+                return -1.0f;
+            }
+            
+            return game.getTimeOfDay();
+            
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error getting game time: " + e.getMessage());
+            return -1.0f;
+        }
+    }
+    
+    /**
+     * Sets the game time of day.
+     * 
+     * @param time Time of day (0.0-1.0)
+     */
+    public void setGameTime(float time) {
+        try {
+            if (game == null) {
+                System.err.println("[ModAPI] Cannot set game time: game not initialized");
+                return;
+            }
+            
+            if (time < 0.0f || time > 1.0f) {
+                System.err.println("[ModAPI] Invalid game time: " + time + " (must be 0.0-1.0)");
+                return;
+            }
+            
+            game.setTimeOfDay(time);
+            
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error setting game time: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Gets the current real-world system time.
+     * 
+     * @return Milliseconds since Unix epoch
+     */
+    public long getRealTime() {
+        return System.currentTimeMillis();
+    }
+    
+    /**
+     * Gets the current weather status.
+     * 
+     * @return Weather status string, currently always "clear" (placeholder)
+     */
+    public String getWeather() {
+        // TODO: Implement weather system
+        // For now, always return clear since no weather system exists
+        return "clear";
     }
     
     // ========== Event Registration Methods ==========
@@ -411,5 +499,100 @@ public class ModAPI {
      */
     public void npcSay(int npcId, String message) {
         System.out.println("[NPC " + npcId + "] " + message);
+    }
+    
+    /**
+     * Sets whether external time control is enabled.
+     * When enabled, the game will not advance time automatically,
+     * allowing mods to manage time progression.
+     * 
+     * @param enabled true to disable automatic time progression
+     */
+    public void setTimeControlEnabled(boolean enabled) {
+        try {
+            if (game == null) {
+                System.err.println("[ModAPI] Cannot set time control: game not initialized");
+                return;
+            }
+            
+            game.setExternalTimeControlEnabled(enabled);
+            
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error setting time control: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Gets a mod's configuration as a Map for easy access.
+     * Converts the JSON configuration to a Java Map structure.
+     * 
+     * @param modId Target mod identifier
+     * @return Map containing configuration, or empty map if unavailable
+     */
+    public Map<String, Object> getModConfigTable(String modId) {
+        if (modId == null || modId.isEmpty()) {
+            return new HashMap<>();
+        }
+        
+        try {
+            LuaModLoader modLoader = game.getModLoader();
+            if (modLoader == null) {
+                return new HashMap<>();
+            }
+            
+            LuaModContainer container = modLoader.getModById(modId);
+            if (container == null) {
+                return new HashMap<>();
+            }
+            
+            return jsonObjectToMap(container.getConfig());
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error retrieving config table for mod '" + modId + "': " + e.getMessage());
+            return new HashMap<>();
+        }
+    }
+    
+    /**
+     * Recursively converts a JsonObject to a Map.
+     */
+    private Map<String, Object> jsonObjectToMap(com.google.gson.JsonObject json) {
+        Map<String, Object> map = new HashMap<>();
+        if (json == null) {
+            return map;
+        }
+        
+        for (String key : json.keySet()) {
+            map.put(key, jsonElementToJava(json.get(key)));
+        }
+        return map;
+    }
+    
+    /**
+     * Converts a JsonElement to a Java object.
+     */
+    private Object jsonElementToJava(com.google.gson.JsonElement element) {
+        if (element == null || element.isJsonNull()) {
+            return null;
+        } else if (element.isJsonPrimitive()) {
+            com.google.gson.JsonPrimitive primitive = element.getAsJsonPrimitive();
+            if (primitive.isBoolean()) {
+                return primitive.getAsBoolean();
+            } else if (primitive.isNumber()) {
+                // Return as double for simplicity (Lua handles all numbers as doubles)
+                return primitive.getAsDouble();
+            } else if (primitive.isString()) {
+                return primitive.getAsString();
+            }
+        } else if (element.isJsonObject()) {
+            return jsonObjectToMap(element.getAsJsonObject());
+        } else if (element.isJsonArray()) {
+            com.google.gson.JsonArray array = element.getAsJsonArray();
+            Object[] result = new Object[array.size()];
+            for (int i = 0; i < array.size(); i++) {
+                result[i] = jsonElementToJava(array.get(i));
+            }
+            return result;
+        }
+        return null;
     }
 }
