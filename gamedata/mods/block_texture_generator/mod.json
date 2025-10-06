@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Generates up to 256 unique 16x16 block textures with biome-specific color palettes and procedural patterns",
   "author": "PoorCraft Team",
-  "main": "block_texture_generator.main",
+  "main": "main.lua",
   "enabled": true,
   "config": {
     "max_textures": 256,

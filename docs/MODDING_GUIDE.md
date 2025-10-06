@@ -1,6 +1,6 @@
-# PoorCraft Modding Guide
+# PoorCraft Lua Modding Guide v2.0
 
-Welcome to PoorCraft modding! This guide will help you create your first mod.
+Welcome to PoorCraft Lua modding! This guide will help you create your first Lua mod.
 
 ## Table of Contents
 
@@ -17,40 +17,39 @@ Welcome to PoorCraft modding! This guide will help you create your first mod.
 
 ### Prerequisites
 
-- Python 3.8 or higher installed
 - PoorCraft game installed
-- Basic Python knowledge
-- Text editor or IDE
+- Basic Lua knowledge
+- Text editor or IDE (VSCode with Lua extension recommended)
+
+### Why Lua?
+
+PoorCraft v2.0 switched from Python to Lua for modding:
+- **Lightweight**: No external dependencies required
+- **Portable**: Better for single-executable distribution
+- **Fast**: Lua is designed for embedding in applications
+- **Industry Standard**: Used in many games (World of Warcraft, Roblox, Garry's Mod)
 
 ### Setting Up Development Environment
 
-1. Install Python dependencies:
+1. Create a new mod directory:
    ```bash
-   cd python/
-   pip install -r requirements.txt
+   mkdir gamedata/mods/my_first_mod
+   cd gamedata/mods/my_first_mod
    ```
 
-2. Create a new mod directory:
-   ```bash
-   mkdir mods/my_first_mod
-   cd mods/my_first_mod
-   ```
-
-3. Create required files:
-   - `mod.json` - Mod metadata
-   - `main.py` - Main mod code
-   - `__init__.py` - Python package marker (can be empty)
+2. Create required files:
+   - `mod.json` - Mod metadata and configuration
+   - `main.lua` - Main mod code
 
 ## Mod Structure
 
 ### Directory Layout
 
 ```
-mods/
+gamedata/mods/
 └── my_first_mod/
-    ├── __init__.py          # Python package marker
     ├── mod.json             # Mod metadata and config
-    ├── main.py              # Main mod code
+    ├── main.lua             # Main mod code
     └── resources/           # Optional: textures, data files
 ```
 
@@ -63,7 +62,7 @@ mods/
   "version": "1.0.0",
   "description": "A simple example mod",
   "author": "Your Name",
-  "main": "my_first_mod.main",
+  "main": "main.lua",
   "enabled": true,
   "server_only": false,
   "config": {
@@ -78,16 +77,16 @@ mods/
 - `version`: Semantic version (major.minor.patch)
 - `description`: What your mod does
 - `author`: Your name
-- `main`: Python module path (directory.filename without .py)
+- `main`: Lua script filename (default: "main.lua")
 - `enabled`: Whether mod loads on startup
 - `server_only`: If true, only loads on server (not clients)
-- `config`: Custom configuration (accessible in Python)
+- `config`: Custom configuration (accessible in Lua via api.get_mod_config())
 
 ## Creating Your First Mod
 
 ### Step 1: Create mod.json
 
-Create `mods/hello_world/mod.json`:
+Create `gamedata/mods/hello_world/mod.json`:
 
 ```json
 {

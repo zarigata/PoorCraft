@@ -43,13 +43,23 @@ public class Main {
     }
 
     private static void initializeUserDirectories() {
+        System.out.println("[Main] Initializing game directories...");
+        
         Map<String, String> directories = new LinkedHashMap<>();
-        directories.put("skins", "Player skin directory");
-        directories.put("skins/default", "Bundled default skins directory");
-        directories.put("resourcepacks", "Resource pack directory");
-        directories.put("screenshots", "Screenshot directory");
-        directories.put("worlds", "World saves directory");
-        directories.put("config", "Configuration directory");
+        // Gamedata directories
+        directories.put("gamedata", "Game data root directory");
+        directories.put("gamedata/mods", "Lua mods directory");
+        directories.put("gamedata/resourcepacks", "Resource pack directory");
+        directories.put("gamedata/worlds", "World saves directory");
+        directories.put("gamedata/screenshots", "Screenshot directory");
+        directories.put("gamedata/skins", "Player skin directory");
+        directories.put("gamedata/skins/default", "Bundled default skins directory");
+        directories.put("gamedata/config", "Configuration directory");
+        
+        // Assets directories
+        directories.put("assets", "Development assets directory");
+        directories.put("assets/ui", "UI textures directory");
+        directories.put("assets/scripts", "Utility scripts directory");
 
         directories.forEach((relativePath, description) -> {
             Path path = Paths.get(relativePath);
@@ -65,5 +75,7 @@ public class Main {
                 e.printStackTrace();
             }
         });
+        
+        System.out.println("[Main] Directory initialization complete");
     }
 }

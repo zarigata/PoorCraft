@@ -1,7 +1,7 @@
 package com.poorcraft.render;
 
 import com.poorcraft.config.Settings;
-import com.poorcraft.modding.ModLoader;
+import com.poorcraft.modding.LuaModLoader;
 import com.poorcraft.world.chunk.Chunk;
 import com.poorcraft.world.chunk.ChunkMesh;
 import com.poorcraft.world.chunk.ChunkPos;
@@ -48,7 +48,7 @@ public class ChunkRenderer {
 
     private Shader blockShader;
     private TextureAtlas textureAtlas;
-    private ModLoader modLoader;
+    private LuaModLoader modLoader;
     private Settings settings;
     private SunLight sunLight;
     private Map<ChunkPos, ChunkRenderData> chunkRenderData;
@@ -80,9 +80,9 @@ public class ChunkRenderer {
     /**
      * Sets the mod loader reference so we can sneak in procedural textures before rendering starts.
      *
-     * @param modLoader Active mod loader
+     * @param modLoader Active Lua mod loader
      */
-    public void setModLoader(ModLoader modLoader) {
+    public void setModLoader(LuaModLoader modLoader) {
         this.modLoader = modLoader;
     }
     public void setSettings(Settings settings) {

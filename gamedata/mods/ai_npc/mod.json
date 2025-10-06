@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Adds conversational NPCs powered by LLMs (Ollama, Gemini, OpenRouter, OpenAI)",
   "author": "PoorCraft Team",
-  "main": "ai_npc.main",
+  "main": "main.lua",
   "enabled": true,
   "server_only": true,
   "config": {

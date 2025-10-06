@@ -1,0 +1,12 @@
+{
+  "id": "example_mod",
+  "name": "Example Lua Mod",
+  "version": "1.0.0",
+  "description": "A simple example mod to test Lua modding",
+  "author": "PoorCraft Team",
+  "main": "main.lua",
+  "enabled": true,
+  "config": {
+    "message": "Hello from Lua!"
+  }
+}

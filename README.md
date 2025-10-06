@@ -17,7 +17,7 @@ A free, open-source Minecraft clone that empowers players to create, modify and 
 - **Configuration**: JSON-based settings with in-game editor ✅ **IMPLEMENTED**
 - **Procedural Textures**: Up to 256 unique block skin variations ✅ **IMPLEMENTED** (Procedural Block Texture Generator mod)
 - **AI NPCs**: Conversational NPCs powered by LLMs ✅ **IMPLEMENTED** (AI NPC mod)
-- **Modding**: Python-based modding system ✅ **IMPLEMENTED**
+- **Modding**: Lua-based modding system ✅ **IMPLEMENTED**
 
 ## Requirements
 
@@ -37,51 +37,61 @@ PoorCraft uses a sophisticated procedural generation system:
 - **Height Maps**: Multi-octave Simplex noise creates natural-looking terrain
 - **Dynamic Loading**: Chunks load/unload automatically based on player position
 {{ ... }}
-- **mods/** - Official and user-created mods
-  - **mods/block_texture_generator/** - Procedural texture generation mod
-  - **mods/ai_npc/** - AI-powered NPC mod
+- **gamedata/** - Runtime game data (NEW in v2.0)
+  - **gamedata/mods/** - Lua mods
+  - **gamedata/resourcepacks/** - Resource packs
+  - **gamedata/worlds/** - World saves
+  - **gamedata/screenshots/** - Screenshots
+  - **gamedata/skins/** - Player skins
+  - **gamedata/config/** - Configuration files
+- **assets/** - Development assets
+  - **assets/ui/** - UI textures
+  - **assets/scripts/** - Utility scripts
 - **docs/** - Documentation and modding guides
+- **changelog/** - Release notes
 
 ### Modding
 
-PoorCraft has a powerful Python-based modding system:
-- Mods live in the `mods/` directory and can hook into events, world data, and utility helpers.
-- Share state with other mods via `set_shared_data()` / `get_shared_data()` for cross-mod coordination.
-- Register event callbacks (`on_player_join`, `on_block_place`, etc.) to integrate with the game loop.
-- Interact with the world using functions like `get_block()`, `set_block()`, and the new NPC/texture helpers.
+PoorCraft has a powerful Lua-based modding system:
+- Mods live in the `gamedata/mods/` directory and can hook into events, world data, and utility helpers.
+- Share state with other mods via `api.set_shared_data()` / `api.get_shared_data()` for cross-mod coordination.
+- Register event callbacks (`api.register_event()`) to integrate with the game loop.
+- Interact with the world using functions like `api.get_block()`, `api.set_block()`, and the NPC/texture helpers.
+- Lua modding allows for easier single-executable distribution.
 
 **Documentation:**
-- `docs/MODDING_GUIDE.md` - Getting started guide
-- `docs/API_REFERENCE.md` - Complete API documentation
+- `docs/MODDING_GUIDE.md` - Getting started with Lua modding
+- `docs/API_REFERENCE.md` - Complete Lua API documentation
 - `docs/EVENT_CATALOG.md` - All available events
-- `docs/EXAMPLES.md` - Step-by-step tutorials
+- `docs/EXAMPLES.md` - Step-by-step Lua tutorials
 - `docs/OFFICIAL_MODS.md` - Official mod documentation
 
 ### Official Mods
 
-PoorCraft ships with two official mods out of the box:
+PoorCraft ships with example mods to demonstrate the Lua modding system:
 
-- **Procedural Block Texture Generator** (`mods/block_texture_generator/`)
-  - Generates up to 256 unique 16×16 block textures before rendering starts
-  - Uses biome-specific color palettes and pattern toggles from `config.json`
-  - Interacts with the Java renderer through `add_procedural_texture()`
-- **AI NPC System** (`mods/ai_npc/`)
-  - Adds conversational NPCs backed by Ollama, Gemini, OpenRouter, or OpenAI
-  - Detects provider availability automatically and runs responses asynchronously
-  - Manages NPC spawn/despawn on player join/leave events
+- **Example Mod** (`gamedata/mods/example_mod/`)
+  - Simple demonstration of Lua mod structure
+  - Shows basic API usage and mod lifecycle
+- **Procedural Block Texture Generator** (`gamedata/mods/block_texture_generator/`)
+  - Placeholder for procedural texture generation (requires image processing library)
+  - Demonstrates mod structure and configuration
+- **AI NPC System** (`gamedata/mods/ai_npc/`)
+  - Placeholder for AI-powered NPCs (requires HTTP library integration)
+  - Shows NPC spawning and management API
 
 Configuration:
-- Procedural Block Texture Generator: edit `mods/block_texture_generator/config.json`
-- AI NPC System: edit `mods/ai_npc/config.json` (set API keys or Ollama URL)
+- Edit each mod's `mod.json` to configure settings
+- Mods can be enabled/disabled via the `enabled` flag
 
-See `docs/OFFICIAL_MODS.md` for the full rundown on both mods.
+See `docs/OFFICIAL_MODS.md` and `docs/MODDING_GUIDE.md` for more details.
 
 ## UI Assets
 
 PoorCraft uses a flexible UI asset system that supports both filesystem and classpath loading:
 
 ### Directory Structure
-- `UI_FILES/` - UI textures loaded from filesystem (buttons, panels, etc.)
+- `assets/ui/` - UI textures loaded from filesystem (buttons, panels, etc.)
 - `src/main/resources/textures/ui/` - HUD textures in classpath (hotbar, hearts, armor, XP bar)
 
 ### Required Textures
@@ -104,7 +114,7 @@ PoorCraft uses a flexible UI asset system that supports both filesystem and clas
 ### Generating Textures
 Run the included Python script to generate placeholder textures:
 ```bash
-python scripts/generate_ui_textures.py
+python assets/scripts/generate_ui_textures.py
 ```
 
 This creates simple, Minecraft-style textures that can be customized later.

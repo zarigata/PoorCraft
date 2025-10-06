@@ -5,7 +5,7 @@ import com.poorcraft.config.ConfigManager;
 import com.poorcraft.config.Settings;
 import com.poorcraft.discord.DiscordRichPresenceManager;
 import com.poorcraft.input.InputHandler;
-import com.poorcraft.modding.ModLoader;
+import com.poorcraft.modding.LuaModLoader;
 import com.poorcraft.inventory.Inventory;
 import com.poorcraft.player.SkinManager;
 import com.poorcraft.render.BlurRenderer;
@@ -60,7 +60,7 @@ public class Game {
     private BlockHighlightRenderer blockHighlightRenderer;
     private ItemDropRenderer itemDropRenderer;
     private DropManager dropManager;
-    private ModLoader modLoader;
+    private LuaModLoader modLoader;
     private DiscordRichPresenceManager discordRPC;
     private SkinManager skinManager;
     private GameMode currentGameMode;
@@ -194,10 +194,10 @@ public class Game {
         
         System.out.println("[Game] UI Manager initialized");
         
-        // Initialize mod loader to enable Python mods
-        modLoader = new ModLoader(this);
+        // Initialize mod loader to enable Lua mods
+        modLoader = new LuaModLoader(this);
         modLoader.init();
-        System.out.println("[Game] Mod loader initialized");
+        System.out.println("[Game] Lua mod loader initialized");
 
         skinManager = SkinManager.getInstance();
         skinManager.init(settings);
@@ -780,11 +780,11 @@ public class Game {
     }
     
     /**
-     * Gets the mod loader instance.
+     * Gets the mod loader.
      * 
-     * @return The mod loader
+     * @return The Lua mod loader
      */
-    public ModLoader getModLoader() {
+    public LuaModLoader getModLoader() {
         return modLoader;
     }
     

@@ -1,0 +1,9 @@
+{
+  "id": "hi_mod",
+  "name": "Hi Mod",
+  "version": "1.0.0",
+  "description": "Simple test mod that says hi for 5 seconds when the game starts",
+  "author": "PoorCraft Team",
+  "main": "main.lua",
+  "enabled": true
+}

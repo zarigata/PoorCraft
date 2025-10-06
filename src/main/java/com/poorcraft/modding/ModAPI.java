@@ -354,12 +354,12 @@ public class ModAPI {
         }
 
         try {
-            ModLoader modLoader = game.getModLoader();
+            LuaModLoader modLoader = game.getModLoader();
             if (modLoader == null) {
                 return null;
             }
 
-            ModContainer container = modLoader.getModById(modId);
+            LuaModContainer container = modLoader.getModById(modId);
             if (container == null) {
                 return null;
             }
