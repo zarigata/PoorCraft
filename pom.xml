@@ -241,7 +241,8 @@
                             <classPath>
                                 <mainClass>com.poorcraft.Main</mainClass>
                             </classPath>
-                            <icon>src/main/resources/images/icon.ico</icon>
+                            <!-- <icon>src/main/resources/images/icon.ico</icon> -->
+                            <!-- Uncomment above line and add icon.ico file for custom icon -->
                             <jre>
                                 <minVersion>17</minVersion>
                                 <opts>
