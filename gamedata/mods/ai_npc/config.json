@@ -3,7 +3,7 @@
   "ai_provider": "ollama",
   "ollama": {
     "url": "http://localhost:11434",
-    "model": "llama2"
+    "model": "llama3.2"
   },
   "gemini": {
     "api_key": "",

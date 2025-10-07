@@ -28,8 +28,9 @@ PoorCraft v2.0 can be built as a **single Windows executable** (`PoorCraft.exe`)
 
 ```bash
 # Quick build
-./build-exe.bat           # Windows
-./build-exe.sh            # Linux/Mac
+scripts\build-exe.bat           # Windows
+chmod +x scripts/build-exe.sh
+scripts/build-exe.sh            # Linux/Mac
 
 # Or manually
 mvn clean package
@@ -285,7 +286,7 @@ Approximate sizes:
 
 ## 🚀 Next Steps
 
-1. **Build**: `./build-exe.bat` or `mvn package`
+1. **Build**: `scripts\build-exe.bat` or `mvn package`
 2. **Test**: Run `target/PoorCraft.exe`
 3. **Verify**: Look for "Hi Mod" message
 4. **Play**: Enjoy PoorCraft!

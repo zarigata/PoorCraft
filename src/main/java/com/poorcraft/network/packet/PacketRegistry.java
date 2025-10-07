@@ -18,6 +18,7 @@ import java.util.function.Supplier;
  * - 0x10-0x1F: Chunk packets (chunk data, requests, unload)
  * - 0x20-0x2F: Player packets (movement, spawn, despawn)
  * - 0x30-0x3F: Block packets (updates, place, break)
+ * - 0x40-0x4F: Chat packets (chat messages)
  * 
  * This registry is static and initialized at class load time.
  * Thread-safe because it's immutable after initialization.
@@ -53,6 +54,9 @@ public class PacketRegistry {
         registerPacket(0x30, BlockUpdatePacket.class, BlockUpdatePacket::new);
         registerPacket(0x31, BlockPlacePacket.class, BlockPlacePacket::new);
         registerPacket(0x32, BlockBreakPacket.class, BlockBreakPacket::new);
+        
+        // Chat packets (0x40-0x4F)
+        registerPacket(0x40, ChatMessagePacket.class, ChatMessagePacket::new);
     }
     
     /**

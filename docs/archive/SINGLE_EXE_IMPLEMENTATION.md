@@ -37,10 +37,11 @@ Created `gamedata/mods/hi_mod/` that:
 ### Quick Build (Recommended)
 ```bash
 # Windows
-build-exe.bat
+scripts\build-exe.bat
 
 # Linux/Mac  
-./build-exe.sh
+chmod +x scripts/build-exe.sh
+scripts/build-exe.sh
 
 # Or use Maven directly
 mvn clean package
@@ -104,8 +105,8 @@ Check that these exist:
 ### Build Files
 ```
 pom.xml                    ← Maven config with launch4j plugin
-build-exe.bat              ← Windows build script
-build-exe.sh               ← Linux/Mac build script
+scripts/build-exe.bat      ← Windows build script
+scripts/build-exe.sh       ← Linux/Mac build script
 ```
 
 ### Source Changes

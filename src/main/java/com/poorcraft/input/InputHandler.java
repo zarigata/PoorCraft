@@ -31,6 +31,7 @@ public class InputHandler {
     private Consumer<Character> charInputCallback;
     private Consumer<Integer> mouseClickCallback;
     private Consumer<Integer> mouseReleaseCallback;
+    private Consumer<Double> scrollCallback;
     
     /**
      * Creates a new input handler.
@@ -93,6 +94,11 @@ public class InputHandler {
         // Scroll callback - accumulates scroll offset for hotbar selection and UI
         glfwSetScrollCallback(windowHandle, (window, xoffset, yoffset) -> {
             scrollOffset += yoffset;
+            
+            // Fire scroll callback for UI overlays
+            if (scrollCallback != null) {
+                scrollCallback.accept(yoffset);
+            }
         });
         
         // Initialize last mouse position to window center
@@ -274,5 +280,14 @@ public class InputHandler {
      */
     public void setMouseReleaseCallback(Consumer<Integer> callback) {
         this.mouseReleaseCallback = callback;
+    }
+    
+    /**
+     * Sets the scroll callback.
+     * 
+     * @param callback Callback to invoke when mouse wheel is scrolled
+     */
+    public void setScrollCallback(Consumer<Double> callback) {
+        this.scrollCallback = callback;
     }
 }

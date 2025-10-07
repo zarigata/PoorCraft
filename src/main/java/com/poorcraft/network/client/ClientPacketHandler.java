@@ -64,6 +64,8 @@ public class ClientPacketHandler extends SimpleChannelInboundHandler<Packet> {
             handlePlayerMove((PlayerMovePacket) packet);
         } else if (packet instanceof BlockUpdatePacket) {
             handleBlockUpdate((BlockUpdatePacket) packet);
+        } else if (packet instanceof ChatMessagePacket) {
+            handleChatMessage((ChatMessagePacket) packet);
         } else {
             System.out.println("[ClientPacketHandler] Unknown packet type: " + packet.getClass().getSimpleName());
         }
@@ -139,6 +141,13 @@ public class ClientPacketHandler extends SimpleChannelInboundHandler<Packet> {
      */
     private void handleBlockUpdate(BlockUpdatePacket packet) {
         client.onBlockUpdate(packet.x, packet.y, packet.z, packet.blockType);
+    }
+    
+    /**
+     * Handles chat message packet.
+     */
+    private void handleChatMessage(ChatMessagePacket packet) {
+        client.onChatMessage(packet.senderId, packet.senderName, packet.message, packet.timestamp, packet.isSystemMessage);
     }
     
     @Override

@@ -13,17 +13,58 @@ PoorCraft ships with two showcase mods demonstrating the Lua modding workflow: a
 - **Configuration**: `gamedata/mods/block_texture_generator/mod.json` contains mod metadata and settings.
 - **Docs**: See `gamedata/mods/block_texture_generator/README.md` for notes. Note that the README may reference the old Python implementation.
 
-## AI NPC System (`gamedata/mods/ai_npc/`)
+## AI NPC Companion (`gamedata/mods/ai_npc/`)
 
-- **Purpose**: Placeholder for AI-powered NPC companion system.
-- **Current Status**: This mod serves as a Lua implementation placeholder demonstrating NPC spawning and management. Full AI integration requires HTTP libraries not available in standard Lua. Future versions may implement this through Java-side HTTP handling with Lua scripting for NPC behavior.
+- **Purpose**: Interactive AI companion that responds to chat messages and comments on biome changes.
+- **Current Status**: Fully functional with chat integration. Uses simple pattern matching for responses. Future versions may integrate with external AI services (Ollama, OpenAI, etc.).
 - **Key Features**:
-  - Demonstrates NPC spawning via `api.spawn_npc()`
-  - Shows NPC lifecycle management and cleanup
-  - Example of Lua mod initialization and configuration loading
-  - Table-based state management for tracking spawned NPCs
-- **Configuration**: `gamedata/mods/ai_npc/mod.json` defines mod metadata, spawn behavior, and personality settings.
-- **Docs**: `gamedata/mods/ai_npc/README.md` covers the vision for this mod. Note that the README may reference the old Python implementation.
+  - **Chat Interaction**: Responds to common greetings and questions ("hello", "help", "weather", etc.)
+  - **Biome Awareness**: Automatically comments when player enters a new biome
+  - **Smart Cooldown**: Prevents spam by limiting responses to once every 5 seconds
+  - **Pattern Matching**: Uses keyword-based response system (extensible to external AI APIs)
+  - **Update Loop**: Demonstrates continuous mod update mechanism for real-time biome tracking
+  - **Chat API**: Showcases `api.register_chat_listener()` and `api.send_chat_message()`
+- **Usage**:
+  - Enable the mod in your mod list
+  - Press `T` to open chat in-game
+  - Type messages like "hello", "help", or "weather" to interact
+  - Explore different biomes to trigger biome-specific responses
+- **Configuration**: `gamedata/mods/ai_npc/mod.json` defines mod metadata and future AI provider settings:
+  - `ai_provider` - "ollama" (planned for future)
+  - `ollama_url` - "http://localhost:11434" (planned)
+  - `model` - "llama2" (planned)
+  - `max_npcs` - Maximum concurrent NPCs (planned)
+  - `npc_response_timeout` - Response timeout in seconds (planned)
+- **Technical Implementation**:
+  - Uses `api.register_chat_listener()` to receive player messages
+  - Tracks last biome with `api.get_current_biome()` in update loop
+  - Sends responses via `api.send_chat_message()`
+  - Implements cooldown timer to prevent message flooding
+- **Future Plans**:
+  - Integration with external AI services (Ollama, OpenAI, Gemini)
+  - Voice-to-text support
+  - Persistent conversation memory
+  - Multiple NPC personalities
+  - Quest system integration
+- **Example Code**:
+```lua
+api.register_chat_listener(function(msg)
+    if not msg.is_system then
+        -- Process player message
+        api.send_chat_message("Response message")
+    end
+end)
+
+-- Track biome changes
+local last_biome = api.get_current_biome()
+function mod.update(delta_time)
+    local current_biome = api.get_current_biome()
+    if current_biome ~= last_biome then
+        api.send_chat_message("Welcome to " .. current_biome .. "!")
+        last_biome = current_biome
+    end
+end
+```
 
 ## Real-Time Synchronization (`gamedata/mods/realtime_sync/`)
 

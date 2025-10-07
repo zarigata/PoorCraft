@@ -48,68 +48,68 @@ public class PauseScreen extends UIScreen {
     public void init() {
         clearComponents();
         
-        float centerX = windowWidth / 2.0f;
         float uiScale = settings.graphics.uiScale;
+        panelWidth = LayoutUtils.getMinecraftPanelWidth(windowWidth, uiScale) * 0.85f;
+        panelHeight = LayoutUtils.getMinecraftPanelHeight(windowHeight, uiScale) * 0.8f;
+        panelWidth = LayoutUtils.clamp(panelWidth, 340f * uiScale, windowWidth - 100f);
+        panelHeight = LayoutUtils.clamp(panelHeight, 320f * uiScale, windowHeight - 100f);
+        panelX = LayoutUtils.centerHorizontally(windowWidth, panelWidth);
+        panelY = LayoutUtils.centerVertically(windowHeight, panelHeight);
+        contentPadding = LayoutUtils.getMinecraftPanelPadding(panelWidth);
 
-        // Simplified single-column layout
-        panelWidth = clamp(windowWidth * 0.45f * uiScale, 450f * uiScale, Math.max(450f * uiScale, windowWidth - 120f));
-        panelHeight = clamp(windowHeight * 0.7f * uiScale, 500f * uiScale, Math.max(500f * uiScale, windowHeight - 120f));
-        panelX = (windowWidth - panelWidth) / 2.0f;
-        panelY = (windowHeight - panelHeight) / 2.0f;
-        contentPadding = Math.max(26f * uiScale, panelWidth * 0.05f);
+        float centerX = panelX + panelWidth / 2f;
 
-        float titleScale = Math.max(1.7f, panelWidth / 520f) * uiScale;
+        float titleScale = LayoutUtils.MINECRAFT_TITLE_SCALE * uiScale;
         float titleBaseline = panelY + contentPadding;
         Label titleLabel = new Label(centerX, titleBaseline, "GAME PAUSED",
             0.02f, 0.96f, 0.96f, 1.0f);
         titleLabel.setCentered(true);
         titleLabel.setScale(titleScale);
+        titleLabel.setUseTextShadow(true);
         addComponent(titleLabel);
 
-        float topContentY = titleBaseline + Math.max(52f, 34f * titleScale);
-        float controlWidth = panelWidth - contentPadding * 2f;
-        float leftPanelX = panelX + contentPadding;
-        float contentY = topContentY;
-        
-        // Core action buttons (simplified layout)
-        float buttonHeight = Math.max(52f * uiScale, panelHeight * 0.095f);
-        float buttonSpacing = Math.max(16f * uiScale, buttonHeight * 0.28f);
-        float buttonWidth = controlWidth;
-        float buttonX = leftPanelX;
-        
-        MenuButton resumeButton = new MenuButton(buttonX, contentY, buttonWidth, buttonHeight,
+
+        float postTitleSpacing = Math.max(52f * uiScale, titleScale * 32f) * 1.5f;
+
+        float buttonWidth = LayoutUtils.getMinecraftButtonWidth(windowWidth, uiScale) * 0.9f;
+        float buttonHeight = LayoutUtils.getMinecraftButtonHeight(windowHeight, uiScale);
+        float buttonSpacing = LayoutUtils.getMinecraftButtonSpacing(buttonHeight);
+        float buttonStackHeight = LayoutUtils.calculateButtonStackHeight(5, buttonHeight, buttonSpacing);
+        float defaultButtonOffset = LayoutUtils.centerVertically((int) panelHeight, buttonStackHeight);
+        float defaultButtonStart = panelY + defaultButtonOffset;
+        float contentTop = titleBaseline + postTitleSpacing;
+        float buttonStartY = Math.max(contentTop, defaultButtonStart);
+        float buttonX = panelX + (panelWidth - buttonWidth) / 2f;
+
+        MenuButton resumeButton = new MenuButton(buttonX, buttonStartY, buttonWidth, buttonHeight,
             "RESUME GAME", () -> uiManager.setState(GameState.IN_GAME));
         addComponent(resumeButton);
-        contentY += buttonHeight + buttonSpacing;
 
-        MenuButton settingsButton = new MenuButton(buttonX, contentY, buttonWidth, buttonHeight,
+        MenuButton settingsButton = new MenuButton(buttonX, buttonStartY + (buttonHeight + buttonSpacing), buttonWidth, buttonHeight,
             "SETTINGS",
             () -> {
                 uiManager.getConfigManager().saveSettings(settings);
                 uiManager.setState(GameState.SETTINGS_MENU);
             });
         addComponent(settingsButton);
-        contentY += buttonHeight + buttonSpacing;
 
-        MenuButton modsButton = new MenuButton(buttonX, contentY, buttonWidth, buttonHeight,
+        MenuButton modsButton = new MenuButton(buttonX, buttonStartY + 2f * (buttonHeight + buttonSpacing), buttonWidth, buttonHeight,
             "MODS",
             () -> {
                 // TODO: Navigate to dedicated mods screen
                 System.out.println("[PauseScreen] Mods screen not yet implemented");
             });
         addComponent(modsButton);
-        contentY += buttonHeight + buttonSpacing;
 
-        MenuButton saveButton = new MenuButton(buttonX, contentY, buttonWidth, buttonHeight,
+        MenuButton saveButton = new MenuButton(buttonX, buttonStartY + 3f * (buttonHeight + buttonSpacing), buttonWidth, buttonHeight,
             "SAVE SETTINGS",
             () -> {
                 uiManager.getConfigManager().saveSettings(settings);
                 System.out.println("[PauseScreen] Settings saved!");
             });
         addComponent(saveButton);
-        contentY += buttonHeight + buttonSpacing;
 
-        MenuButton quitButton = new MenuButton(buttonX, contentY, buttonWidth, buttonHeight,
+        MenuButton quitButton = new MenuButton(buttonX, buttonStartY + 4f * (buttonHeight + buttonSpacing), buttonWidth, buttonHeight,
             "QUIT TO MENU",
             () -> {
                 if (quitConfirmDialog != null) {
@@ -133,22 +133,16 @@ public class PauseScreen extends UIScreen {
         addComponent(quitConfirmDialog);
         
         // Footer hint
-        float footerBaseline = panelY + panelHeight - contentPadding * 0.8f;
+        float footerBaseline = panelY + panelHeight - 16f;
         Label hintLabel = new Label(centerX, footerBaseline,
             "Press ESC to resume",
             0.7f, 0.5f, 0.9f, 0.7f);
         hintLabel.setCentered(true);
-        hintLabel.setScale(Math.max(0.9f, panelWidth / 600f));
+        hintLabel.setScale(Math.max(1.0f, LayoutUtils.MINECRAFT_LABEL_SCALE * uiScale));
+        hintLabel.setUseTextShadow(true);
         addComponent(hintLabel);
         
         System.out.println("[PauseScreen] Layout initialized for " + windowWidth + "x" + windowHeight);
-    }
-    
-    /**
-     * Clamps a value between min and max.
-     */
-    private float clamp(float value, float min, float max) {
-        return Math.max(min, Math.min(max, value));
     }
     
     @Override
@@ -175,26 +169,23 @@ public class PauseScreen extends UIScreen {
     public void render(UIRenderer renderer, FontRenderer fontRenderer) {
         // Adjust overlay alpha based on blur state
         // When blur is active, use lighter overlay; otherwise use darker overlay for readability
-        float overlayAlpha = settings.graphics.pauseMenuBlur ? 0.40f : 0.88f;
+        float overlayAlpha = settings.graphics.pauseMenuBlur ? 0.40f : 0.92f;
         renderer.drawRect(0, 0, windowWidth, windowHeight,
             0.03f, 0.01f, 0.08f, overlayAlpha);
         
-        // Slightly more opaque panel
-        renderer.drawRect(panelX, panelY, panelWidth, panelHeight,
-            0.08f, 0.05f, 0.12f, 0.97f);
-        float border = Math.max(2f, panelWidth * 0.003f);
-        renderer.drawRect(panelX, panelY, panelWidth, border,
-            0.0f, 0.95f, 0.95f, 0.8f);
-        renderer.drawRect(panelX, panelY + panelHeight - border, panelWidth, border,
-            0.0f, 0.95f, 0.95f, 0.8f);
-        renderer.drawRect(panelX, panelY, border, panelHeight,
-            0.0f, 0.95f, 0.95f, 0.8f);
-        renderer.drawRect(panelX + panelWidth - border, panelY, border, panelHeight,
-            0.0f, 0.95f, 0.95f, 0.8f);
-        // Remove center divider for cleaner look
-        // renderer.drawRect(panelX + panelWidth / 2f, panelY + contentPadding * 1.2f,
-        //     2f, panelHeight - contentPadding * 2.4f, 0.0f, 0.95f, 0.95f, 0.32f);
-        
+        renderer.drawDropShadow(panelX, panelY, panelWidth, panelHeight, 8f, 0.5f);
+        renderer.drawOutsetPanel(panelX, panelY, panelWidth, panelHeight,
+            0.10f, 0.08f, 0.14f, 0.98f);
+        renderer.drawBorderedRect(panelX, panelY, panelWidth, panelHeight, 3f,
+            new float[]{0f, 0f, 0f, 0f}, new float[]{0.0f, 0.95f, 0.95f, 0.4f});
+
+        float innerX = panelX + 2f;
+        float innerY = panelY + 2f;
+        float innerW = panelWidth - 4f;
+        float innerH = panelHeight - 4f;
+        renderer.drawBorderedRect(innerX, innerY, innerW, innerH, 2f,
+            new float[]{0f, 0f, 0f, 0f}, new float[]{0f, 0f, 0f, 0.3f});
+
         super.render(renderer, fontRenderer);
     }
 }

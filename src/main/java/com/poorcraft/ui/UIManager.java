@@ -40,6 +40,8 @@ public class UIManager {
     private UIScreen hudScreen;  // Special screen for in-game HUD
     private SkinManagerScreen skinManagerScreen;
     private SkinEditorScreen skinEditorScreen;
+    private ChatOverlay chatOverlay;
+    private ConsoleOverlay consoleOverlay;
     
     private Settings settings;
     private ConfigManager configManager;
@@ -148,6 +150,14 @@ public class UIManager {
         
         // HUD
         hudScreen = new HUD(windowWidth, windowHeight, game);
+        
+        // Chat overlay
+        chatOverlay = new ChatOverlay(windowWidth, windowHeight, (Game) game);
+        chatOverlay.init();
+        
+        // Console overlay
+        consoleOverlay = new ConsoleOverlay(windowWidth, windowHeight, (Game) game);
+        consoleOverlay.init();
 
         System.out.println("[UIManager] Created " + screens.size() + " screens");
         
@@ -234,6 +244,16 @@ public class UIManager {
             }
         }
         
+        // Render chat overlay if visible (in IN_GAME or PAUSED states)
+        if ((currentState == GameState.IN_GAME || currentState == GameState.PAUSED) && chatOverlay != null) {
+            chatOverlay.render(uiRenderer, fontRenderer);
+        }
+        
+        // Render console overlay if visible
+        if (consoleOverlay != null && consoleOverlay.isVisible()) {
+            consoleOverlay.render(uiRenderer, fontRenderer);
+        }
+        
         uiRenderer.end();
     }
     
@@ -279,6 +299,14 @@ public class UIManager {
         UIScreen screen = screens.get(currentState);
         if (screen != null) {
             screen.update(deltaTime);
+        }
+        
+        // Update overlays
+        if (chatOverlay != null) {
+            chatOverlay.update(deltaTime);
+        }
+        if (consoleOverlay != null) {
+            consoleOverlay.update(deltaTime);
         }
     }
     
@@ -341,6 +369,34 @@ public class UIManager {
             ? settings.controls.getKeybind("inventory", GLFW_KEY_E)
             : GLFW_KEY_E;
 
+        // Handle chat toggle (T key)
+        if (key == GLFW_KEY_T && currentState == GameState.IN_GAME && consoleOverlay != null && !consoleOverlay.isVisible()) {
+            if (chatOverlay != null) {
+                chatOverlay.toggleVisibility();
+            }
+            return;
+        }
+        
+        // Handle console toggle (F1 or / key)
+        if ((key == GLFW_KEY_F1 || key == GLFW_KEY_SLASH) && currentState == GameState.IN_GAME) {
+            if (consoleOverlay != null) {
+                consoleOverlay.toggleVisibility();
+            }
+            return;
+        }
+        
+        // Forward to console if visible
+        if (consoleOverlay != null && consoleOverlay.isVisible()) {
+            consoleOverlay.onKeyPress(key, mods);
+            return;
+        }
+        
+        // Forward to chat if visible
+        if (chatOverlay != null && chatOverlay.isVisible()) {
+            chatOverlay.onKeyPress(key, mods);
+            return;
+        }
+
         // Handle global hotkeys
         if (key == GLFW_KEY_F3 && (currentState == GameState.IN_GAME || currentState == GameState.PAUSED)) {
             // Toggle debug info
@@ -386,9 +442,40 @@ public class UIManager {
      * @param character Typed character
      */
     public void onCharInput(char character) {
+        // Forward to console if visible
+        if (consoleOverlay != null && consoleOverlay.isVisible()) {
+            consoleOverlay.onCharInput(character);
+            return;
+        }
+        
+        // Forward to chat if visible
+        if (chatOverlay != null && chatOverlay.isVisible()) {
+            chatOverlay.onCharInput(character);
+            return;
+        }
+        
         UIScreen screen = screens.get(currentState);
         if (screen != null) {
             screen.onCharInput(character);
+        }
+    }
+    
+    /**
+     * Handles mouse scroll events.
+     * 
+     * @param yOffset Scroll amount (positive = up, negative = down)
+     */
+    public void onScroll(double yOffset) {
+        // Forward to console if visible
+        if (consoleOverlay != null && consoleOverlay.isVisible()) {
+            consoleOverlay.onScroll(yOffset);
+            return;
+        }
+        
+        // Forward to chat if visible
+        if (chatOverlay != null && chatOverlay.isVisible()) {
+            chatOverlay.onScroll(yOffset);
+            return;
         }
     }
     
@@ -408,6 +495,13 @@ public class UIManager {
         
         if (hudScreen != null) {
             hudScreen.onResize(width, height);
+        }
+        
+        if (chatOverlay != null) {
+            chatOverlay.onResize(width, height);
+        }
+        if (consoleOverlay != null) {
+            consoleOverlay.onResize(width, height);
         }
     }
     
@@ -524,6 +618,14 @@ public class UIManager {
         
         // Set disconnect callback
         gameClient.setDisconnectCallback(reason -> onConnectionFailed(reason));
+        
+        // Set chat message callback to forward to ChatOverlay (which fires mod events)
+        gameClient.setChatMessageCallback(chatMsg -> {
+            if (chatOverlay != null) {
+                chatOverlay.enqueueMessage(chatMsg.senderId, chatMsg.senderName,
+                    chatMsg.message, chatMsg.timestamp, chatMsg.isSystemMessage);
+            }
+        });
         
         // Transition to connecting state
         setState(GameState.CONNECTING);
@@ -757,6 +859,24 @@ public class UIManager {
             System.err.println("[UIManager] Failed to get rendering components: " + e.getMessage());
             return new Object[]{null, null, null};
         }
+    }
+    
+    /**
+     * Gets the chat overlay.
+     * 
+     * @return Chat overlay instance
+     */
+    public ChatOverlay getChatOverlay() {
+        return chatOverlay;
+    }
+    
+    /**
+     * Gets the console overlay.
+     * 
+     * @return Console overlay instance
+     */
+    public ConsoleOverlay getConsoleOverlay() {
+        return consoleOverlay;
     }
     
     /**

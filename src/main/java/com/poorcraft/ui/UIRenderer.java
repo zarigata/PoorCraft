@@ -130,40 +130,126 @@ public class UIRenderer {
     
     /**
      * Draws a solid color rectangle.
-     * 
-     * @param x X position (pixels from left)
-     * @param y Y position (pixels from top)
-     * @param width Rectangle width in pixels
-     * @param height Rectangle height in pixels
-     * @param r Red component (0.0 to 1.0)
-     * @param g Green component (0.0 to 1.0)
-     * @param b Blue component (0.0 to 1.0)
-     * @param a Alpha component (0.0 to 1.0)
+     *
+     * @param x      X position (pixels from left)
+     * @param y      Y position (pixels from top)
+     * @param width  rectangle width in pixels
+     * @param height rectangle height in pixels
+     * @param r      red component (0.0 to 1.0)
+     * @param g      green component (0.0 to 1.0)
+     * @param b      blue component (0.0 to 1.0)
+     * @param a      alpha component (0.0 to 1.0)
      */
     public void drawRect(float x, float y, float width, float height, float r, float g, float b, float a) {
         // Build model matrix: translate to position, scale to size
         modelMatrix.identity()
             .translate(x, y, 0)
             .scale(width, height, 1);
-        
+
         uiShader.setUniform("uModel", modelMatrix);
         uiShader.setUniform("uColor", r, g, b, a);
         uiShader.setUniform("uUseTexture", false);
-        
+
         glBindVertexArray(vao);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
     }
-    
+
     /**
-     * Draws a textured rectangle.
-     * 
-     * @param x X position (pixels from left)
-     * @param y Y position (pixels from top)
-     * @param width Rectangle width in pixels
-     * @param height Rectangle height in pixels
-     * @param textureId OpenGL texture ID
+     * Draws a semi-transparent drop shadow behind a rectangular element.
+     *
+     * @param x            source element X coordinate
+     * @param y            source element Y coordinate
+     * @param width        element width
+     * @param height       element height
+     * @param shadowOffset offset applied to both axes (pixels)
+     * @param shadowAlpha  alpha value for the shadow (0.0-1.0)
      */
+    public void drawDropShadow(float x, float y, float width, float height,
+                               float shadowOffset, float shadowAlpha) {
+        float shadowX = x + shadowOffset;
+        float shadowY = y + shadowOffset;
+        drawRect(shadowX, shadowY, width, height, 0f, 0f, 0f, shadowAlpha);
+    }
+
+    /**
+     * Draws a recessed (inset) panel with darker top/left borders and
+     * lighter bottom/right borders to simulate depth.
+     */
+    public void drawInsetPanel(float x, float y, float width, float height,
+                               float r, float g, float b, float a) {
+        drawRect(x, y, width, height, r, g, b, a);
+
+        float border = Math.max(2f, Math.min(width, height) * 0.015f);
+
+        float darkR = r * 0.6f;
+        float darkG = g * 0.6f;
+        float darkB = b * 0.6f;
+
+        float lightR = Math.min(1f, r * 1.15f);
+        float lightG = Math.min(1f, g * 1.15f);
+        float lightB = Math.min(1f, b * 1.15f);
+
+        // Top shadow
+        drawRect(x, y, width, border, darkR, darkG, darkB, a);
+        // Left shadow
+        drawRect(x, y, border, height, darkR, darkG, darkB, a);
+        // Bottom highlight
+        drawRect(x, y + height - border, width, border, lightR, lightG, lightB, a);
+        // Right highlight
+        drawRect(x + width - border, y, border, height, lightR, lightG, lightB, a);
+    }
+
+    /**
+     * Draws a raised (outset) panel with lighter top/left borders and
+     * darker bottom/right borders to simulate elevation.
+     */
+    public void drawOutsetPanel(float x, float y, float width, float height,
+                                float r, float g, float b, float a) {
+        drawRect(x, y, width, height, r, g, b, a);
+
+        float border = Math.max(2f, Math.min(width, height) * 0.015f);
+
+        float darkR = r * 0.65f;
+        float darkG = g * 0.65f;
+        float darkB = b * 0.65f;
+
+        float lightR = Math.min(1f, r * 1.2f);
+        float lightG = Math.min(1f, g * 1.2f);
+        float lightB = Math.min(1f, b * 1.2f);
+
+        // Top highlight
+        drawRect(x, y, width, border, lightR, lightG, lightB, a);
+        // Left highlight
+        drawRect(x, y, border, height, lightR, lightG, lightB, a);
+        // Bottom shadow
+        drawRect(x, y + height - border, width, border, darkR, darkG, darkB, a);
+        // Right shadow
+        drawRect(x + width - border, y, border, height, darkR, darkG, darkB, a);
+    }
+
+    /**
+     * Draws a rectangle with a configurable border.
+     */
+    public void drawBorderedRect(float x, float y, float width, float height,
+                                 float borderWidth, float[] bgColor, float[] borderColor) {
+        if (borderWidth > 0f) {
+            drawRect(x, y, width, height,
+                    borderColor[0], borderColor[1], borderColor[2], borderColor[3]);
+
+            float innerX = x + borderWidth;
+            float innerY = y + borderWidth;
+            float innerWidth = Math.max(0f, width - borderWidth * 2f);
+            float innerHeight = Math.max(0f, height - borderWidth * 2f);
+
+            drawRect(innerX, innerY, innerWidth, innerHeight,
+                    bgColor[0], bgColor[1], bgColor[2], bgColor[3]);
+        } else {
+            drawRect(x, y, width, height,
+                    bgColor[0], bgColor[1], bgColor[2], bgColor[3]);
+        }
+    }
+
     public void drawTexturedRect(float x, float y, float width, float height, int textureId) {
         drawTexturedRect(x, y, width, height, textureId, 1.0f, 1.0f, 1.0f, 1.0f);
     }

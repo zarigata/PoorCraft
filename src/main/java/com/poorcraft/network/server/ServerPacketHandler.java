@@ -65,6 +65,8 @@ public class ServerPacketHandler extends SimpleChannelInboundHandler<Packet> {
             handleBlockPlace((BlockPlacePacket) packet);
         } else if (packet instanceof BlockBreakPacket) {
             handleBlockBreak((BlockBreakPacket) packet);
+        } else if (packet instanceof ChatMessagePacket) {
+            handleChatMessage((ChatMessagePacket) packet);
         } else {
             System.out.println("[ServerPacketHandler] Unknown packet type: " + packet.getClass().getSimpleName());
         }
@@ -132,6 +134,14 @@ public class ServerPacketHandler extends SimpleChannelInboundHandler<Packet> {
     private void handleBlockBreak(BlockBreakPacket packet) {
         if (!session.isLoggedIn()) return;
         server.onBlockBreak(session, packet.x, packet.y, packet.z);
+    }
+    
+    /**
+     * Handles chat message packet.
+     */
+    private void handleChatMessage(ChatMessagePacket packet) {
+        if (!session.isLoggedIn()) return;
+        server.onChatMessage(session, packet.message);
     }
     
     @Override

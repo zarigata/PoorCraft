@@ -235,6 +235,48 @@ public class LuaModAPI {
             }
         });
         
+        // Chat API
+        api.set("send_chat_message", new OneArgFunction() {
+            @Override
+            public LuaValue call(LuaValue message) {
+                modAPI.sendChatMessage(message.checkjstring());
+                return LuaValue.NIL;
+            }
+        });
+        
+        api.set("register_chat_listener", new OneArgFunction() {
+            @Override
+            public LuaValue call(LuaValue callback) {
+                if (!callback.isfunction()) {
+                    return LuaValue.NIL;
+                }
+                
+                // Wrap Lua callback in Java Consumer
+                modAPI.registerChatListener(data -> {
+                    try {
+                        LuaTable msgTable = new LuaTable();
+                        msgTable.set("sender_id", LuaValue.valueOf(data.senderId));
+                        msgTable.set("sender_name", LuaValue.valueOf(data.senderName));
+                        msgTable.set("message", LuaValue.valueOf(data.message));
+                        msgTable.set("timestamp", LuaValue.valueOf(data.timestamp));
+                        msgTable.set("is_system", LuaValue.valueOf(data.isSystemMessage));
+                        callback.call(msgTable);
+                    } catch (Exception e) {
+                        System.err.println("[LuaModAPI] Error in Lua chat listener: " + e.getMessage());
+                    }
+                });
+                return LuaValue.NIL;
+            }
+        });
+        
+        api.set("get_current_biome", new VarArgFunction() {
+            @Override
+            public LuaValue invoke(org.luaj.vm2.Varargs args) {
+                String biome = modAPI.getCurrentBiome();
+                return biome != null ? LuaValue.valueOf(biome) : LuaValue.NIL;
+            }
+        });
+        
         return api;
     }
     

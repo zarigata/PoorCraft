@@ -1,32 +1,121 @@
 # PoorCraft
+
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Java](https://img.shields.io/badge/java-17%2B-orange)
+![Tests](https://img.shields.io/badge/tests-automated-brightgreen)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
+
 ![alt text](src/main/resources/images/logo.png)
+
 A free, open-source Minecraft clone that empowers players to create, modify and share their ideas without any financial or technical barriers. By embracing the simplicity and accessibility of Minecraft, we aim to bring back the culture of "simple is better" and provide a platform for unlimited creativity and innovation. Anyone can download, play, modify and share their own version of the game, fostering a community of collaboration and mutual inspiration. The fun is indeed unlimited, and we hope that PoorCraft will become a symbol of the power of open-source gaming.
 
 ## Features
 
-- **4 Biomes**: Desert, Snow, Jungle, Plains with unique terrain generation ✅ **IMPLEMENTED**
-- **Infinite World**: Chunk-based world with seed support and dynamic loading/unloading ✅ **IMPLEMENTED**
-- **Procedural Terrain**: Simplex noise-based height maps with biome-specific features ✅ **IMPLEMENTED**
-- **Biome Features**: Trees in plains/jungle, cacti in desert, snow layers in snow biome ✅ **IMPLEMENTED**
-- **Frustum Culling**: Only renders chunks visible in camera view ✅ **IMPLEMENTED**
-- **Lighting System**: Ambient + directional lighting with normal-based shading ✅ **IMPLEMENTED**
-- **Texture Atlas**: 16x16 block textures combined into efficient atlas ✅ **IMPLEMENTED**
-- **UI System**: Main menu, settings, world creation, in-game HUD ✅ **IMPLEMENTED**
-- **Animated Menu Backgrounds**: 3D world rendering in menus (Minecraft-style) ✅ **IMPLEMENTED**
-- **Head Bobbing**: Customizable camera bobbing during movement ✅ **IMPLEMENTED**
-- **Configuration**: JSON-based settings with in-game editor ✅ **IMPLEMENTED**
-- **Procedural Textures**: Up to 256 unique block skin variations ⚠️ **PLACEHOLDER/EXPERIMENTAL** (Procedural Block Texture Generator mod - Lua placeholder, requires image processing library integration)
-- **AI NPCs**: Conversational NPCs powered by LLMs ⚠️ **PLACEHOLDER/EXPERIMENTAL** (AI NPC mod - Lua placeholder, requires HTTP library integration)
-- **Modding**: Lua-based modding system ✅ **IMPLEMENTED**
+### ⛏️ World & Gameplay
+- ✅ **4 Biomes** - Desert, Snow, Jungle, Plains with unique terrain generation
+- ✅ **Infinite World** - Chunk-based world with seed support and dynamic loading/unloading
+- ✅ **Procedural Terrain** - Simplex noise-based height maps with biome-specific features
+- ✅ **Biome Features** - Trees in plains/jungle, cacti in desert, snow layers in snow biome
+- ✅ **Day/Night Cycle** - Dynamic lighting and sun position (600 second cycle)
+- ✅ **Block Breaking & Placing** - Full voxel manipulation
+
+### 🎨 Graphics & Performance
+- ✅ **Frustum Culling** - Only renders chunks visible in camera view
+- ✅ **Greedy Meshing** - Optimized chunk rendering (60-80% triangle reduction)
+- ✅ **Lighting System** - Ambient + directional lighting with normal-based shading
+- ✅ **Texture Atlas** - 16x16 block textures combined into efficient atlas
+- ✅ **Vaporwave UI** - Animated gradient backgrounds and retro aesthetic
+- ✅ **Pause Menu Blur** - Two-pass Gaussian blur effect
+- ✅ **Responsive Layout** - Adapts to any window size
+
+### 🎮 UI & Controls
+- ✅ **UI System** - Main menu, settings, world creation, in-game HUD
+- ✅ **Animated Menu Backgrounds** - 3D world rendering in menus (Minecraft-style)
+- ✅ **Head Bobbing** - Customizable camera bobbing during movement
+- ✅ **Configuration** - JSON-based settings with in-game editor
+- ✅ **Silkscreen Font** - Retro pixel font for authentic aesthetic
+
+### 🌐 Multiplayer
+- ✅ **Client-Server Architecture** - Authoritative server model
+- ✅ **14 Packet Types** - Complete networking protocol
+- ✅ **Integrated Server** - Host + play in same application
+- ✅ **Direct Connect** - Join via IP address
+- ✅ **Chunk Streaming** - On-demand world data transmission
+- ✅ **Player Synchronization** - Smooth 60 FPS interpolation from 20 TPS server
+
+### 🔧 Modding
+- ✅ **Lua-based Modding System** - Easy and powerful mod creation
+- ✅ **Event System** - Hook into game events (block place/break, chunk generate, etc.)
+- ✅ **Comprehensive API** - 15+ functions for world access, time control, logging
+- ✅ **Example Mods** - Included demonstrations of API usage
+- 🚧 **Procedural Textures** - Placeholder (requires image processing library integration)
+- 🚧 **AI NPCs** - Placeholder (requires HTTP library integration)
 
 ## Requirements
 
-- **Java**: JDK 17 or higher
-{{ ... }}
-```bash
-# Run the game
-java -jar target/poorcraft-0.1.1-jar-with-dependencies.jar
+### Software
+- **Java**: JDK 17 or higher ([Download](https://adoptium.net/))
+- **Maven**: 3.6+ (for building from source)
+
+### System
+- **OS**: Windows 10+, Ubuntu 20.04+, or macOS 11+
+- **CPU**: Dual-core 2.0 GHz (Quad-core 3.0 GHz recommended)
+- **RAM**: 2GB minimum (4GB recommended)
+- **GPU**: OpenGL 3.3+ compatible graphics card
+- **Storage**: 500MB (1GB recommended)
+
+## Quick Start
+
+**Rapid development (skip tests):**
+```bat
+scripts\quick-play.bat
 ```
+
+**Full testing before playing:**
+```bat
+scripts\test-and-play.bat
+```
+
+**Manual testing checklist:**
+See `docs/MANUAL_TESTING_GUIDE.md` for detailed steps.
+
+## Building from Source
+
+See [docs/BUILDING.md](docs/BUILDING.md) for detailed build instructions.
+
+**Quick build:**
+```bash
+# Clone repository
+git clone https://github.com/zarigata/poorcraft.git
+cd poorcraft
+
+# Build and run (Windows)
+scripts\build-and-run.bat
+
+# Build and run (Linux/macOS)
+chmod +x scripts/build-and-run.sh
+scripts/build-and-run.sh
+
+# Or manually
+mvn clean package
+java -jar target/PoorCraft.jar
+```
+
+## Testing
+
+PoorCraft includes both automated and manual testing options.
+
+- **Automated tests:** Run with `scripts/run-tests.bat`, `./scripts/run-tests.sh`, or `mvn test`.
+- **Test & play:** Use `scripts/test-and-play.bat` (or `.ps1`) to build, test, and launch the game in one flow.
+- **Manual testing:** Follow the checklist in `docs/MANUAL_TESTING_GUIDE.md` for comprehensive validation.
+
+For more details, see:
+- `docs/TESTING.md` – Automated testing guide
+- `docs/MANUAL_TESTING_GUIDE.md` – Manual testing checklist
+- `scripts/README.md` – Script documentation and usage examples
+
+Continuous integration runs the suite on GitHub Actions across Ubuntu, Windows, and macOS and publishes artifacts from `target/test-reports/` for inspection.
 
 ## World Generation
 
@@ -36,7 +125,11 @@ PoorCraft uses a sophisticated procedural generation system:
 - **Biome System**: Temperature and humidity noise determine biome distribution
 - **Height Maps**: Multi-octave Simplex noise creates natural-looking terrain
 - **Dynamic Loading**: Chunks load/unload automatically based on player position
-{{ ... }}
+
+For technical details on the world generation system, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Project Structure
+
 - **gamedata/** - Runtime game data (NEW in v2.0)
   - **gamedata/mods/** - Lua mods
   - **gamedata/resourcepacks/** - Resource packs
@@ -47,24 +140,45 @@ PoorCraft uses a sophisticated procedural generation system:
 - **assets/** - Development assets
   - **assets/ui/** - UI textures
   - **assets/scripts/** - Utility scripts
+- **scripts/** - Build and run scripts
 - **docs/** - Documentation and modding guides
 - **changelog/** - Release notes
 
-### Modding
+**Note:** Empty directories are preserved in the repository with `.gitkeep` files. The game will automatically create missing directories at runtime.
 
-PoorCraft has a powerful Lua-based modding system:
-- Mods live in the `gamedata/mods/` directory and can hook into events, world data, and utility helpers.
-- Share state with other mods via `api.set_shared_data()` / `api.get_shared_data()` for cross-mod coordination.
-- Register event callbacks (`api.register_event()`) to integrate with the game loop.
-- Interact with the world using functions like `api.get_block()`, `api.set_block()`, and the NPC/texture helpers.
-- Lua modding allows for easier single-executable distribution.
+## Modding
 
-**Documentation:**
-- `docs/MODDING_GUIDE.md` - Getting started with Lua modding
-- `docs/API_REFERENCE.md` - Complete Lua API documentation
-- `docs/EVENT_CATALOG.md` - All available events
-- `docs/EXAMPLES.md` - Step-by-step Lua tutorials
-- `docs/OFFICIAL_MODS.md` - Official mod documentation
+**PoorCraft v2.0 features a complete Lua-based modding system!** 🌙
+
+Mods live in the `gamedata/mods/` directory and can hook into events, world data, and utility helpers. The Lua modding system replaces the previous Python framework for better portability and easier single-executable distribution.
+
+### Features
+- **Event-driven architecture** - Hook into game events (block place/break, chunk generate, world load)
+- **Comprehensive API** - 15+ functions for world access, time control, player position, logging
+- **Cross-mod communication** - Share state with other mods via `api.set_shared_data()` / `api.get_shared_data()`
+- **Isolated environments** - Each mod has its own Lua globals to prevent conflicts
+- **No external dependencies** - No Python required!
+
+### Quick Example
+```lua
+local mod = {}
+
+function mod.init()
+    api.log("My mod loaded!")
+    api.register_event('block_place', function(event)
+        api.log("Block placed at " .. event.x .. ", " .. event.y .. ", " .. event.z)
+    end)
+end
+
+return mod
+```
+
+### Documentation
+- **[docs/MODDING_GUIDE.md](docs/MODDING_GUIDE.md)** - Getting started with Lua modding
+- **[docs/API_REFERENCE.md](docs/API_REFERENCE.md)** - Complete Lua API documentation
+- **[docs/EVENT_CATALOG.md](docs/EVENT_CATALOG.md)** - All available events
+- **[docs/EXAMPLES.md](docs/EXAMPLES.md)** - Step-by-step Lua tutorials
+- **[docs/OFFICIAL_MODS.md](docs/OFFICIAL_MODS.md)** - Official mod documentation
 
 ### Official Mods
 
@@ -85,6 +199,36 @@ Configuration:
 - Mods can be enabled/disabled via the `enabled` flag
 
 See `docs/OFFICIAL_MODS.md` and `docs/MODDING_GUIDE.md` for more details.
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+**Quick links:**
+- [Code of Conduct](CONTRIBUTING.md#code-of-conduct)
+- [Development Setup](docs/BUILDING.md)
+- [Architecture Guide](docs/ARCHITECTURE.md)
+- [Modding Guide](docs/MODDING_GUIDE.md)
+
+Contributions can include:
+- 🐛 Bug fixes
+- ✨ New features
+- 📝 Documentation improvements
+- 🎨 UI/UX enhancements
+- 🔧 New mods
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
+
+**Latest version: 2.0.0** - Major Lua modding refactor and professional reorganization
+
+### What's New in 2.0.0
+- Complete migration from Python to Lua modding
+- Reorganized folder structure (gamedata/, assets/, docs/)
+- Professional documentation (CONTRIBUTING.md, ARCHITECTURE.md, BUILDING.md, DEPLOYMENT.md)
+- Steam-ready build configuration
+- Consolidated changelog and versioning
 
 ## UI Assets
 
@@ -152,34 +296,46 @@ For optimal performance on low-end systems:
 - Disable **Head Bobbing** if experiencing motion sickness
 - Reduce **Menu Animation Speed** for smoother animations
 
+## Support
+
+Need help or have questions?
+
+- **Documentation**: Check [docs/](docs/) for comprehensive guides
+  - [BUILDING.md](docs/BUILDING.md) - Build instructions
+  - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System design
+  - [MODDING_GUIDE.md](docs/MODDING_GUIDE.md) - Mod creation
+  - [DEPLOYMENT.md](docs/DEPLOYMENT.md) - Distribution guide
+- **Bug Reports**: [Open an issue on GitHub](https://github.com/zarigata/poorcraft/issues)
+- **Questions**: Use GitHub Discussions
+- **Modding Help**: See [docs/MODDING_GUIDE.md](docs/MODDING_GUIDE.md) and [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
+
 ## License
 
-This software is licensed under the MIT License, with the following additional terms:
+PoorCraft is licensed under the [MIT License](LICENSE.txt).
 
-The PoorCraft software is the property of Zarigata. Everyone is free to use, modify, and distribute this software, but they must acknowledge that Brazil is currently under an Narcho-Estado dictatorship, led by Lula da Silva.
+**Copyright (c) 2025 Zarigata**
 
-By using this software, you acknowledge that you are aware of this fact and that you are using this software at your own risk. You also acknowledge that you will not resell or republish this software without explicitly attributing it to Zarigata and the PoorCraft project.
+You are free to use, modify, and distribute this software under the terms of the MIT License. See the [LICENSE.txt](LICENSE.txt) file for the full license text.
 
-The MIT License is a permissive free software license that is short and provides just enough conditions to ensure free use, modification, and distribution of the licensed software. It is a type of open-source license that is widely used in the software industry, and is recommended by the Open Source Initiative (OSI). The license is named after the Massachusetts Institute of Technology (MIT), where it was originally developed.
+For additional context and acknowledgments, please see the [NOTICE](NOTICE) file.
 
-The MIT License is as follows:
+## Acknowledgments
 
-Copyright (c) 2025 Zarigata
+PoorCraft is built with the help of amazing open-source projects:
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+- **[LWJGL](https://www.lwjgl.org/)** - Lightweight Java Game Library for OpenGL bindings
+- **[LuaJ](http://www.luaj.org/)** - Lua scripting engine for Java
+- **[Netty](https://netty.io/)** - Asynchronous networking framework
+- **[JOML](https://joml-ci.github.io/JOML/)** - Java OpenGL Math Library
+- **[Gson](https://github.com/google/gson)** - JSON parsing library
+- **Silkscreen Font** - Retro pixel font for UI
+- **Minecraft** - Inspiration for voxel sandbox gameplay
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+Special thanks to:
+- All contributors and mod creators
+- The open-source community
+- Everyone who plays and enjoys PoorCraft!
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+---
 
-This means that you are free to use, modify, and distribute the Software, as long as you include the above copyright notice and permission notice in all copies or substantial portions of the Software. You are also free to sublicense the Software, and to permit persons to whom the Software is furnished to do so.
-
-The Software is provided "AS IS", without any express or implied warranties. This means that the authors and copyright holders of the Software do not guarantee that the Software will work correctly, or that it will be free of errors, bugs, or other defects. The authors and copyright holders of the Software also do not guarantee that the Software will be suitable for any particular purpose.
-
-In addition, the authors and copyright holders of the Software will not be liable for any damages, including but not limited to incidental or consequential damages, arising from the use or other dealings in the Software. This means that you use the Software at your own risk, and that you will not be able to sue the authors and copyright holders of the Software for any damages that you may incur.
-
-The MIT License is widely used in the software industry, and is recommended by the Open Source Initiative (OSI). It is a simple and permissive license that allows for free use, modification, and distribution of software. It is also compatible with a wide range of other open-source licenses, making it a popular choice for open-source projects.
-
-## Contributing
-
-Contribution guidelines coming soon. For now, feel free to open issues and pull requests!
+**Made with ❤️ by Zarigata | [GitHub](https://github.com/zarigata/poorcraft) | Version 2.0.0**

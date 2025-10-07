@@ -135,6 +135,10 @@ public class Game {
         return skinManager;
     }
     
+    public UIManager getUIManager() {
+        return uiManager;
+    }
+    
     /**
      * Initializes all game subsystems.
      * Creates window, input handler, camera, etc.
@@ -235,6 +239,9 @@ public class Game {
         inputHandler.setMouseReleaseCallback(button -> {
             uiManager.onMouseRelease((float)inputHandler.getMouseX(), (float)inputHandler.getMouseY(), button);
         });
+        inputHandler.setScrollCallback(yOffset -> {
+            uiManager.onScroll(yOffset);
+        });
         
         // Don't create world yet - wait for player to click "Create World" in UI
         // World creation moved to createWorld() method
@@ -309,6 +316,27 @@ public class Game {
         // Update mods after time advancement so they can override time each frame
         if (modLoader != null) {
             modLoader.update(deltaTime);
+        }
+        
+        // Track biome changes for mods
+        if (worldLoaded && playerController != null && world != null && modLoader != null) {
+            Vector3f pos = playerController.getPosition();
+            BiomeType newBiome = world.getBiome((int)pos.x, (int)pos.z);
+            
+            if (lastBiome != newBiome && lastBiome != null) {
+                // Biome changed, fire event
+                if (modLoader.getEventBus() != null) {
+                    modLoader.getEventBus().fire(new com.poorcraft.modding.events.BiomeChangeEvent(
+                        0,  // Player ID (0 for local player)
+                        lastBiome.toString(),
+                        newBiome.toString(),
+                        (int)pos.x,
+                        (int)pos.z
+                    ));
+                }
+            }
+            
+            lastBiome = newBiome;
         }
 
         if (skyRenderer != null) {
@@ -806,7 +834,7 @@ public class Game {
     public float getTimeOfDay() {
         return timeOfDay;
     }
-    
+
     /**
      * Sets the game time of day and updates lighting.
      * 
@@ -818,7 +846,19 @@ public class Game {
         // Update lighting to match new time
         updateSkyLighting(this.timeOfDay);
     }
-    
+
+    public void setExternalTimeControlEnabled(boolean enabled) {
+        this.externalTimeControlEnabled = enabled;
+    }
+
+    public boolean isExternalTimeControlEnabled() {
+        return externalTimeControlEnabled;
+    }
+
+    public boolean isWorldLoaded() {
+        return worldLoaded && world != null;
+    }
+
     /**
      * Gets the player's current position in the world.
      * 
@@ -830,42 +870,17 @@ public class Game {
         }
         return null;
     }
-    
-    /**
-     * Gets the player controller instance.
-     * 
-     * @return Player controller, or null if not initialized
-     */
+
     public PlayerController getPlayerController() {
         return playerController;
     }
-    
-    /**
-     * Checks if external time control is enabled.
-     * When enabled, the game will not advance time automatically.
-     * 
-     * @return true if external time control is enabled
-     */
-    public boolean isExternalTimeControlEnabled() {
-        return externalTimeControlEnabled;
-    }
-    
-    /**
-     * Sets whether external time control is enabled.
-     * When enabled, the game will not advance time automatically,
-     * allowing mods to manage time progression.
-     * 
-     * @param enabled true to disable automatic time progression
-     */
-    public void setExternalTimeControlEnabled(boolean enabled) {
-        this.externalTimeControlEnabled = enabled;
-    }
-    
+
     /**
      * Updates Discord Rich Presence based on current game state.
      * Called periodically from the update loop.
      * 
      * This is where the magic happens - we tell Discord what we're doing.
+{{ ... }}
      * Or what we want Discord to think we're doing. Same thing really.
      */
     private void updateDiscordPresence() {

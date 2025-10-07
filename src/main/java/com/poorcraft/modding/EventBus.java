@@ -53,7 +53,7 @@ public class EventBus {
      * @param eventName Name of the event (e.g., "block_place")
      * @param callback Callback object (Lua callback)
      */
-    public void registerPythonCallback(String eventName, Object callback) {
+    public void registerCallback(String eventName, Object callback) {
         callbacks.computeIfAbsent(eventName, k -> new ArrayList<>()).add(callback);
         System.out.println("[EventBus] Registered callback for event: " + eventName);
     }
@@ -64,7 +64,7 @@ public class EventBus {
      * @param eventName Name of the event
      * @param callback Callback object to remove
      */
-    public void unregisterPythonCallback(String eventName, Object callback) {
+    public void unregisterCallback(String eventName, Object callback) {
         List<Object> eventCallbacks = callbacks.get(eventName);
         if (eventCallbacks != null) {
             eventCallbacks.remove(callback);

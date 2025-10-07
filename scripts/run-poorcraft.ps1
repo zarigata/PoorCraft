@@ -1,7 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-Set-Location -Path $PSScriptRoot
+Set-Location -Path (Join-Path -Path $PSScriptRoot -ChildPath "..")
 
 # ok kinda messy but i swear it's like minecraft beta when redstone just randomly behaved
 echo "Building PoorCraft (mvn clean package)..."
@@ -12,7 +12,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-$jarPath = Join-Path -Path $PSScriptRoot -ChildPath "target/poorcraft-0.1.1-jar-with-dependencies.jar"
+$jarPath = "target/PoorCraft.jar"
 
 if (-not (Test-Path -Path $jarPath)) {
     echo "Expected jar $jarPath not found."

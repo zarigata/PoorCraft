@@ -143,18 +143,7 @@ api.set_game_time(0.5)  -- Set to noon
 - Example:
 ```lua
 -- In mod enable():
-api.set_time_control_enabled(true)  -- Take control of time
-
--- In mod disable():
 api.set_time_control_enabled(false)  -- Restore auto progression
-```
-
-**`api.get_real_time()`**
-- Parameters: none
-- Returns: number (milliseconds since Unix epoch)
-- Description: Get current real-world system time for synchronization purposes
-- Example:
-```lua
 local millis = api.get_real_time()
 api.log("Real time: " .. millis)
 ```

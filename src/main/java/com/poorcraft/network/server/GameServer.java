@@ -397,6 +397,66 @@ public class GameServer {
         }
     }
     
+    /**
+     * Called when a player sends a chat message.
+     * Validates the message and broadcasts it to all players.
+     * 
+     * @param session Player session
+     * @param message Chat message content
+     */
+    public void onChatMessage(PlayerSession session, String message) {
+        // Validate message
+        if (message == null || message.trim().isEmpty()) {
+            return;
+        }
+        
+        // Trim to max length
+        if (message.length() > 256) {
+            message = message.substring(0, 256);
+        }
+        
+        // Create chat packet with sender info
+        ChatMessagePacket chatPacket = new ChatMessagePacket(
+            session.getPlayerId(),
+            session.getUsername(),
+            message,
+            System.currentTimeMillis(),
+            false
+        );
+        
+        // Broadcast to all logged-in players
+        for (PlayerSession player : players.values()) {
+            if (player.isLoggedIn()) {
+                player.sendPacket(chatPacket);
+            }
+        }
+        
+        System.out.println("[Chat] " + session.getUsername() + ": " + message);
+    }
+    
+    /**
+     * Broadcasts a system message to all players.
+     * 
+     * @param message System message content
+     */
+    public void broadcastSystemMessage(String message) {
+        ChatMessagePacket chatPacket = new ChatMessagePacket(
+            -1,
+            "System",
+            message,
+            System.currentTimeMillis(),
+            true
+        );
+        
+        for (PlayerSession player : players.values()) {
+            if (player.isLoggedIn()) {
+                player.sendPacket(chatPacket);
+            }
+        }
+        
+        System.out.println("[System] " + message);
+    }
+    
     public World getWorld() {
         return world;
     }

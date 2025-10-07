@@ -1,4 +1,6 @@
 @echo off
+cd /d "%~dp0.."
+
 echo ========================================
 echo PoorCraft Build and Run Script
 echo ========================================
@@ -28,7 +30,7 @@ echo Build successful! Starting PoorCraft...
 echo ========================================
 echo.
 
-java -jar target\poorcraft-0.1.1-jar-with-dependencies.jar
+java -jar target\PoorCraft.jar
 
 if errorlevel 1 (
     echo.

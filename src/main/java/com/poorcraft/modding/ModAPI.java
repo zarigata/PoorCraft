@@ -2,44 +2,36 @@ package com.poorcraft.modding;
 
 import com.google.gson.Gson;
 import com.poorcraft.core.Game;
+import com.poorcraft.modding.events.ChatMessageEvent;
 import com.poorcraft.world.World;
 import com.poorcraft.world.block.BlockType;
 import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
- * Main API class exposed to Python mods via Py4J.
- * 
- * <p>This class is the entry point for Python mods to interact with the game.
- * It provides methods for:
+ * Primary scripting interface exposed to Lua mods (and other supported runtimes).
+ *
+ * <p>This class lets mods interact with the game engine by providing routines for:
  * <ul>
- *   <li>World access (getting/setting blocks, biomes, height)</li>
- *   <li>Event registration (registering Python callbacks)</li>
- *   <li>Utility functions (logging, server check, shared data)</li>
+ *   <li>World access (blocks, biomes, terrain height)</li>
+ *   <li>Event wiring (registering script callbacks)</li>
+ *   <li>Utility helpers (logging, shared data, time/weather)</li>
  * </ul>
- * 
- * <p>All methods are designed to be safe when called from Python:
+ *
+ * <p>Methods are written defensively for sandboxed environments:
  * <ul>
- *   <li>Return safe defaults (null, -1) instead of throwing exceptions</li>
- *   <li>Handle null checks internally</li>
- *   <li>Log errors for debugging</li>
+ *   <li>Return safe defaults (null, -1) instead of throwing unchecked exceptions</li>
+ *   <li>Validate inputs and log recoverable errors</li>
+ *   <li>Operate without assuming a specific scripting bridge implementation</li>
  * </ul>
- * 
- * <p><b>Python access:</b>
- * <pre>
- * from py4j.java_gateway import JavaGateway
- * gateway = JavaGateway()
- * mod_api = gateway.entry_point  # This ModAPI instance
- * block_id = mod_api.getBlock(100, 64, 200)
- * </pre>
- * 
- * @author PoorCraft Team
- * @version 1.0
  */
 public class ModAPI {
     
@@ -47,6 +39,7 @@ public class ModAPI {
     private final EventBus eventBus;
     private final Map<String, Object> sharedData;
     private final Map<String, ByteBuffer> proceduralTextures;
+    private final List<Consumer<ChatMessageData>> chatListeners;
     
     /**
      * Creates a new ModAPI instance.
@@ -59,6 +52,7 @@ public class ModAPI {
         this.eventBus = eventBus;
         this.sharedData = new HashMap<>();
         this.proceduralTextures = new LinkedHashMap<>();
+        this.chatListeners = new ArrayList<>();
     }
     
     // ========== World Access Methods ==========
@@ -248,43 +242,43 @@ public class ModAPI {
         // For now, always return clear since no weather system exists
         return "clear";
     }
-    
+
     // ========== Event Registration Methods ==========
-    
+
     /**
-     * Registers a Python callback for the specified event.
-     * 
-     * <p>The callback should be a Python callable that accepts one argument (the event object).
-     * 
+     * Registers a mod callback for the specified event.
+     *
+     * <p>The callback object is provided by the scripting runtime (Lua function, Java listener, etc.).
+     *
      * @param eventName Name of the event (e.g., "block_place", "player_join")
-     * @param callback Python callback object (Py4J proxy)
+     * @param callbackHandle Callback handle supplied by the mod runtime
      */
-    public void registerEvent(String eventName, Object callback) {
+    public void registerEvent(String eventName, Object callbackHandle) {
         try {
-            eventBus.registerPythonCallback(eventName, callback);
-            System.out.println("[ModAPI] Registered Python callback for event: " + eventName);
+            eventBus.registerCallback(eventName, callbackHandle);
+            System.out.println("[ModAPI] Registered callback for event: " + eventName);
         } catch (Exception e) {
             System.err.println("[ModAPI] Error registering event callback: " + e.getMessage());
         }
     }
-    
+
     /**
-     * Unregisters a Python callback for the specified event.
-     * 
+     * Unregisters a mod callback for the specified event.
+     *
      * @param eventName Name of the event
-     * @param callback Python callback object to remove
+     * @param callbackHandle Callback handle to remove
      */
-    public void unregisterEvent(String eventName, Object callback) {
+    public void unregisterEvent(String eventName, Object callbackHandle) {
         try {
-            eventBus.unregisterPythonCallback(eventName, callback);
-            System.out.println("[ModAPI] Unregistered Python callback for event: " + eventName);
+            eventBus.unregisterCallback(eventName, callbackHandle);
+            System.out.println("[ModAPI] Unregistered callback for event: " + eventName);
         } catch (Exception e) {
             System.err.println("[ModAPI] Error unregistering event callback: " + e.getMessage());
         }
     }
-    
+
     // ========== Utility Methods ==========
-    
+
     /**
      * Logs a message to the console with [MOD] prefix.
      * Useful for mod debugging.
@@ -352,15 +346,10 @@ public class ModAPI {
     }
     
     /**
-     * Imports a Python module by path.
-     * This is called from Java to dynamically load Python mod modules.
-     * 
-     * <p>The Python side should implement this by using importlib or __import__.
-     * This method is designed to be called via Py4J callback.
-     * 
-     * @param modulePath Python module path (e.g., "mods.ai_npc.main")
-     * @return Python module object (Py4J proxy), or null if import fails
+     * @deprecated Legacy entrypoint kept for backward compatibility with the retired Python bridge.
+     * Prefer Lua mod registration paths; this method will be removed once old integrations are migrated.
      */
+    @Deprecated(forRemoval = true)
     public Object importPythonModule(String modulePath) {
         try {
             // This method is a placeholder that will be overridden by Python
@@ -594,5 +583,124 @@ public class ModAPI {
             return result;
         }
         return null;
+    }
+    
+    // ========== Chat API Methods ==========
+    
+    /**
+     * Sends a chat message.
+     * In single-player, adds to local chat.
+     * In multiplayer, sends to server for broadcasting.
+     * 
+     * @param message Message to send
+     */
+    public void sendChatMessage(String message) {
+        try {
+            if (game == null) {
+                System.err.println("[ModAPI] Cannot send chat message: game not initialized");
+                return;
+            }
+            
+            // Trim message to max length for safety
+            if (message != null && message.length() > 256) {
+                message = message.substring(0, 256);
+            }
+            
+            // Get UIManager
+            var uiManager = game.getUIManager();
+            if (uiManager == null) {
+                System.err.println("[ModAPI] Cannot send chat message: UIManager not available");
+                return;
+            }
+            
+            // Check if in multiplayer mode
+            if (game.isMultiplayerMode() && uiManager.getGameClient() != null && uiManager.getGameClient().isConnected()) {
+                // Send to server for broadcasting
+                uiManager.getGameClient().sendChatMessage(message);
+            } else {
+                // Single-player: add locally
+                var chatOverlay = uiManager.getChatOverlay();
+                if (chatOverlay != null) {
+                    chatOverlay.enqueueMessage(-1, "AI Companion", message, System.currentTimeMillis(), false);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error sending chat message: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Registers a callback to be invoked when chat messages are received.
+     * 
+     * @param listener Callback function
+     */
+    public void registerChatListener(Consumer<ChatMessageData> listener) {
+        chatListeners.add(listener);
+        System.out.println("[ModAPI] Registered chat listener");
+    }
+    
+    /**
+     * Fires a chat message event to all registered listeners.
+     * Called internally when chat messages are received.
+     * 
+     * @param senderId Sender player ID
+     * @param senderName Sender name
+     * @param message Message content
+     * @param timestamp Message timestamp
+     * @param isSystemMessage Whether this is a system message
+     */
+    public void fireChatMessage(int senderId, String senderName, String message, long timestamp, boolean isSystemMessage) {
+        ChatMessageData data = new ChatMessageData(senderId, senderName, message, timestamp, isSystemMessage);
+        
+        for (Consumer<ChatMessageData> listener : chatListeners) {
+            try {
+                listener.accept(data);
+            } catch (Exception e) {
+                System.err.println("[ModAPI] Error in chat listener: " + e.getMessage());
+            }
+        }
+        
+        // Also fire through EventBus
+        if (eventBus != null) {
+            eventBus.fire(new ChatMessageEvent(senderId, senderName, message, timestamp, isSystemMessage));
+        }
+    }
+    
+    /**
+     * Gets the biome at the player's current position.
+     * 
+     * @return Biome name, or null if not available
+     */
+    public String getCurrentBiome() {
+        try {
+            if (game == null || game.getWorld() == null || game.getPlayerPosition() == null) {
+                return null;
+            }
+            
+            Vector3f pos = game.getPlayerPosition();
+            return game.getWorld().getBiome((int)pos.x, (int)pos.z).toString();
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error getting current biome: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Data structure for chat messages passed to listeners.
+     */
+    public static class ChatMessageData {
+        public final int senderId;
+        public final String senderName;
+        public final String message;
+        public final long timestamp;
+        public final boolean isSystemMessage;
+        
+        public ChatMessageData(int senderId, String senderName, String message, long timestamp, boolean isSystemMessage) {
+            this.senderId = senderId;
+            this.senderName = senderName;
+            this.message = message;
+            this.timestamp = timestamp;
+            this.isSystemMessage = isSystemMessage;
+        }
     }
 }

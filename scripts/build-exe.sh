@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "$(dirname "$0")/.."
+
 echo "========================================"
 echo "PoorCraft Windows Executable Builder"
 echo "========================================"

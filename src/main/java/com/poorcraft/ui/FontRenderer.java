@@ -236,6 +236,35 @@ public class FontRenderer {
 
         glBindTexture(GL_TEXTURE_2D, 0);
     }
+
+    /**
+     * Draws text with a shadow offset for improved readability.
+     */
+    public void drawTextWithShadow(String text, float x, float y, float scale,
+                                   float r, float g, float b, float a,
+                                   float shadowOffset, float shadowAlpha) {
+        if (useFallback) {
+            return;
+        }
+
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+
+        float offset = Math.max(0f, shadowOffset);
+        float alpha = Math.max(0f, Math.min(1f, shadowAlpha));
+
+        drawText(text, x + offset, y + offset, scale, 0f, 0f, 0f, alpha);
+        drawText(text, x, y, scale, r, g, b, a);
+    }
+
+    /**
+     * Convenience overload using default Minecraft shadow values.
+     */
+    public void drawTextWithShadow(String text, float x, float y, float scale,
+                                   float r, float g, float b, float a) {
+        drawTextWithShadow(text, x, y, scale, r, g, b, a, 2.0f, 0.6f);
+    }
     
     /**
      * Calculates the width of a text string in pixels.

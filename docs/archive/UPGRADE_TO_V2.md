@@ -65,10 +65,11 @@ All guides have been rewritten for Lua:
 1. **Build the game:**
    ```bash
    # Windows
-   build-and-run.bat
+   scripts\build-and-run.bat
    
    # Linux/Mac
-   ./build-and-run.sh
+   chmod +x scripts/build-and-run.sh
+   scripts/build-and-run.sh
    ```
 
 2. **Check your mods:**

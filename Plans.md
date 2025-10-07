@@ -36,7 +36,7 @@ Seasons — changes in biomes or weather.
 
 Events — meteor storms, eclipses, etc.
 
-Natural disasters — earthquakes, floods.
+$Natural disasters — earthquakes, floods.
 
 Structures / ruins — villages, dungeons, temples, towers.
 
@@ -46,19 +46,19 @@ Competition & Multiplayer
 
 PvP mode — duels / arenas.
 
-Team -based battles — capture the flag, king of the hill.
+$Team -based battles — capture the flag, king of the hill.
 
-Leaderboards — most blocks mined, most mobs killed, etc.
+$Leaderboards — most blocks mined, most mobs killed, etc.
 
 Player rankings / XP levels — leveling for skills.
 
 Territory control — players / teams capture zones.
 
-Resource scarcity servers — limited ores/special materials.
+$Resource scarcity servers — limited ores/special materials.
 
-Timed challenges — build something in specified time.
+$Timed challenges — build something in specified time.
 
-Race mode — reach from point A to B fastest.
+$Race mode — reach from point A to B fastest.
 
 Sieges / base raiding — protect fort, raid others.
 
@@ -68,7 +68,7 @@ Progression & Goals
 
 Achievements / badges — for doing tasks, exploring, killing mobs.
 
-Tech tree / advancement system — unlocking better features/tools.
+$Tech tree / advancement system — unlocking better features/tools.
 
 Quests / missions — NPCs give tasks.
 

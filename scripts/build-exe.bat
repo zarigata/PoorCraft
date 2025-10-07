@@ -1,4 +1,6 @@
 @echo off
+cd /d "%~dp0.."
+
 echo ========================================
 echo PoorCraft Windows Executable Builder
 echo ========================================

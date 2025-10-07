@@ -12,7 +12,9 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -43,7 +45,9 @@ public class GameClient {
     private int localPlayerId;
     private World remoteWorld;
     private final Map<Integer, RemotePlayer> remotePlayers;
+    private final List<ChatMessage> chatHistory;
     private Consumer<String> disconnectCallback;
+    private Consumer<ChatMessage> chatMessageCallback;
     private long lastKeepAlive;
     
     /**
@@ -61,18 +65,20 @@ public class GameClient {
         this.localPlayerId = -1;
         this.remoteWorld = null;
         this.remotePlayers = new ConcurrentHashMap<>();
+        this.chatHistory = new ArrayList<>();
         this.disconnectCallback = null;
+        this.chatMessageCallback = null;
         this.lastKeepAlive = System.currentTimeMillis();
     }
-    
+
     /**
      * Connects to the server.
      */
     public void connect() {
         System.out.println("[Client] Connecting to " + host + ":" + port + "...");
-        
+
         workerGroup = new NioEventLoopGroup();
-        
+
         try {
             Bootstrap bootstrap = new Bootstrap();
             bootstrap.group(workerGroup)
@@ -98,27 +104,36 @@ public class GameClient {
             disconnect();
         }
     }
-    
+
+    /**
+     * Returns the active Netty channel. Intended for integration tests that
+     * need to manipulate the connection directly (e.g., simulate abrupt
+     * disconnects). Gameplay code should not rely on this API.
+     */
+    public Channel getActiveChannelForTesting() {
+        return channel;
+    }
+
     /**
      * Disconnects from the server.
      */
     public void disconnect() {
         if (connected) {
             sendPacket(new DisconnectPacket("Client disconnecting"));
-            
+
             if (channel != null) {
                 channel.close();
+                channel = null;
             }
-            
+
             if (workerGroup != null) {
                 workerGroup.shutdownGracefully();
             }
-            
+
             connected = false;
             System.out.println("[Client] Disconnected from server");
         }
     }
-    
     /**
      * Sends a packet to the server.
      * 
@@ -309,8 +324,49 @@ public class GameClient {
         sendPacket(new BlockBreakPacket(x, y, z));
     }
     
+    /**
+     * Called when a chat message is received.
+     */
+    public void onChatMessage(int senderId, String senderName, String message, long timestamp, boolean isSystemMessage) {
+        ChatMessage chatMsg = new ChatMessage(senderId, senderName, message, timestamp, isSystemMessage);
+        chatHistory.add(chatMsg);
+        
+        // Keep only last 100 messages
+        if (chatHistory.size() > 100) {
+            chatHistory.remove(0);
+        }
+        
+        // Fire callback to notify UI/mods
+        if (chatMessageCallback != null) {
+            chatMessageCallback.accept(chatMsg);
+        }
+        
+        System.out.println("[Chat] " + senderName + ": " + message);
+    }
+    
+    /**
+     * Sends a chat message to the server.
+     */
+    public void sendChatMessage(String message) {
+        if (message == null || message.trim().isEmpty()) {
+            return;
+        }
+        sendPacket(new ChatMessagePacket(localPlayerId, "", message, System.currentTimeMillis(), false));
+    }
+    
+    /**
+     * Gets the chat message history.
+     */
+    public List<ChatMessage> getChatHistory() {
+        return new ArrayList<>(chatHistory);
+    }
+    
     public void setDisconnectCallback(Consumer<String> callback) {
         this.disconnectCallback = callback;
+    }
+    
+    public void setChatMessageCallback(Consumer<ChatMessage> callback) {
+        this.chatMessageCallback = callback;
     }
     
     public World getRemoteWorld() {
@@ -327,5 +383,24 @@ public class GameClient {
     
     public int getLocalPlayerId() {
         return localPlayerId;
+    }
+    
+    /**
+     * Represents a chat message in history.
+     */
+    public static class ChatMessage {
+        public final int senderId;
+        public final String senderName;
+        public final String message;
+        public final long timestamp;
+        public final boolean isSystemMessage;
+        
+        public ChatMessage(int senderId, String senderName, String message, long timestamp, boolean isSystemMessage) {
+            this.senderId = senderId;
+            this.senderName = senderName;
+            this.message = message;
+            this.timestamp = timestamp;
+            this.isSystemMessage = isSystemMessage;
+        }
     }
 }
