@@ -1,0 +1,15 @@
+{
+  "id": "ai_npc",
+  "name": "AI Companion",
+  "version": "0.1.0",
+  "description": "Adds a lightweight AI-driven companion placeholder for testing the Lua mod pipeline.",
+  "author": "PoorCraft Team",
+  "main": "main.lua",
+  "enabled": true,
+  "config": {
+    "enabled": true,
+    "companion_name": "Sparky",
+    "speak_interval": 45,
+    "debug_logging": false
+  }
+}
