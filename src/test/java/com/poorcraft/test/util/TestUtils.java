@@ -147,7 +147,7 @@ public final class TestUtils {
      * @return world instance
      */
     public static World createTestWorld(long seed) {
-        return new World(seed, false);
+        return new World(seed, true);
     }
 
     /**

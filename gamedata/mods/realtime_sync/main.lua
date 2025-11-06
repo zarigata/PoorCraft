@@ -131,8 +131,21 @@ function mod.enable()
         if event.channel ~= "realtime_sync" then
             return
         end
-        if event.payload.type == "block_change" then
-            api.set_block(event.payload.x, event.payload.y, event.payload.z, event.payload.block)
+
+        local payload = event.payload
+        if type(payload) ~= "table" then
+            log_debug("Real-Time Sync: Ignored network event without payload table")
+            return
+        end
+
+        if payload.type == "block_change"
+            and payload.x ~= nil
+            and payload.y ~= nil
+            and payload.z ~= nil
+            and payload.block ~= nil then
+            api.set_block(payload.x, payload.y, payload.z, payload.block)
+        else
+            log_debug("Real-Time Sync: Ignored unknown payload type '" .. tostring(payload.type) .. "'")
         end
     end)
 end
