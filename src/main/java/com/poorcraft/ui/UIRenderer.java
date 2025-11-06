@@ -30,6 +30,9 @@ public class UIRenderer {
     private int vbo;
     private Matrix4f projectionMatrix;
     private Matrix4f modelMatrix;
+    private int windowWidth;
+    private int windowHeight;
+    private UIScaleManager scaleManager;
     
     /**
      * Creates a new UI renderer.
@@ -48,6 +51,9 @@ public class UIRenderer {
      * @param windowHeight Window height in pixels
      */
     public void init(int windowWidth, int windowHeight) {
+        this.windowWidth = windowWidth;
+        this.windowHeight = windowHeight;
+
         try {
             // Load shader sources from resources
             String vertSource = Files.readString(Paths.get("src/main/resources/shaders/ui.vert"));
@@ -110,6 +116,8 @@ public class UIRenderer {
     public void updateProjection(int windowWidth, int windowHeight) {
         // Orthographic projection: left, right, bottom, top, near, far
         // Note: bottom > top to flip Y axis (top-left origin)
+        this.windowWidth = windowWidth;
+        this.windowHeight = windowHeight;
         projectionMatrix.identity().ortho(0, windowWidth, windowHeight, 0, -1, 1);
     }
     
@@ -322,6 +330,282 @@ public class UIRenderer {
     public void end() {
         uiShader.unbind();
         glEnable(GL_DEPTH_TEST);
+    }
+    
+    /**
+     * Sets the scale manager for percentage-based layout helpers.
+     * 
+     * @param manager UI scale manager instance
+     */
+    public void setScaleManager(UIScaleManager manager) {
+        this.scaleManager = manager;
+    }
+    
+    /**
+     * Draws a rectangle using percentages of window size.
+     * Requires scaleManager to be set.
+     * 
+     * @param xPercent X position as percentage of window width (0.0 to 1.0)
+     * @param yPercent Y position as percentage of window height (0.0 to 1.0)
+     * @param widthPercent Width as percentage of window width (0.0 to 1.0)
+     * @param heightPercent Height as percentage of window height (0.0 to 1.0)
+     * @param r Red component (0.0 to 1.0)
+     * @param g Green component (0.0 to 1.0)
+     * @param b Blue component (0.0 to 1.0)
+     * @param a Alpha component (0.0 to 1.0)
+     */
+    public void drawRectPercent(float xPercent, float yPercent, float widthPercent, float heightPercent,
+                                float r, float g, float b, float a) {
+        if (scaleManager == null) {
+            // Fallback to direct pixel calculations if no scale manager
+            return;
+        }
+        
+        float x = scaleManager.scaleWidth(xPercent);
+        float y = scaleManager.scaleHeight(yPercent);
+        float width = scaleManager.scaleWidth(widthPercent);
+        float height = scaleManager.scaleHeight(heightPercent);
+        
+        drawRect(x, y, width, height, r, g, b, a);
+    }
+    
+    /**
+     * Draws a rectangle with dimensions scaled by scaleManager.
+     * Requires scaleManager to be set.
+     * 
+     * @param x X position (pixels)
+     * @param y Y position (pixels)
+     * @param width Width (pixels at reference resolution)
+     * @param height Height (pixels at reference resolution)
+     * @param r Red component (0.0 to 1.0)
+     * @param g Green component (0.0 to 1.0)
+     * @param b Blue component (0.0 to 1.0)
+     * @param a Alpha component (0.0 to 1.0)
+     */
+    public void drawScaledRect(float x, float y, float width, float height,
+                               float r, float g, float b, float a) {
+        if (scaleManager == null) {
+            // Fallback to unscaled drawing
+            drawRect(x, y, width, height, r, g, b, a);
+            return;
+        }
+        
+        float scaledWidth = scaleManager.scaleDimension(width);
+        float scaledHeight = scaleManager.scaleDimension(height);
+        
+        drawRect(x, y, scaledWidth, scaledHeight, r, g, b, a);
+    }
+    
+    /**
+     * Converts X percentage to pixels using scaleManager.
+     * 
+     * @param percent X percentage (0.0 to 1.0)
+     * @return X position in pixels
+     */
+    public float toPixelsX(float percent) {
+        return scaleManager != null ? scaleManager.scaleWidth(percent) : 0;
+    }
+    
+    /**
+     * Converts Y percentage to pixels using scaleManager.
+     * 
+     * @param percent Y percentage (0.0 to 1.0)
+     * @return Y position in pixels
+     */
+    public float toPixelsY(float percent) {
+        return scaleManager != null ? scaleManager.scaleHeight(percent) : 0;
+    }
+
+    public int getWindowWidth() {
+        return windowWidth;
+    }
+
+    public int getWindowHeight() {
+        return windowHeight;
+    }
+    
+    /**
+     * Converts width percentage to pixels using scaleManager.
+     * 
+     * @param percent Width percentage (0.0 to 1.0)
+     * @return Width in pixels
+     */
+    public float toPixelsWidth(float percent) {
+        return scaleManager != null ? scaleManager.scaleWidth(percent) : 0;
+    }
+    
+    /**
+     * Converts height percentage to pixels using scaleManager.
+     * 
+     * @param percent Height percentage (0.0 to 1.0)
+     * @return Height in pixels
+     */
+    public float toPixelsHeight(float percent) {
+        return scaleManager != null ? scaleManager.scaleHeight(percent) : 0;
+    }
+    
+    /**
+     * Draws a vertical gradient rectangle from top color to bottom color.
+     * 
+     * @param x X position
+     * @param y Y position
+     * @param width Rectangle width
+     * @param height Rectangle height
+     * @param topColor Top color [r, g, b, a]
+     * @param bottomColor Bottom color [r, g, b, a]
+     */
+    public void drawGradientRect(float x, float y, float width, float height, 
+                                  float[] topColor, float[] bottomColor) {
+        // Draw gradient using multiple horizontal strips for smooth transition
+        int stripCount = 8;
+        float stripHeight = height / stripCount;
+        
+        for (int i = 0; i < stripCount; i++) {
+            float t = i / (float) stripCount;
+            float stripY = y + i * stripHeight;
+            
+            // Linear interpolation between top and bottom colors
+            float r = topColor[0] * (1 - t) + bottomColor[0] * t;
+            float g = topColor[1] * (1 - t) + bottomColor[1] * t;
+            float b = topColor[2] * (1 - t) + bottomColor[2] * t;
+            float a = topColor[3] * (1 - t) + bottomColor[3] * t;
+            
+            drawRect(x, stripY, width, stripHeight, r, g, b, a);
+        }
+    }
+    
+    /**
+     * Draws a glowing border effect around a rectangle.
+     * Creates multiple concentric borders with decreasing alpha for a smooth glow.
+     * 
+     * @param x X position
+     * @param y Y position
+     * @param width Rectangle width
+     * @param height Rectangle height
+     * @param borderWidth Thickness of the glow effect
+     * @param glowIntensity Multiplier for alpha (0.0 to 1.0)
+     * @param color Base color [r, g, b, a] for the glow
+     */
+    public void drawGlowBorder(float x, float y, float width, float height, 
+                               float borderWidth, float glowIntensity, float[] color) {
+        int layers = 4;
+        
+        for (int i = 0; i < layers; i++) {
+            float layerProgress = i / (float) layers;
+            float alpha = color[3] * glowIntensity * (1.0f - layerProgress);
+            float offset = borderWidth * layerProgress;
+            
+            float layerX = x - offset;
+            float layerY = y - offset;
+            float layerWidth = width + offset * 2f;
+            float layerHeight = height + offset * 2f;
+            float thickness = borderWidth / layers;
+            
+            // Top edge
+            drawRect(layerX, layerY, layerWidth, thickness, 
+                color[0], color[1], color[2], alpha);
+            // Bottom edge
+            drawRect(layerX, layerY + layerHeight - thickness, layerWidth, thickness, 
+                color[0], color[1], color[2], alpha);
+            // Left edge
+            drawRect(layerX, layerY, thickness, layerHeight, 
+                color[0], color[1], color[2], alpha);
+            // Right edge
+            drawRect(layerX + layerWidth - thickness, layerY, thickness, layerHeight, 
+                color[0], color[1], color[2], alpha);
+        }
+    }
+    
+    /**
+     * Draws a prominent frame/border with rounded corners effect.
+     * Includes inner highlight line for depth.
+     * 
+     * @param x X position
+     * @param y Y position
+     * @param width Rectangle width
+     * @param height Rectangle height
+     * @param thickness Border thickness
+     * @param color Border color [r, g, b, a]
+     */
+    public void drawHighlightFrame(float x, float y, float width, float height, 
+                                    float thickness, float[] color) {
+        // Draw outer border
+        // Top
+        drawRect(x, y, width, thickness, color[0], color[1], color[2], color[3]);
+        // Bottom
+        drawRect(x, y + height - thickness, width, thickness, 
+            color[0], color[1], color[2], color[3]);
+        // Left
+        drawRect(x, y, thickness, height, color[0], color[1], color[2], color[3]);
+        // Right
+        drawRect(x + width - thickness, y, thickness, height, 
+            color[0], color[1], color[2], color[3]);
+        
+        // Draw inner highlight (brighter)
+        float highlightR = Math.min(1.0f, color[0] * 1.3f);
+        float highlightG = Math.min(1.0f, color[1] * 1.3f);
+        float highlightB = Math.min(1.0f, color[2] * 1.3f);
+        float highlightThickness = Math.max(1f, thickness * 0.3f);
+        
+        float innerOffset = thickness;
+        // Top highlight
+        drawRect(x + innerOffset, y + innerOffset, width - innerOffset * 2f, highlightThickness, 
+            highlightR, highlightG, highlightB, color[3]);
+        // Left highlight
+        drawRect(x + innerOffset, y + innerOffset, highlightThickness, height - innerOffset * 2f, 
+            highlightR, highlightG, highlightB, color[3]);
+        
+        // Draw corner emphasis squares
+        float cornerSize = thickness * 1.5f;
+        // Top-left
+        drawRect(x, y, cornerSize, cornerSize, color[0], color[1], color[2], color[3]);
+        // Top-right
+        drawRect(x + width - cornerSize, y, cornerSize, cornerSize, 
+            color[0], color[1], color[2], color[3]);
+        // Bottom-left
+        drawRect(x, y + height - cornerSize, cornerSize, cornerSize, 
+            color[0], color[1], color[2], color[3]);
+        // Bottom-right
+        drawRect(x + width - cornerSize, y + height - cornerSize, cornerSize, cornerSize, 
+            color[0], color[1], color[2], color[3]);
+    }
+    
+    /**
+     * Draws a panel background suitable for content display.
+     * 
+     * @param x X position
+     * @param y Y position
+     * @param width Rectangle width
+     * @param height Rectangle height
+     * @param baseColor Base color [r, g, b, a]
+     * @param withGradient Whether to use gradient or solid color
+     */
+    public void drawBackdropPanel(float x, float y, float width, float height, 
+                                   float[] baseColor, boolean withGradient) {
+        if (withGradient) {
+            // Create slightly darker bottom color
+            float[] bottomColor = {
+                baseColor[0] * 0.85f,
+                baseColor[1] * 0.85f,
+                baseColor[2] * 0.85f,
+                baseColor[3]
+            };
+            drawGradientRect(x, y, width, height, baseColor, bottomColor);
+        } else {
+            drawRect(x, y, width, height, baseColor[0], baseColor[1], baseColor[2], baseColor[3]);
+        }
+        
+        // Add subtle border
+        float[] borderColor = {
+            baseColor[0] * 0.7f,
+            baseColor[1] * 0.7f,
+            baseColor[2] * 0.7f,
+            baseColor[3]
+        };
+        drawBorderedRect(x, y, width, height, 2f, baseColor, borderColor);
+        
+        // Add drop shadow for depth
+        drawDropShadow(x, y, width, height, 3f, 0.3f);
     }
     
     /**

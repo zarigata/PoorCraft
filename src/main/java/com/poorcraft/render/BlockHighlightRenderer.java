@@ -142,9 +142,19 @@ public class BlockHighlightRenderer {
             return;
         }
 
+        boolean wasCullEnabled = glIsEnabled(GL_CULL_FACE);
+        boolean wasBlendEnabled = glIsEnabled(GL_BLEND);
+        boolean wasPolygonOffsetFillEnabled = glIsEnabled(GL_POLYGON_OFFSET_FILL);
+        boolean wasDepthMask = glGetBoolean(GL_DEPTH_WRITEMASK);
+
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDisable(GL_CULL_FACE);
+        glDepthMask(false);
+        if (!wasPolygonOffsetFillEnabled) {
+            glEnable(GL_POLYGON_OFFSET_FILL);
+        }
+        glPolygonOffset(-1.0f, -1.0f);
 
         overlayShader.bind();
         overlayShader.setUniform("uView", view);
@@ -152,7 +162,7 @@ public class BlockHighlightRenderer {
 
         modelMatrix.identity()
             .translate(target.getX(), target.getY(), target.getZ())
-            .scale(1.002f); // Nudge to minimize z-fighting
+            .scale(1.005f); // Slightly expanded to reduce z-fighting
         overlayShader.setUniform("uModel", modelMatrix);
         overlayShader.setUniform("uProgress", progress);
 
@@ -171,8 +181,23 @@ public class BlockHighlightRenderer {
         glBindVertexArray(0);
         overlayShader.unbind();
 
-        glEnable(GL_CULL_FACE);
-        glDisable(GL_BLEND);
+        glPolygonOffset(0f, 0f);
+        if (wasPolygonOffsetFillEnabled) {
+            glEnable(GL_POLYGON_OFFSET_FILL);
+        } else {
+            glDisable(GL_POLYGON_OFFSET_FILL);
+        }
+        glDepthMask(wasDepthMask);
+        if (wasCullEnabled) {
+            glEnable(GL_CULL_FACE);
+        } else {
+            glDisable(GL_CULL_FACE);
+        }
+        if (wasBlendEnabled) {
+            glEnable(GL_BLEND);
+        } else {
+            glDisable(GL_BLEND);
+        }
     }
 
     public void cleanup() {

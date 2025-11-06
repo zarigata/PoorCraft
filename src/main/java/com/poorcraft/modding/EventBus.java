@@ -144,13 +144,29 @@ public class EventBus {
      * @throws Exception if invocation fails
      */
     private void invokeCallback(Object callback, Event event) throws Exception {
-        // For now, callbacks are simple and just need to be invoked
-        // The LuaModAPI wraps Lua callbacks in objects that can be called
-        if (callback != null) {
-            // Simplified callback - just log for now
-            // Full implementation would invoke the Lua callback
-            System.out.println("[EventBus] Callback invoked for event: " + event.getEventName());
+        if (callback == null) {
+            return;
         }
+
+        if (callback instanceof java.util.function.Consumer) {
+            @SuppressWarnings("unchecked")
+            java.util.function.Consumer<Event> consumer = (java.util.function.Consumer<Event>) callback;
+            consumer.accept(event);
+            return;
+        }
+
+        try {
+            Method invokeMethod = callback.getClass().getMethod("invoke", Object.class);
+            invokeMethod.setAccessible(true);
+            invokeMethod.invoke(callback, event);
+            return;
+        } catch (NoSuchMethodException ignored) {
+            // Fall through to unknown callback warning
+        } catch (ReflectiveOperationException reflectiveException) {
+            throw reflectiveException;
+        }
+
+        System.err.println("[EventBus] Unknown callback type: " + callback.getClass().getName());
     }
     
     /**

@@ -1,10 +1,12 @@
 package com.poorcraft.core;
 
+import com.poorcraft.ai.AICompanionManager;
 import com.poorcraft.camera.Camera;
 import com.poorcraft.config.ConfigManager;
 import com.poorcraft.config.Settings;
 import com.poorcraft.discord.DiscordRichPresenceManager;
 import com.poorcraft.input.InputHandler;
+import com.poorcraft.modding.LuaModContainer;
 import com.poorcraft.modding.LuaModLoader;
 import com.poorcraft.inventory.Inventory;
 import com.poorcraft.player.SkinManager;
@@ -14,6 +16,7 @@ import com.poorcraft.render.ChunkRenderer;
 import com.poorcraft.render.Frustum;
 import com.poorcraft.render.GPUCapabilities;
 import com.poorcraft.render.ItemDropRenderer;
+import com.poorcraft.render.NPCRenderer;
 import com.poorcraft.render.PerformanceMonitor;
 import com.poorcraft.render.SkyRenderer;
 import com.poorcraft.render.SunLight;
@@ -25,12 +28,16 @@ import com.poorcraft.world.World;
 import com.poorcraft.world.chunk.Chunk;
 import com.poorcraft.world.generation.BiomeType;
 import com.poorcraft.world.entity.DropManager;
+import com.poorcraft.world.entity.NPCManager;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Queue;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL30.*;
@@ -59,7 +66,10 @@ public class Game {
     private SkyRenderer skyRenderer;
     private BlockHighlightRenderer blockHighlightRenderer;
     private ItemDropRenderer itemDropRenderer;
+    private NPCRenderer npcRenderer;
     private DropManager dropManager;
+    private NPCManager npcManager;
+    private AICompanionManager aiCompanionManager;
     private LuaModLoader modLoader;
     private DiscordRichPresenceManager discordRPC;
     private SkinManager skinManager;
@@ -72,6 +82,10 @@ public class Game {
     private GPUCapabilities gpuCapabilities;
     private PerformanceMonitor performanceMonitor;
     private boolean chunkRendererInitialized;
+    private boolean chunkRendererUnavailableWarned;
+    
+    // Main thread task queue for async operations
+    private final Queue<Runnable> mainThreadTasks;
     
     // Blur effect resources
     private BlurRenderer blurRenderer;
@@ -89,6 +103,11 @@ public class Game {
     private GameState lastGameState;  // Track last game state for Discord presence updates
     private BiomeType lastBiome;  // Track last biome for Discord presence updates
     private float discordUpdateTimer;  // Timer for periodic Discord updates
+    private long lastBlurResizeTime = 0L;
+    private int pendingBlurWidth = 0;
+    private int pendingBlurHeight = 0;
+    private boolean blurResizePending = false;
+    private static final long BLUR_RESIZE_DEBOUNCE_MS = 150L;
     private int selectedHotbarSlot;
     private double hotbarScrollRemainder;
     
@@ -112,7 +131,10 @@ public class Game {
         this.inventory = new Inventory();
         this.blockHighlightRenderer = new BlockHighlightRenderer();
         this.itemDropRenderer = new ItemDropRenderer();
+        this.npcRenderer = new NPCRenderer();
         this.dropManager = new DropManager();
+        this.npcManager = new NPCManager();
+        this.aiCompanionManager = null;
         this.miningSystem.setDropManager(this.dropManager);
         this.highlightRendererInitialized = false;
         this.selectedHotbarSlot = 0;
@@ -123,12 +145,14 @@ public class Game {
         this.performanceMonitor = null;
         this.gpuCapabilities = null;
         this.chunkRendererInitialized = false;
+        this.chunkRendererUnavailableWarned = false;
         this.blurRenderer = null;
         this.blurFbo = 0;
         this.blurTexture = 0;
         this.blurFbo2 = 0;
         this.blurTexture2 = 0;
         this.blurSupported = false;
+        this.mainThreadTasks = new ConcurrentLinkedQueue<>();
     }
 
     public SkinManager getSkinManager() {
@@ -147,15 +171,28 @@ public class Game {
         System.out.println("[Game] Initializing...");
         
         // Create and initialize window
-        window = new Window(
-            settings.window.width,
-            settings.window.height,
-            settings.window.title,
-            settings.window.vsync
-        );
-        window.create();
+        try {
+            window = new Window(
+                settings.window.width,
+                settings.window.height,
+                settings.window.title,
+                settings.window.vsync
+            );
+            window.create();
+        } catch (Exception ex) {
+            System.err.println("[Game] Failed to create window: " + ex.getMessage());
+            ex.printStackTrace();
+            throw new RuntimeException("Unable to create game window", ex);
+        }
 
-        GPUCapabilities caps = GPUCapabilities.detect();
+        GPUCapabilities caps;
+        try {
+            caps = GPUCapabilities.detect();
+        } catch (Exception ex) {
+            System.err.println("[Game] GPU capability detection failed: " + ex.getMessage());
+            ex.printStackTrace();
+            caps = GPUCapabilities.createFallbackCapabilities();
+        }
         this.gpuCapabilities = caps;
 
         PerformanceMonitor perfMon = new PerformanceMonitor();
@@ -164,9 +201,16 @@ public class Game {
         chunkRenderer = new ChunkRenderer();
         chunkRenderer.setGPUCapabilities(caps);
         chunkRenderer.setPerformanceMonitor(perfMon);
-        chunkRenderer.init();
-        chunkRendererInitialized = true;
-        System.out.println("[Game] Chunk renderer initialized early for menu rendering");
+        try {
+            chunkRenderer.init();
+            chunkRendererInitialized = true;
+            chunkRendererUnavailableWarned = false;
+            System.out.println("[Game] Chunk renderer initialized early for menu rendering");
+        } catch (Exception ex) {
+            chunkRendererInitialized = false;
+            System.err.println("[Game] Chunk renderer failed to initialize: " + ex.getMessage());
+            ex.printStackTrace();
+        }
 
         // Initialize timer
         timer = new Timer();
@@ -195,32 +239,92 @@ public class Game {
         window.setResizeCallback((width, height) -> {
             System.out.println("[Game] Window resized to: " + width + "x" + height);
             uiManager.onResize(width, height);
-            resizeBlurTargets(width, height);
+            if (width < 1 || height < 1) {
+                System.out.println("[Game] Ignoring blur resize with invalid dimensions: " + width + "x" + height);
+                return;
+            }
+            pendingBlurWidth = width;
+            pendingBlurHeight = height;
+            blurResizePending = true;
+            lastBlurResizeTime = System.currentTimeMillis();
         });
         
         System.out.println("[Game] UI Manager initialized");
         
         // Initialize mod loader to enable Lua mods
-        modLoader = new LuaModLoader(this);
-        modLoader.init();
-        System.out.println("[Game] Lua mod loader initialized");
+        try {
+            modLoader = new LuaModLoader(this);
+            modLoader.init();
+            System.out.println("[Game] Lua mod loader initialized with " + modLoader.getLoadedMods().size() + " mods");
+        } catch (Exception e) {
+            System.err.println("[Game] Failed to initialize mod loader: " + e.getMessage());
+            e.printStackTrace();
+            System.err.println("[Game] Continuing without mods...");
+            modLoader = null;
+        }
+
+        if (settings != null && settings.ai != null) {
+            aiCompanionManager = new AICompanionManager();
+            aiCompanionManager.init(settings.ai, npcManager, this::postToMainThread);
+        }
+
+        if (modLoader != null) {
+            List<LuaModContainer> mods = modLoader.getLoadedMods();
+            int totalMods = mods.size();
+            long enabledMods = mods.stream()
+                .filter(m -> m.getState() == LuaModContainer.ModState.ENABLED)
+                .count();
+            long errorMods = mods.stream()
+                .filter(m -> m.getState() == LuaModContainer.ModState.ERROR)
+                .count();
+
+            System.out.println("[Game] Mod summary: " + enabledMods + " enabled, " + errorMods + " failed, " + totalMods + " total");
+
+            if (errorMods > 0) {
+                System.err.println("[Game] Warning: Some mods failed to load. Check logs above for details.");
+            }
+        }
 
         skinManager = SkinManager.getInstance();
-        skinManager.init(settings);
-        System.out.println("[Game] Skin manager initialized with " + skinManager.getAllSkins().size() + " skins");
+        try {
+            skinManager.init(settings);
+            System.out.println("[Game] Skin manager initialized with " + skinManager.getAllSkins().size() + " skins");
+        } catch (Exception ex) {
+            System.err.println("[Game] Failed to initialize skin manager: " + ex.getMessage());
+            ex.printStackTrace();
+            System.err.println("[Game] Continuing without skin manager...");
+        }
 
         skyRenderer = new SkyRenderer();
-        skyRenderer.init();
-        
+        try {
+            skyRenderer.init();
+        } catch (Exception ex) {
+            System.err.println("[Game] Failed to initialise sky renderer: " + ex.getMessage());
+            ex.printStackTrace();
+            skyRenderer = null;
+        }
+
         // Initialize blur effect resources
-        initBlurResources(window.getWidth(), window.getHeight());
+        try {
+            initBlurResources(window.getWidth(), window.getHeight());
+        } catch (Exception ex) {
+            System.err.println("[Game] Failed to initialise blur resources: " + ex.getMessage());
+            ex.printStackTrace();
+            blurSupported = false;
+        }
 
         // Generate baseline textures before mods start tinkering with them
-        Map<String, ByteBuffer> generatedTextures = TextureGenerator.ensureDefaultBlockTextures();
-        TextureGenerator.ensureAuxiliaryTextures();
+        Map<String, ByteBuffer> generatedTextures = Map.of();
+        try {
+            generatedTextures = TextureGenerator.ensureDefaultBlockTextures();
+            TextureGenerator.ensureAuxiliaryTextures();
+        } catch (Exception ex) {
+            System.err.println("[Game] Texture generation failed: " + ex.getMessage());
+            ex.printStackTrace();
+        }
 
         // Share generated textures with ModAPI so chunk renderer can combine them with mod assets
-        if (modLoader.getModAPI() != null) {
+        if (modLoader != null && modLoader.getModAPI() != null) {
             generatedTextures.forEach((name, buffer) -> {
                 if (buffer != null) {
                     byte[] rgba = new byte[buffer.remaining()];
@@ -231,7 +335,8 @@ public class Game {
         }
 
         // Set up input callbacks for UI
-        inputHandler.setKeyPressCallback(key -> uiManager.onKeyPress(key, 0));
+        // Use only the new keyEventCallback API to avoid double-dispatch
+        inputHandler.setKeyEventCallback((key, action) -> uiManager.onKeyEvent(key, action));
         inputHandler.setCharInputCallback(character -> uiManager.onCharInput(character));
         inputHandler.setMouseClickCallback(button -> {
             uiManager.onMouseClick((float)inputHandler.getMouseX(), (float)inputHandler.getMouseY(), button);
@@ -279,7 +384,7 @@ public class Game {
             float deltaTime = timer.getDeltaTimeFloat();
             
             // Update input
-            inputHandler.update();
+            inputHandler.update(deltaTime);
             
             // Forward mouse movement to UI manager
             uiManager.onMouseMove((float)inputHandler.getMouseX(), (float)inputHandler.getMouseY());
@@ -304,6 +409,10 @@ public class Game {
      * @param deltaTime Time since last frame in seconds
      */
     private void update(float deltaTime) {
+        // Process main thread tasks from async operations
+        processMainThreadTasks();
+        processBlurResizeDebounce();
+        
         // Update UI
         uiManager.update(deltaTime);
         
@@ -371,25 +480,40 @@ public class Game {
             return;
         }
         
-        // Process mouse movement (always in IN_GAME state)
-        camera.processMouseMovement(
-            (float) inputHandler.getMouseDeltaX(),
-            (float) inputHandler.getMouseDeltaY()
-        );
+        // Process mouse movement (only if input is not captured by UI)
+        if (!uiManager.isInputCaptured()) {
+            camera.processMouseMovement(
+                (float) inputHandler.getMouseDeltaX(),
+                (float) inputHandler.getMouseDeltaY()
+            );
+        }
 
-        handleHotbarScroll();
+        // Handle hotbar scroll (only if input is not captured by UI)
+        if (!uiManager.isInputCaptured()) {
+            handleHotbarScroll();
+        }
 
-        if (playerController != null) {
+        // Update player controller (only if input is not captured by UI)
+        if (!uiManager.isInputCaptured() && playerController != null) {
             playerController.update(world, inputHandler, settings, camera, deltaTime);
             camera.setPosition(playerController.getEyePosition());
         }
 
-        if (miningSystem != null) {
+        // Update mining system (only if input is not captured by UI)
+        if (!uiManager.isInputCaptured() && miningSystem != null) {
             miningSystem.update(world, camera, inputHandler, deltaTime);
         }
 
         if (dropManager != null && inventory != null && playerController != null) {
             dropManager.update(world, playerController.getPosition(), inventory, deltaTime);
+        }
+        
+        if (npcManager != null && playerController != null) {
+            npcManager.update(world, playerController.getPosition(), deltaTime);
+        }
+
+        if (aiCompanionManager != null) {
+            aiCompanionManager.update(deltaTime);
         }
         
         // Update chunk manager with camera position
@@ -413,6 +537,30 @@ public class Game {
         if (monitorActive) {
             performanceMonitor.endZone();
         }
+    }
+
+    private void processBlurResizeDebounce() {
+        if (!blurResizePending) {
+            return;
+        }
+
+        long elapsed = System.currentTimeMillis() - lastBlurResizeTime;
+        if (elapsed < BLUR_RESIZE_DEBOUNCE_MS) {
+            return;
+        }
+
+        int width = pendingBlurWidth;
+        int height = pendingBlurHeight;
+
+        if (width < 1 || height < 1) {
+            System.out.println("[Game] Waiting for valid blur dimensions before processing resize: " + width + "x" + height);
+            return;
+        }
+
+        resizeBlurTargets(width, height);
+
+        System.out.println("[Game] Processing debounced blur resize: " + width + "x" + height);
+        blurResizePending = false;
     }
     
     /**
@@ -468,7 +616,12 @@ public class Game {
 
             // Render all loaded chunks
             Collection<Chunk> loadedChunks = world.getLoadedChunks();
-            chunkRenderer.render(loadedChunks, view, projection);
+            if (chunkRenderer != null && chunkRendererInitialized) {
+                chunkRenderer.render(loadedChunks, view, projection);
+            } else if (!chunkRendererUnavailableWarned) {
+                System.err.println("[Game] Skipping chunk rendering because renderer is unavailable.");
+                chunkRendererUnavailableWarned = true;
+            }
 
             if (highlightRendererInitialized && miningSystem != null) {
                 miningSystem.getAimedTarget().ifPresent(target ->
@@ -478,6 +631,10 @@ public class Game {
 
             if (itemDropRenderer != null && dropManager != null) {
                 itemDropRenderer.render(dropManager.getDrops(), camera, view, projection);
+            }
+            
+            if (npcRenderer != null && npcManager != null) {
+                npcRenderer.render(npcManager.getAllNPCs(), camera, view, projection);
             }
         }
         
@@ -556,13 +713,15 @@ public class Game {
             highlightRendererInitialized = false;
         }
         
-        // Cleanup blur resources
-        cleanupBlurResources();
-        if (blurRenderer != null) {
-            blurRenderer.cleanup();
-            blurRenderer = null;
+        if (npcRenderer != null) {
+            npcRenderer.cleanup();
+            System.out.println("[Game] NPC renderer cleaned up");
         }
         
+        if (aiCompanionManager != null) {
+            aiCompanionManager.shutdown();
+        }
+
         window.destroy();
         System.out.println("[Game] Cleanup complete");
     }
@@ -659,7 +818,9 @@ public class Game {
         currentGameMode = mode;
         if (!multiplayerMode) {
             world = new World(seed, generateStructures);
-            world.setEventBus(modLoader.getEventBus());
+            if (modLoader != null) {
+                world.setEventBus(modLoader.getEventBus());
+            }
             chunkManager = new ChunkManager(
                 world,
                 settings.world.chunkLoadDistance,
@@ -686,9 +847,16 @@ public class Game {
         chunkRenderer.setSunLight(sunLight);
 
         if (!chunkRendererInitialized) {
-            chunkRenderer.init();
-            chunkRendererInitialized = true;
-            System.out.println("[Game] Chunk renderer initialized");
+            try {
+                chunkRenderer.init();
+                chunkRendererInitialized = true;
+                chunkRendererUnavailableWarned = false;
+                System.out.println("[Game] Chunk renderer initialized");
+            } catch (Exception ex) {
+                chunkRendererInitialized = false;
+                System.err.println("[Game] Chunk renderer failed to initialize during world setup: " + ex.getMessage());
+                ex.printStackTrace();
+            }
         }
 
         if (world != null) {
@@ -698,8 +866,15 @@ public class Game {
         updateSkyLighting(0.0f);
 
         itemDropRenderer.init();
-        itemDropRenderer.setTextureAtlas(chunkRenderer.getTextureAtlas());
+        if (chunkRenderer != null && chunkRendererInitialized && chunkRenderer.getTextureAtlas() != null) {
+            itemDropRenderer.setTextureAtlas(chunkRenderer.getTextureAtlas());
+        }
         dropManager.clear();
+        
+        npcRenderer.init();
+        npcRenderer.setSkinAtlas(skinManager.getAtlas());
+        npcManager.clear();
+        System.out.println("[Game] NPC renderer initialized");
 
         ensureHighlightRendererInitialized();
 
@@ -713,6 +888,15 @@ public class Game {
             playerController.respawn(world);
             playerController.setGameMode(currentGameMode);
             camera.setPosition(playerController.getEyePosition());
+        }
+
+        if (aiCompanionManager != null && settings != null && settings.ai != null
+            && settings.ai.aiEnabled && settings.ai.spawnOnStart) {
+            boolean spawned = aiCompanionManager.spawnCompanion(playerController != null
+                ? playerController.getPosition() : null, settings.ai);
+            if (spawned) {
+                System.out.println("[AI] Companion spawned on world start.");
+            }
         }
 
         System.out.println("[Game] World creation complete!");
@@ -762,7 +946,9 @@ public class Game {
 
         // Set EventBus on world so mods can receive world/block/chunk events
         // Even in multiplayer, mods need to know about world changes
-        world.setEventBus(modLoader.getEventBus());
+        if (modLoader != null) {
+            world.setEventBus(modLoader.getEventBus());
+        }
         ensureHighlightRendererInitialized();
         if (miningSystem != null) {
             miningSystem.reset();
@@ -773,11 +959,20 @@ public class Game {
             chunkRenderer.setModLoader(modLoader);
             chunkRenderer.setSettings(settings);
             chunkRenderer.setSunLight(sunLight);
-            chunkRenderer.init();
-            System.out.println("[Game] Chunk renderer initialized");
+            try {
+                chunkRenderer.init();
+                chunkRendererInitialized = true;
+                chunkRendererUnavailableWarned = false;
+                System.out.println("[Game] Chunk renderer initialized");
+            } catch (Exception ex) {
+                chunkRendererInitialized = false;
+                System.err.println("[Game] Chunk renderer failed to initialize: " + ex.getMessage());
+                ex.printStackTrace();
+            }
         } else {
             chunkRenderer.setSettings(settings);
             chunkRenderer.setSunLight(sunLight);
+            chunkRenderer.setModLoader(modLoader);
         }
 
         if (world != null) {
@@ -787,8 +982,14 @@ public class Game {
         updateSkyLighting(0.0f);
 
         itemDropRenderer.init();
-        itemDropRenderer.setTextureAtlas(chunkRenderer.getTextureAtlas());
+        if (chunkRenderer != null && chunkRendererInitialized && chunkRenderer.getTextureAtlas() != null) {
+            itemDropRenderer.setTextureAtlas(chunkRenderer.getTextureAtlas());
+        }
         dropManager.clear();
+        
+        npcRenderer.init();
+        npcRenderer.setSkinAtlas(skinManager.getAtlas());
+        npcManager.clear();
 
         ensureHighlightRendererInitialized();
 
@@ -820,10 +1021,27 @@ public class Game {
     /**
      * Gets the mod loader.
      * 
-     * @return The Lua mod loader
+     * @return The Lua mod loader, or null if mod loading failed
      */
     public LuaModLoader getModLoader() {
         return modLoader;
+    }
+    
+    /**
+     * Gets the NPC manager instance.
+     * 
+     * @return The NPC manager
+     */
+    public NPCManager getNPCManager() {
+        return npcManager;
+    }
+
+    public AICompanionManager getAICompanionManager() {
+        return aiCompanionManager;
+    }
+
+    public Settings getSettings() {
+        return settings;
     }
     
     /**
@@ -908,6 +1126,7 @@ public class Game {
                 break;
                 
             case SETTINGS_MENU:
+            case AI_COMPANION_SETTINGS:
             case MULTIPLAYER_MENU:
                 if (stateChanged) {
                     discordRPC.updateMainMenu();
@@ -1056,9 +1275,13 @@ public class Game {
      * @param height New window height
      */
     private void resizeBlurTargets(int width, int height) {
-        if (blurSupported || blurRenderer != null) {
-            cleanupBlurResources();
+        if (!blurSupported || blurRenderer == null) {
+            return;
+        }
+        try {
             initBlurResources(width, height);
+        } catch (Exception e) {
+            System.err.println("[Game] Failed to resize blur resources: " + e.getMessage());
         }
     }
     
@@ -1081,6 +1304,34 @@ public class Game {
         if (blurTexture2 != 0) {
             glDeleteTextures(blurTexture2);
             blurTexture2 = 0;
+        }
+    }
+    
+    /**
+     * Posts a task to be executed on the main game thread.
+     * Thread-safe method for async operations to schedule work on the main thread.
+     * 
+     * @param task Runnable to execute on main thread
+     */
+    public void postToMainThread(Runnable task) {
+        if (task != null) {
+            mainThreadTasks.offer(task);
+        }
+    }
+    
+    /**
+     * Processes all pending main thread tasks.
+     * Called once per frame from the update loop.
+     */
+    private void processMainThreadTasks() {
+        Runnable task;
+        while ((task = mainThreadTasks.poll()) != null) {
+            try {
+                task.run();
+            } catch (Exception e) {
+                System.err.println("[Game] Error executing main thread task: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     }
 }

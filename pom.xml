@@ -48,6 +48,12 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <lwjgl.version>3.3.3</lwjgl.version>
         <joml.version>1.10.5</joml.version>
+        <test.report.directory>${project.build.directory}/test-reports</test.report.directory>
+        <preflight.test.class>com.poorcraft.test.PreFlightTestSuite</preflight.test.class>
+        <poorcraft.surefire.includes>**/*Test.java</poorcraft.surefire.includes>
+        <poorcraft.surefire.excludes>**/*IT.java</poorcraft.surefire.excludes>
+        <poorcraft.skip.it>false</poorcraft.skip.it>
+        <poorcraft.skip.launch4j>true</poorcraft.skip.launch4j>
     </properties>
 
     <!-- JitPack repository removed - no longer needed as Discord RPC dependencies were removed -->
@@ -276,9 +282,18 @@
                 <version>3.2.2</version>
                 <configuration>
                     <useModulePath>false</useModulePath>
+                    <includes>
+                        <include>${poorcraft.surefire.includes}</include>
+                    </includes>
+                    <excludes>
+                        <exclude>${poorcraft.surefire.excludes}</exclude>
+                        <exclude>**/WindowResizeTest.java</exclude>
+                    </excludes>
+                    <reportsDirectory>${test.report.directory}</reportsDirectory>
                     <systemPropertyVariables>
                         <java.awt.headless>true</java.awt.headless>
                         <poorcraft.test.headless>true</poorcraft.test.headless>
+                        <poorcraft.test.report.dir>${test.report.directory}</poorcraft.test.report.dir>
                     </systemPropertyVariables>
                     <properties>
                         <property>
@@ -305,9 +320,15 @@
                 </executions>
                 <configuration>
                     <useModulePath>false</useModulePath>
+                    <skip>${poorcraft.skip.it}</skip>
+                    <includes>
+                        <include>**/WindowResizeTest.java</include>
+                    </includes>
+                    <reportsDirectory>${test.report.directory}</reportsDirectory>
                     <systemPropertyVariables>
                         <java.awt.headless>true</java.awt.headless>
                         <poorcraft.test.headless>true</poorcraft.test.headless>
+                        <poorcraft.test.report.dir>${test.report.directory}</poorcraft.test.report.dir>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
@@ -353,6 +374,7 @@
                             <goal>launch4j</goal>
                         </goals>
                         <configuration>
+                            <skip>${poorcraft.skip.launch4j}</skip>
                             <headerType>gui</headerType>
                             <outfile>target/PoorCraft.exe</outfile>
                             <jar>target/PoorCraft.jar</jar>
@@ -384,6 +406,73 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-report-plugin</artifactId>
+                <version>3.2.2</version>
+                <executions>
+                    <execution>
+                        <id>aggregate-test-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report-only</goal>
+                        </goals>
+                        <configuration>
+                            <reportsDirectory>${test.report.directory}</reportsDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.4.1</version>
+                <executions>
+                    <execution>
+                        <id>enforce-java-maven</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[17,)</version>
+                                </requireJavaVersion>
+                                <requireMavenVersion>
+                                    <version>[3.6,)</version>
+                                </requireMavenVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>quick-tests</id>
+            <properties>
+                <poorcraft.surefire.includes>**/PreFlightTestSuite.java</poorcraft.surefire.includes>
+                <poorcraft.surefire.excludes>none</poorcraft.surefire.excludes>
+                <poorcraft.skip.it>true</poorcraft.skip.it>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>dev-build</id>
+            <properties>
+                <poorcraft.skip.launch4j>true</poorcraft.skip.launch4j>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>prod-build</id>
+            <properties>
+                <poorcraft.skip.launch4j>false</poorcraft.skip.launch4j>
+            </properties>
+        </profile>
+    </profiles>
 </project>

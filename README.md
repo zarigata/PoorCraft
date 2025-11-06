@@ -36,6 +36,12 @@ A free, open-source Minecraft clone that empowers players to create, modify and 
 - ✅ **Configuration** - JSON-based settings with in-game editor
 - ✅ **Silkscreen Font** - Retro pixel font for authentic aesthetic
 
+### 🤖 AI Companion
+- ✅ **Smart Companion NPC** – Spawns alongside the player and responds to directed chat
+- ✅ **Action Commands** – "follow", "stop", and resource gathering requests become in-game tasks
+- ✅ **Multi-Provider Support** – Switch between local Ollama or cloud providers (Gemini, OpenRouter)
+- 📘 **Companion Guide** – See [docs/AI_COMPANION_GUIDE.md](docs/AI_COMPANION_GUIDE.md) for setup and usage
+
 ### 🌐 Multiplayer
 - ✅ **Client-Server Architecture** - Authoritative server model
 - ✅ **14 Packet Types** - Complete networking protocol
@@ -50,7 +56,6 @@ A free, open-source Minecraft clone that empowers players to create, modify and 
 - ✅ **Comprehensive API** - 15+ functions for world access, time control, logging
 - ✅ **Example Mods** - Included demonstrations of API usage
 - 🚧 **Procedural Textures** - Placeholder (requires image processing library integration)
-- 🚧 **AI NPCs** - Placeholder (requires HTTP library integration)
 
 ## Requirements
 
@@ -67,18 +72,21 @@ A free, open-source Minecraft clone that empowers players to create, modify and 
 
 ## Quick Start
 
-**Rapid development (skip tests):**
-```bat
-scripts\quick-play.bat
-```
+**Unified test & run (recommended):**
 
-**Full testing before playing:**
-```bat
-scripts\test-and-play.bat
-```
+- **Windows:**
+  ```bat
+  scripts\unified-test-and-run.bat --mode dev
+  ```
+- **Linux/macOS:**
+  ```bash
+  ./scripts/unified-test-and-run.sh --mode dev
+  ```
+
+This workflow executes the pre-flight suite, optionally runs the full test suite, builds the game, and launches it. Add `--quick-tests` to run only the pre-flight checks, `--skip-tests` to jump straight to build/launch, or `--test-only` when you just want the validation outcomes.
 
 **Manual testing checklist:**
-See `docs/MANUAL_TESTING_GUIDE.md` for detailed steps.
+See `docs/MANUAL_TESTING_GUIDE.md` for detailed steps, including the resize regression scenarios introduced in the latest verification pass.
 
 ## Building from Source
 
@@ -104,14 +112,14 @@ java -jar target/PoorCraft.jar
 
 ## Testing
 
-PoorCraft includes both automated and manual testing options.
+PoorCraft ships with dedicated tooling for fast validation:
 
-- **Automated tests:** Run with `scripts/run-tests.bat`, `./scripts/run-tests.sh`, or `mvn test`.
-- **Test & play:** Use `scripts/test-and-play.bat` (or `.ps1`) to build, test, and launch the game in one flow.
-- **Manual testing:** Follow the checklist in `docs/MANUAL_TESTING_GUIDE.md` for comprehensive validation.
+- **Pre-flight suite:** `mvn -Pquick-tests test` or run the unified script with `--quick-tests` to execute `PreFlightTestSuite` and produce reports via `TestReportGenerator`.
+- **Full regression:** `mvn clean verify` or omit `--quick-tests` when using the unified workflow to follow the complete Surefire + Failsafe pipeline (including resize integration tests).
+- **Manual verification:** Follow the updated scenarios in `docs/MANUAL_TESTING_GUIDE.md` to confirm window resizing, menu blur, and UI responsiveness.
 
-For more details, see:
-- `docs/TESTING.md` – Automated testing guide
+Additional resources:
+- `docs/TESTING.md` – Automated testing guide, including workflow and pre-flight details
 - `docs/MANUAL_TESTING_GUIDE.md` – Manual testing checklist
 - `scripts/README.md` – Script documentation and usage examples
 
@@ -190,9 +198,6 @@ PoorCraft ships with example mods to demonstrate the Lua modding system:
 - **Procedural Block Texture Generator** (`gamedata/mods/block_texture_generator/`)
   - Placeholder for procedural texture generation (requires image processing library integration with Java)
   - Demonstrates Lua mod structure and configuration
-- **AI NPC System** (`gamedata/mods/ai_npc/`)
-  - Placeholder for AI-powered NPCs (requires HTTP library integration with Java)
-  - Shows NPC spawning and management using Lua API
 
 Configuration:
 - Edit each mod's `mod.json` to configure settings
@@ -295,29 +300,68 @@ For optimal performance on low-end systems:
 - Set **UI Scale** to 0.75 for slightly better performance
 - Disable **Head Bobbing** if experiencing motion sickness
 - Reduce **Menu Animation Speed** for smoother animations
-
 ## Support
 
 Need help or have questions?
 
-- **Documentation**: Check [docs/](docs/) for comprehensive guides
+- Documentation: Check [docs/](docs/) for comprehensive guides
   - [BUILDING.md](docs/BUILDING.md) - Build instructions
   - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System design
   - [MODDING_GUIDE.md](docs/MODDING_GUIDE.md) - Mod creation
   - [DEPLOYMENT.md](docs/DEPLOYMENT.md) - Distribution guide
-- **Bug Reports**: [Open an issue on GitHub](https://github.com/zarigata/poorcraft/issues)
-- **Questions**: Use GitHub Discussions
-- **Modding Help**: See [docs/MODDING_GUIDE.md](docs/MODDING_GUIDE.md) and [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
+- Bug Reports: [Open an issue on GitHub](https://github.com/zarigata/poorcraft/issues)
+- Questions: Use GitHub Discussions
+- Modding Help: See [docs/MODDING_GUIDE.md](docs/MODDING_GUIDE.md) and [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
+
+## Troubleshooting
+
+### Game Won't Start / Crashes on Launch
+
+1. **Mod initialization failures**
+   - Look for `[LuaModContainer] Error initializing mod` entries in the console
+   - Set `"enabled": false` in the offending mod's `mod.json` under `gamedata/mods/<mod>/`
+   - Restart the game; other mods will continue loading
+
+2. **Lua syntax errors**
+   - Check for `LuaError` messages with file names and line numbers
+   - Fix the Lua script or disable the mod until corrected
+
+3. **Missing AI configuration**
+   - Ensure provider credentials and local services are configured as described in [docs/AI_COMPANION_GUIDE.md](docs/AI_COMPANION_GUIDE.md)
+   - Disable experimental mods via `mod.json` if issues persist
+
+### Disabling Mods
+
+1. Open `gamedata/mods/<mod_name>/mod.json`
+2. Change `"enabled": true` to `"enabled": false`
+3. Save and restart the game
+
+### Test Mods
+
+- `faulty_test_mod` – Intentionally throws an error to verify resilience
+- `isolation_alpha` / `isolation_beta` – Validate Lua environment isolation
+- `hi_mod` – Demonstration mod that logs a greeting
+
+All are disabled by default. Enable only when testing the modding system.
+
+### Mod Isolation Issues
+
+- Each mod now runs inside its own Lua globals
+- Use `api.set_shared_data()` / `api.get_shared_data()` for cross-mod communication
+- Avoid relying on `_G` to share state between mods
+
+### Getting Help
+
+1. Review console logs for detailed error output
+2. Read recent entries in `CHANGELOG.md` for known issues
+3. Refer to `docs/MODDING_GUIDE.md` for modding best practices
+4. Include full error logs when reporting bugs
 
 ## License
 
 PoorCraft is licensed under the [MIT License](LICENSE.txt).
 
-**Copyright (c) 2025 Zarigata**
-
 You are free to use, modify, and distribute this software under the terms of the MIT License. See the [LICENSE.txt](LICENSE.txt) file for the full license text.
-
-For additional context and acknowledgments, please see the [NOTICE](NOTICE) file.
 
 ## Acknowledgments
 

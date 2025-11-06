@@ -18,7 +18,6 @@ import static org.lwjgl.glfw.GLFW.*;
 public class ChatOverlay extends UIScreen {
     
     private static final int MAX_MESSAGES = 100;
-    private static final int MAX_VISIBLE_MESSAGES = 10;
     private static final SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("HH:mm");
     
     private final Game game;
@@ -30,8 +29,8 @@ public class ChatOverlay extends UIScreen {
     private float scrollOffset;
     private ModAPI modAPI;
     
-    public ChatOverlay(int windowWidth, int windowHeight, Game game) {
-        super(windowWidth, windowHeight);
+    public ChatOverlay(int windowWidth, int windowHeight, Game game, UIScaleManager scaleManager) {
+        super(windowWidth, windowHeight, scaleManager);
         this.game = game;
         this.messages = new ArrayList<>();
         this.pendingMessages = new ConcurrentLinkedQueue<>();
@@ -52,10 +51,16 @@ public class ChatOverlay extends UIScreen {
     public void init() {
         components.clear();
         
-        // Create text input field at bottom of screen
-        inputField = new TextField(50, windowHeight - 80, windowWidth - 100, 40, "Press T to chat...");
+        // Create text input field at bottom of screen with scaled dimensions
+        float fieldX = scaleDimension(50f);
+        float fieldY = windowHeight - scaleDimension(80f);
+        float fieldWidth = windowWidth - scaleDimension(100f);
+        float fieldHeight = scaleDimension(40f);
+        
+        inputField = new TextField(fieldX, fieldY, fieldWidth, fieldHeight, "Press T to chat...");
         inputField.setMaxLength(256);
         inputField.setVisible(false);  // Hidden by default
+        // Text scale will be set during render when FontRenderer is available
         addComponent(inputField);
     }
     
@@ -64,12 +69,13 @@ public class ChatOverlay extends UIScreen {
         this.windowWidth = width;
         this.windowHeight = height;
         
-        // Reposition input field
+        // Reposition input field with scaled dimensions
         if (inputField != null) {
-            inputField.setX(50);
-            inputField.setY(height - 80);
-            inputField.setWidth(width - 100);
-            inputField.setHeight(40);
+            inputField.setX(scaleDimension(50f));
+            inputField.setY(height - scaleDimension(80f));
+            inputField.setWidth(width - scaleDimension(100f));
+            inputField.setHeight(scaleDimension(40f));
+            // Text scale will be set during render when FontRenderer is available
         }
     }
     
@@ -79,11 +85,11 @@ public class ChatOverlay extends UIScreen {
             return;
         }
         
-        // Draw semi-transparent background panel
-        float panelWidth = Math.min(windowWidth - 100, 600);
-        float panelHeight = 350;
-        float panelX = 50;
-        float panelY = windowHeight - 450;
+        // Draw semi-transparent background panel with scaled dimensions
+        float panelWidth = Math.min(windowWidth - scaleDimension(100f), scaleDimension(600f));
+        float panelHeight = scaleDimension(350f);
+        float panelX = scaleDimension(50f);
+        float panelY = windowHeight - scaleDimension(450f);
         
         renderer.drawRect(panelX, panelY, panelWidth, panelHeight, 0.05f, 0.05f, 0.08f, 0.7f);
         
@@ -98,16 +104,25 @@ public class ChatOverlay extends UIScreen {
     
     private void renderMessageHistory(UIRenderer renderer, FontRenderer fontRenderer, 
                                       float panelX, float panelY, float panelWidth, float panelHeight) {
-        float messageScale = 0.8f;
-        float lineHeight = fontRenderer.getTextHeight() * messageScale + 4;
-        float textX = panelX + 10;
-        float startY = panelY + panelHeight - 20;
+        float messageScale = getTextScale(fontRenderer);
+        float lineHeight = fontRenderer.getTextHeight() * messageScale + scaleDimension(4f);
+        
+        // Update input field text scale if needed
+        if (inputField != null && scaleManager != null) {
+            inputField.setTextScale(messageScale);
+        }
+        float textX = panelX + scaleDimension(10f);
+        float startY = panelY + panelHeight - scaleDimension(20f);
         
         List<ChatMessage> snapshot = getMessagesSnapshot();
 
+        // Calculate max visible messages dynamically based on panel height and line height
+        float padding = scaleDimension(20f);
+        int maxVisible = Math.max(1, (int)Math.floor((panelHeight - padding) / lineHeight));
+        
         // Render messages from bottom to top (newest at bottom)
-        int startIndex = Math.max(0, snapshot.size() - MAX_VISIBLE_MESSAGES - (int)scrollOffset);
-        int endIndex = Math.min(snapshot.size(), startIndex + MAX_VISIBLE_MESSAGES);
+        int startIndex = Math.max(0, snapshot.size() - maxVisible - (int)scrollOffset);
+        int endIndex = Math.min(snapshot.size(), startIndex + maxVisible);
         
         float currentY = startY;
         for (int i = endIndex - 1; i >= startIndex; i--) {
@@ -126,7 +141,7 @@ public class ChatOverlay extends UIScreen {
             }
             
             // Word wrap if message is too long
-            float maxWidth = panelWidth - 20;
+            float maxWidth = panelWidth - scaleDimension(20f);
             float textWidth = fontRenderer.getTextWidth(fullMsg) * messageScale;
             
             if (textWidth > maxWidth) {
@@ -140,7 +155,7 @@ public class ChatOverlay extends UIScreen {
             fontRenderer.drawText(fullMsg, textX, currentY, messageScale, r, g, b, a);
             currentY -= lineHeight;
             
-            if (currentY < panelY + 10) {
+            if (currentY < panelY + scaleDimension(10f)) {
                 break;  // Stop if we've run out of space
             }
         }
@@ -245,10 +260,18 @@ public class ChatOverlay extends UIScreen {
             return;
         }
         
+        // Calculate max visible based on current panel size and line height
+        // This requires approximating the line height since FontRenderer isn't available here
+        float panelHeight = scaleDimension(350f);
+        float padding = scaleDimension(20f);
+        // Approximate line height: base text height (20px at 1.0 scale) + spacing (4px)
+        float approxLineHeight = scaleDimension(24f);
+        int maxVisible = Math.max(1, (int)Math.floor((panelHeight - padding) / approxLineHeight));
+        
         // Calculate max scroll offset
         int maxScroll;
         synchronized (messagesLock) {
-            maxScroll = Math.max(0, messages.size() - MAX_VISIBLE_MESSAGES);
+            maxScroll = Math.max(0, messages.size() - maxVisible);
         }
         
         // Update scroll offset (inverted: positive scroll = scroll up = increase offset)
@@ -264,8 +287,31 @@ public class ChatOverlay extends UIScreen {
             }
         }
 
-        if (api != null) {
+        if (api != null && !chatMsg.isSystemMessage) {
             api.fireChatMessage(chatMsg.senderId, chatMsg.senderName, chatMsg.message, chatMsg.timestamp, chatMsg.isSystemMessage);
+        }
+
+        if (game != null && !chatMsg.isSystemMessage) {
+            var aiCompanionManager = game.getAICompanionManager();
+            if (aiCompanionManager != null) {
+                aiCompanionManager.handleChatMessage(chatMsg.message, chatMsg.senderName, reply -> {
+                    game.postToMainThread(() -> {
+                        var ui = game.getUIManager();
+                        if (ui == null || ui.getChatOverlay() == null) {
+                            return;
+                        }
+
+                        var npcManager = game.getNPCManager();
+                        int id = aiCompanionManager.getCompanionNpcId();
+                        var npc = npcManager != null ? npcManager.getNPC(id) : null;
+                        var gameSettings = game.getSettings();
+                        var aiSettings = gameSettings != null ? gameSettings.ai : null;
+                        String npcFallbackName = aiSettings != null ? aiSettings.companionName : "Companion";
+                        String npcName = npc != null ? npc.getName() : npcFallbackName;
+                        ui.getChatOverlay().enqueueMessage(id, npcName, reply, System.currentTimeMillis(), false);
+                    });
+                });
+            }
         }
     }
 

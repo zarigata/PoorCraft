@@ -87,6 +87,16 @@ public class Label extends UIComponent {
     }
 
     /**
+     * Updates the label position.
+     *
+     * @param x new X coordinate
+     * @param y new Y coordinate
+     */
+    public void setPosition(float x, float y) {
+        super.setPosition(x, y);
+    }
+
+    /**
      * Gets the label text.
      *
      * @return label text

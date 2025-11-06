@@ -90,6 +90,24 @@ public class Settings {
         settings.ai = new AISettings();
         settings.ai.aiEnabled = false;
         settings.ai.aiProvider = "ollama";
+        settings.ai.companionName = "Companion";
+        settings.ai.companionSkin = "alex";
+        settings.ai.spawnOnStart = true;
+        settings.ai.followDistance = 3.0f;
+        settings.ai.enableActions = true;
+        settings.ai.actionCooldownSeconds = 10;
+        settings.ai.maxGatherDistance = 20;
+        settings.ai.filterReasoning = true;
+        settings.ai.logReasoning = false;
+        settings.ai.apiKeys = new HashMap<>();
+        settings.ai.apiKeys.put("ollama", "");
+        settings.ai.apiKeys.put("gemini", "");
+        settings.ai.apiKeys.put("openrouter", "");
+        settings.ai.models = new HashMap<>();
+        settings.ai.models.put("ollama", "llama2");
+        settings.ai.models.put("gemini", "gemini-pro");
+        settings.ai.models.put("openrouter", "openai/gpt-3.5-turbo");
+        settings.ai.systemPrompt = "You are a helpful AI companion in a Minecraft-like game. You can perform actions by saying them clearly. Available actions: gather wood, gather stone, follow player, stop following. Respond briefly and mention if you'll help with an action.";
         
         settings.world = new WorldSettings();
         settings.world.seed = 0;  // 0 means random seed
@@ -210,6 +228,18 @@ public class Settings {
     public static class AISettings {
         public boolean aiEnabled;
         public String aiProvider;
+        public String companionName;
+        public String companionSkin;
+        public boolean spawnOnStart;
+        public float followDistance;
+        public boolean enableActions;
+        public int actionCooldownSeconds;
+        public int maxGatherDistance;
+        public boolean filterReasoning;
+        public boolean logReasoning;
+        public Map<String, String> apiKeys;
+        public Map<String, String> models;
+        public String systemPrompt;
     }
     
     /**

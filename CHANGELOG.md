@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Mod Loading System Resilience**
+  - Fixed Lua mod initialization so single failures no longer crash the game
+  - Removed exception re-throwing in `LuaModContainer.init()` and `enable()` allowing graceful degradation
+  - Game now continues startup even when some mods enter the ERROR state
+  - Added summary logging to highlight failing mods
+- **Lua Environment Isolation**
+  - Implemented per-mod Lua globals to prevent shared state conflicts
+  - Ensured `LuaModContainer` provisions a fresh API bridge for each mod
+  - Isolation test mods now validate separate environments without interference
+- **Test Mod Configuration**
+  - Disabled `faulty_test_mod`, `isolation_alpha`, `isolation_beta`, and `hi_mod` by default
+  - Added descriptions clarifying their testing purpose and usage guidance
+- **Hi Mod Performance**
+  - Removed blocking countdown loop from `hi_mod` initialization
+  - Prevents main thread stalls during mod enabling
+- **UI Rendering System Improvements**
+  - FontRenderer now uses dedicated VAO/VBO instead of clobbering UIRenderer buffers
+  - Fixed text double-scaling issue by adding `getTextScaleForFontSize()` to normalize atlas size selection
+  - ChatOverlay and ConsoleOverlay now dynamically calculate max visible lines based on scaled line height
+  - Settings UI Scale slider now provides live preview with instant layout refresh
+  - All UI screens migrated to use UIScaleManager for consistent percentage-based sizing
+
+### Changed
+- **UI Screen Constructor API**: All UI screens now require `UIScaleManager` parameter in constructor. External instantiations must pass scaleManager for proper scaling support.
+
 ## [2.0.0] - 2025-01-XX (Major Refactor)
 
 ### Added

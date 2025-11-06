@@ -180,6 +180,18 @@ public class MenuButton extends UIComponent {
         this.onClick = onClick;
     }
 
+    public void setBounds(float x, float y, float width, float height) {
+        super.setBounds(x, y, width, height);
+    }
+
+    public void setPosition(float x, float y) {
+        super.setPosition(x, y);
+    }
+
+    public void setSize(float width, float height) {
+        super.setSize(width, height);
+    }
+
     private float clamp(float value, float min, float max) {
         return Math.max(min, Math.min(max, value));
     }

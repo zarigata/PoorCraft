@@ -2,8 +2,8 @@
   "id": "hi_mod",
   "name": "Hi Mod",
   "version": "1.0.0",
-  "description": "Simple test mod that says hi for 5 seconds when the game starts",
+  "description": "Simple test mod that says hi when the game starts - demonstrates Lua modding basics",
   "author": "PoorCraft Team",
   "main": "main.lua",
-  "enabled": true
+  "enabled": false
 }

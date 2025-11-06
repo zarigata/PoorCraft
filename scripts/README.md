@@ -1,118 +1,89 @@
 # Build Scripts
 
-This directory contains build and execution scripts for PoorCraft.
+This directory contains build, testing, and launch helpers for PoorCraft.
 
-## Scripts
+## Recommended: Unified Test & Run
+
+`scripts\unified-test-and-run.bat` and `./scripts/unified-test-and-run.sh` are the primary workflows for day-to-day development and release prep. They combine automated testing, Maven builds, and optional launch steps with consistent reporting.
+
+### Quick Usage
+
+- **Dev + quick tests:**
+  - Windows: `scripts\unified-test-and-run.bat --mode dev --quick-tests`
+  - Linux/macOS: `./scripts/unified-test-and-run.sh --mode dev --quick-tests`
+- **Full regression (pre-release):**
+  - Windows: `scripts\unified-test-and-run.bat --mode prod`
+  - Linux/macOS: `./scripts/unified-test-and-run.sh --mode prod`
+- **Test-only CI flow:** add `--test-only` and optionally `--skip-build` when artifacts already exist.
+
+### Key Options
+
+- `--mode <dev|prod>` – select dev JAR or prod EXE packaging profiles.
+- `--quick-tests` – run only the pre-flight (`quick-tests` profile) suite.
+- `--skip-tests` – skip automated validation (not recommended for releases).
+- `--test-only` – exit after tests/builds without launching the game.
+- `--skip-build` – reuse existing artifacts after tests succeed.
+
+The scripts write consolidated artifacts under `target/test-reports/` and enforce Java/Maven prerequisite checks.
+
+## Legacy / Alternative Scripts
+
+These remain for backwards compatibility or niche scenarios but should be considered secondary to the unified workflow.
 
 ### build-and-run.bat / build-and-run.sh
-Builds the project with Maven and automatically runs the game.
+Builds the project with Maven and automatically runs the game without pre-flight checks.
 
-**Usage:**
-```bash
-# Windows
+```bat
 scripts\build-and-run.bat
-
-# Linux/macOS
+```
+```bash
 chmod +x scripts/build-and-run.sh
 scripts/build-and-run.sh
 ```
 
 ### build-exe.bat / build-exe.sh
-Builds the project and creates the Windows executable. Shows detailed output.
+Creates the Windows executable using the production profile.
 
-**Usage:**
-```bash
-# Windows
+```bat
 scripts\build-exe.bat
-
-# Linux/macOS
+```
+```bash
 chmod +x scripts/build-exe.sh
 scripts/build-exe.sh
 ```
 
-### run-poorcraft.ps1
-PowerShell script for building and running PoorCraft on Windows.
+### quick-play.*
+Fast iteration scripts that skip tests and launch immediately (`quick-play.bat`, `.ps1`, `.sh`).
 
-**Usage:**
-```powershell
-scripts\run-poorcraft.ps1
-```
+### test-and-play.*
+Predecessor to the unified flow. Still supports `--skip-tests` / `-SkipTests` and `--test-only` / `-TestOnly` but does not integrate the new Maven profiles.
 
-## Testing & Playing Scripts
+### run-tests.*
+Runs Maven test phases only; use when validating in CI environments without launching the game.
 
-### Quick Play (Development)
-For rapid iteration without running tests.
+### run-poorcraft.*
+Launch-only helpers for players or QA who already have artifacts built.
 
-**Windows:**
-```bat
-scripts\quick-play.bat
-```
+## Troubleshooting
 
-**PowerShell:**
-```powershell
-scripts\quick-play.ps1
-```
-
-These scripts build the project with tests skipped and immediately launch the game.
-
-### Test & Play (Full Testing)
-Run automated tests before launching the game.
-
-**Windows:**
-```bat
-scripts\test-and-play.bat [options]
-```
-
-**PowerShell:**
-```powershell
-scripts\test-and-play.ps1 [options]
-```
-
-**Options:**
-- `--skip-tests` / `-SkipTests` – Skip automated tests.
-- `--test-only` / `-TestOnly` – Run tests without launching the game.
-- `-Verbose` (PowerShell) – Enable detailed Maven output.
-- `-OpenReports` (PowerShell) – Open Surefire reports after testing.
-
-**Examples:**
-```bat
-scripts\test-and-play.bat
-scripts\test-and-play.bat --skip-tests
-scripts\test-and-play.bat --test-only
-```
-
-```powershell
-scripts\test-and-play.ps1 -Verbose
-scripts\test-and-play.ps1 -TestOnly -OpenReports
-```
-
-### Manual Testing
-See `docs/MANUAL_TESTING_GUIDE.md` for a full checklist of features to validate manually.
-
-## Script Comparison
-
-| Script | Purpose | Tests | Speed | Use Case |
-|--------|---------|-------|-------|----------|
-| `quick-play.*` | Fast iteration | ❌ | ⚡ | Development |
-| `test-and-play.*` | Full validation | ✅ | 🐢 | Pre-commit, releases |
-| `run-tests.*` | Tests only | ✅ | 🐢 | CI/CD |
-| `run-poorcraft.*` | Play only | ❌ | ⚡ | End users |
+- Verify Java (JDK 17+) and Maven (3.6+) are on `PATH` before running any script.
+- Review `target/test-reports/` for HTML/Markdown summaries, plus `latest-success.txt` or `latest-failure.txt` markers.
+- On Unix systems ensure scripts are executable: `chmod +x scripts/*.sh`.
+- If Maven reports profile errors, confirm `pom.xml` includes `quick-tests`, `dev-build`, and `prod-build` definitions and rerun with `mvn -Pquick-tests test` manually.
 
 ## Notes
 
-- All scripts automatically change to the project root directory
-- Scripts check for Java installation before building
-- The .bat files are for Windows Command Prompt/PowerShell
-- The .sh files are for Linux/macOS/Git Bash on Windows
-- Make sure shell scripts are executable: `chmod +x scripts/*.sh`
+- All scripts automatically change to the project root directory.
+- Batch (`.bat`) files run on Command Prompt or PowerShell; `.ps1` versions require the appropriate execution policy.
+- Shell (`.sh`) scripts support Linux, macOS, and Git Bash on Windows.
 
 ## Requirements
 
 - Java JDK 17 or higher
 - Maven 3.6 or higher
-- For shell scripts: Bash-compatible shell
+- Bash-compatible shell for `.sh` scripts
 
 ## See Also
 
-- [BUILDING.md](../docs/BUILDING.md) - Detailed build instructions
-- [DEPLOYMENT.md](../docs/DEPLOYMENT.md) - Distribution guide
+- [BUILDING.md](../docs/BUILDING.md) – Detailed build instructions
+- [DEPLOYMENT.md](../docs/DEPLOYMENT.md) – Distribution guide

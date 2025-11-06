@@ -9,6 +9,7 @@ PoorCraft combines automated tests with hands-on validation. Use this guide to p
 - Use the provided scripts for a consistent environment.
 
 ### Quick Start Scripts
+- Recommended unified workflow: `scripts/unified-test-and-run.bat --mode dev --quick-tests`
 - Fast iteration: `scripts/quick-play.bat`
 - Full validation: `scripts/test-and-play.bat`
 
@@ -61,6 +62,10 @@ scripts\test-and-play.bat --skip-tests
 - [ ] Blocks drop items when broken
 - [ ] Item drops can be collected
 
+#### Focus Scenarios
+- [ ] **Chunk neighbor updates** – Build a 3×3 column of blocks and break the center block. Confirm adjacent chunks update lighting/geometry without seams or delayed updates.
+- [ ] **Block break overlay** – Begin mining a block and observe the highlight overlay. Verify both translucent fill and outline render without flicker or depth artifacts when moving the camera.
+
 ### Inventory System
 - [ ] Inventory opens with E key
 - [ ] Hotbar displays correctly
@@ -74,7 +79,9 @@ scripts\test-and-play.bat --skip-tests
 - [ ] Debug info toggles (F3 key)
 - [ ] Chat overlay opens (T key)
 - [ ] Console opens (F1 or / key)
-- [ ] UI scales correctly on window resize
+- [ ] UI scales correctly on window resize (see [Window Resize Testing](#window-resize-testing) for scenarios)
+- [ ] **Settings menu scrolling** – Populate settings with multiple sections, scroll via wheel and drag the scrollbar. Confirm options stay aligned and clicks only affect visible rows.
+- [ ] **Window resize handling** – Resize the window to minimum and maximum supported sizes. Ensure scroll containers and overlays reposition correctly with no clipped controls or misaligned hit targets.
 
 ### Console Commands
 - [ ] `/help` shows command list
@@ -153,3 +160,44 @@ Document known defects from release notes and link to active tickets, then updat
 - `F2` screenshot (if implemented)
 - `F3 + H` advanced debug
 - `F3 + B` bounding boxes
+
+## 8. Window Resize Testing
+
+Perform these checks after running the automated `WindowResizeTest` to validate real-world behavior. Expect debounce logs indicating coalesced resize events (~150 ms) and confirm no crashes or UI glitches throughout.
+
+### Basic Resize
+- Gradually drag the window edges to smaller and larger sizes.
+- Confirm UI anchors and layout grids adapt without overlapping widgets.
+
+### Rapid Resize
+- Quickly resize the window back and forth between minimum and maximum widths.
+- Observe logs for debounced "UIManager resize coalesced" messages and confirm FPS remains stable.
+
+### Maximize Window
+- Click the maximize button.
+- Ensure blur overlays and menu backgrounds stretch cleanly with no desync.
+
+### Restore Window
+- Restore from maximized to a medium size.
+- Verify retained layout state and absence of redundant blur recomputation.
+
+### Fullscreen Toggle
+- Use Alt+Enter (or in-game option) to toggle fullscreen.
+- Ensure HUD scales appropriately and windowed mode restores previous bounds.
+
+### Resize During Gameplay
+- Enter a world, open the inventory and pause menu, then resize while these overlays are active.
+- Confirm no input loss, cursor offsets, or duplicated blur effects.
+
+### Resize in Different States
+- Test resizing from main menu, settings screen, and during loading transitions.
+- Verify each state respects the debounce interval and persists UI scale.
+
+### Multi-Monitor
+- Move the window between monitors of different resolutions and DPI scales.
+- Check that UIManager recalculates scale factors and no rendering artifacts appear on the new display.
+
+### Success Criteria
+- UI logs show debounced resize handling without flooding.
+- No crashes, hangs, or visual corruption occur.
+- Gameplay input remains responsive and menus maintain alignment.

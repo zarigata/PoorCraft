@@ -74,35 +74,35 @@ public class BiomeGenerator {
 
     private BiomeType pickBiome(double temperature, double humidity, double continent, double weirdness, double erosion) {
         double mountainScore = (continent * 0.6) + Math.max(0.0, weirdness) * 0.8;
-        if (mountainScore > 0.75) {
+        if (mountainScore > 0.65) {
             return BiomeType.MOUNTAINS;
         }
 
-        if (temperature < -0.35) {
+        if (temperature < -0.2) {
             return BiomeType.SNOW;
         }
 
-        if (temperature > 0.45 && humidity < -0.1) {
+        if (temperature > 0.3 && humidity < 0.0) {
             return BiomeType.DESERT;
         }
 
-        if (humidity > 0.55 && temperature > -0.15 && erosion < 0.15) {
+        if (humidity > 0.4 && temperature > -0.2 && erosion < 0.2) {
             return BiomeType.SWAMP;
         }
 
-        if (temperature > 0.25 && humidity > 0.25) {
+        if (temperature > 0.15 && humidity > 0.15) {
             return BiomeType.JUNGLE;
         }
 
-        if (humidity > 0.2 && temperature > -0.2 && temperature < 0.4) {
+        if (humidity > 0.1 && temperature > -0.3 && temperature < 0.5) {
             return BiomeType.FOREST;
         }
 
-        if (humidity < -0.3 && temperature > 0.1) {
+        if (humidity < -0.2 && temperature > 0.1) {
             return BiomeType.DESERT;
         }
 
-        if (continent < -0.55 && temperature < -0.1) {
+        if (continent < -0.5 && temperature < -0.1) {
             return BiomeType.SNOW;
         }
 

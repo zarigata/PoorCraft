@@ -44,9 +44,19 @@ public class SkinEditorScreen extends UIScreen {
     private Label statusLabel;
     private MenuButton pencilButton;
     private MenuButton eraserButton;
+    private Label titleLabel;
+    private Label subtitleLabel;
+    private Label nameLabel;
+    private Label toolsLabel;
+    private Label pickerLabel;
+    private MenuButton saveButton;
+    private MenuButton clearButton;
+    private MenuButton backButton;
+    private boolean layoutDirty;
+    private boolean componentsInitialized;
 
-    public SkinEditorScreen(int windowWidth, int windowHeight, UIManager uiManager) {
-        super(windowWidth, windowHeight);
+    public SkinEditorScreen(int windowWidth, int windowHeight, UIManager uiManager, UIScaleManager scaleManager) {
+        super(windowWidth, windowHeight, scaleManager);
         this.uiManager = uiManager;
         this.skinManager = SkinManager.getInstance();
 
@@ -63,154 +73,225 @@ public class SkinEditorScreen extends UIScreen {
 
     @Override
     public void init() {
-        clearComponents();
         if (canvas == null) {
             canvas = createBlankCanvas();
         }
-        buildLayout();
+
+        if (!componentsInitialized) {
+            clearComponents();
+            createComponents();
+            componentsInitialized = true;
+        }
+
+        nameField.setText(defaultName);
+        statusLabel.setText("");
+        updateToolButtons();
+        setSlidersFromColor(currentColor);
+        colorValueLabel.setText(formatColorLabel(currentColor));
+
+        layoutDirty = true;
+        recalculateLayout();
     }
 
     @Override
     public void onResize(int width, int height) {
         this.windowWidth = width;
         this.windowHeight = height;
-        init();
+        if (!componentsInitialized) {
+            init();
+            return;
+        }
+        layoutDirty = true;
     }
 
-    private void buildLayout() {
-        float padding = Math.max(36f, windowWidth * 0.04f);
-        float titleY = padding;
-        float titleX = windowWidth / 2f;
+    @Override
+    public void update(float deltaTime) {
+        if (layoutDirty) {
+            recalculateLayout();
+        }
+        super.update(deltaTime);
+    }
 
-        Label title = new Label(titleX, titleY, "SKIN EDITOR",
-            0.92f, 0.88f, 0.99f, 1.0f);
-        title.setCentered(true);
-        title.setScale(Math.max(1.9f, windowWidth / 820f));
-        addComponent(title);
+    private void createComponents() {
+        float titleR = 0.92f;
+        float titleG = 0.88f;
+        float titleB = 0.99f;
 
-        Label subtitle = new Label(titleX, titleY + 46f,
+        titleLabel = new Label(0f, 0f, "SKIN EDITOR", titleR, titleG, titleB, 1.0f);
+        titleLabel.setCentered(true);
+        addComponent(titleLabel);
+
+        subtitleLabel = new Label(0f, 0f,
             "Paint a 64×64 skin using the tools below",
             0.72f, 0.84f, 0.95f, 0.9f);
-        subtitle.setCentered(true);
-        subtitle.setScale(Math.max(1.0f, windowWidth / 980f));
-        addComponent(subtitle);
+        subtitleLabel.setCentered(true);
+        addComponent(subtitleLabel);
 
-        float canvasSize = Math.min(Math.min(windowWidth * 0.55f, windowHeight - padding * 2.5f), 720f);
-        float canvasX = padding;
-        float canvasY = titleY + Math.max(120f, windowHeight * 0.12f);
-
-        canvasComponent = new PixelCanvasComponent(canvasX, canvasY, canvasSize, canvasSize);
+        canvasComponent = new PixelCanvasComponent(0f, 0f, 0f, 0f);
         addComponent(canvasComponent);
 
-        float controlsX = canvasX + canvasSize + Math.max(40f, windowWidth * 0.03f);
-        float controlsWidth = windowWidth - controlsX - padding;
-        float cursorY = canvasY;
-
-        Label nameLabel = new Label(controlsX, cursorY, "SKIN NAME",
+        nameLabel = new Label(0f, 0f, "SKIN NAME",
             0.72f, 0.9f, 0.95f, 1.0f);
-        nameLabel.setScale(Math.max(1.0f, controlsWidth / 480f));
         addComponent(nameLabel);
-        cursorY += 34f;
 
-        float nameFieldHeight = Math.max(58f, windowHeight * 0.08f);
-        nameField = new TextField(controlsX, cursorY, controlsWidth, nameFieldHeight, "Enter skin name");
+        nameField = new TextField(0f, 0f, 0f, 0f, "Enter skin name");
         nameField.setMaxLength(32);
-        nameField.setText(defaultName);
         addComponent(nameField);
-        cursorY += nameFieldHeight + 38f;
 
-        Label toolsLabel = new Label(controlsX, cursorY, "TOOLS",
+        toolsLabel = new Label(0f, 0f, "TOOLS",
             0.78f, 0.88f, 0.98f, 1.0f);
-        toolsLabel.setScale(Math.max(1.0f, controlsWidth / 520f));
         addComponent(toolsLabel);
-        cursorY += 32f;
 
-        float toolButtonHeight = Math.max(60f, windowHeight * 0.08f);
-        pencilButton = new MenuButton(controlsX, cursorY, (controlsWidth - 16f) / 2f, toolButtonHeight,
+        pencilButton = new MenuButton(0f, 0f, 0f, 0f,
             "PENCIL", () -> setTool(Tool.PENCIL));
         addComponent(pencilButton);
 
-        eraserButton = new MenuButton(controlsX + (controlsWidth + 16f) / 2f, cursorY,
-            (controlsWidth - 16f) / 2f, toolButtonHeight,
+        eraserButton = new MenuButton(0f, 0f, 0f, 0f,
             "ERASER", () -> setTool(Tool.ERASER));
         addComponent(eraserButton);
-        cursorY += toolButtonHeight + 42f;
 
-        Label pickerLabel = new Label(controlsX, cursorY, "COLOR PICKER",
+        pickerLabel = new Label(0f, 0f, "COLOR PICKER",
             0.8f, 0.92f, 1.0f, 1.0f);
-        pickerLabel.setScale(Math.max(1.0f, controlsWidth / 520f));
         addComponent(pickerLabel);
-        cursorY += 32f;
 
-        float previewSize = Math.min(controlsWidth, 140f);
-        colorPreviewComponent = new ColorPreviewComponent(controlsX, cursorY, previewSize, previewSize);
+        colorPreviewComponent = new ColorPreviewComponent(0f, 0f, 0f, 0f);
         addComponent(colorPreviewComponent);
 
-        colorValueLabel = new Label(controlsX + previewSize + 16f, cursorY + previewSize * 0.5f,
+        colorValueLabel = new Label(0f, 0f,
             formatColorLabel(currentColor), 0.88f, 0.92f, 0.98f, 1.0f);
-        colorValueLabel.setScale(Math.max(1.0f, controlsWidth / 540f));
         addComponent(colorValueLabel);
 
-        cursorY += previewSize + 28f;
+        redSlider = createColorSlider("Red", value -> updateCurrentColor());
+        greenSlider = createColorSlider("Green", value -> updateCurrentColor());
+        blueSlider = createColorSlider("Blue", value -> updateCurrentColor());
+        alphaSlider = createColorSlider("Alpha", value -> updateCurrentColor());
 
-        float sliderHeight = Math.max(54f, windowHeight * 0.07f);
-        float sliderWidth = controlsWidth;
-
-        redSlider = createColorSlider("Red", controlsX, cursorY, sliderWidth, sliderHeight,
-            value -> updateCurrentColor());
-        cursorY += sliderHeight + 22f;
-
-        greenSlider = createColorSlider("Green", controlsX, cursorY, sliderWidth, sliderHeight,
-            value -> updateCurrentColor());
-        cursorY += sliderHeight + 22f;
-
-        blueSlider = createColorSlider("Blue", controlsX, cursorY, sliderWidth, sliderHeight,
-            value -> updateCurrentColor());
-        cursorY += sliderHeight + 22f;
-
-        alphaSlider = createColorSlider("Alpha", controlsX, cursorY, sliderWidth, sliderHeight,
-            value -> updateCurrentColor());
-        cursorY += sliderHeight + 36f;
-
-        setSlidersFromColor(currentColor);
-
-        float buttonHeight = Math.max(66f, windowHeight * 0.09f);
-        float buttonSpacing = 18f;
-        float buttonWidth = (controlsWidth - buttonSpacing * 2) / 3f;
-
-        MenuButton saveButton = new MenuButton(controlsX, cursorY, buttonWidth, buttonHeight,
+        saveButton = new MenuButton(0f, 0f, 0f, 0f,
             "SAVE", this::saveSkin);
         addComponent(saveButton);
 
-        MenuButton clearButton = new MenuButton(controlsX + buttonWidth + buttonSpacing, cursorY,
-            buttonWidth, buttonHeight,
+        clearButton = new MenuButton(0f, 0f, 0f, 0f,
             "CLEAR", this::clearCanvas);
         addComponent(clearButton);
 
-        MenuButton backButton = new MenuButton(controlsX + (buttonWidth + buttonSpacing) * 2, cursorY,
-            buttonWidth, buttonHeight,
+        backButton = new MenuButton(0f, 0f, 0f, 0f,
             "CANCEL", () -> uiManager.setState(GameState.SKIN_MANAGER));
         addComponent(backButton);
 
-        cursorY += buttonHeight + 26f;
-
-        statusLabel = new Label(controlsX, cursorY,
+        statusLabel = new Label(0f, 0f,
             "", 0.95f, 0.65f, 0.65f, 1.0f);
-        statusLabel.setScale(Math.max(0.9f, controlsWidth / 680f));
         addComponent(statusLabel);
 
         updateToolButtons();
     }
 
-    private Slider createColorSlider(String label, float x, float y, float width, float height,
-                                     java.util.function.Consumer<Float> onChange) {
-        Slider slider = new Slider(x, y, width, height, label, 0f, 255f, 255f, onChange);
+    private void recalculateLayout() {
+        if (!componentsInitialized) {
+            layoutDirty = false;
+            return;
+        }
+
+        float padding = scaleDimension(36f);
+        float titleY = padding;
+        float titleX = windowWidth / 2f;
+        float norm = scaleManager.getTextScaleForFontSize(uiManager.getCurrentAtlasSize());
+
+        titleLabel.setScale(1.9f * norm);
+        titleLabel.setPosition(titleX, titleY);
+
+        float subtitleY = titleY + scaleDimension(46f);
+        subtitleLabel.setScale(1.0f * norm);
+        subtitleLabel.setPosition(titleX, subtitleY);
+
+        float canvasSize = Math.min(Math.min(windowWidth * 0.55f, windowHeight - padding * 2.5f), scaleDimension(720f));
+        float canvasX = padding;
+        float canvasY = titleY + scaleDimension(120f);
+        canvasComponent.setBounds(canvasX, canvasY, canvasSize, canvasSize);
+
+        float controlsX = canvasX + canvasSize + scaleDimension(40f);
+        float controlsWidth = Math.max(0f, windowWidth - controlsX - padding);
+        float cursorY = canvasY;
+
+        nameLabel.setScale(1.0f * norm);
+        nameLabel.setPosition(controlsX, cursorY);
+        cursorY += scaleDimension(34f);
+
+        float nameFieldHeight = scaleDimension(58f);
+        nameField.setBounds(controlsX, cursorY, controlsWidth, nameFieldHeight);
+        cursorY += nameFieldHeight + scaleDimension(38f);
+
+        toolsLabel.setScale(1.0f * norm);
+        toolsLabel.setPosition(controlsX, cursorY);
+        cursorY += scaleDimension(32f);
+
+        float toolButtonHeight = scaleDimension(60f);
+        float buttonSpacing = scaleDimension(16f);
+        float halfWidth = (controlsWidth - buttonSpacing) / 2f;
+
+        pencilButton.setBounds(controlsX, cursorY, halfWidth, toolButtonHeight);
+        eraserButton.setBounds(controlsX + (controlsWidth + buttonSpacing) / 2f, cursorY,
+            halfWidth, toolButtonHeight);
+        cursorY += toolButtonHeight + scaleDimension(42f);
+
+        pickerLabel.setScale(1.0f * norm);
+        pickerLabel.setPosition(controlsX, cursorY);
+        cursorY += scaleDimension(32f);
+
+        float previewSize = Math.min(controlsWidth, scaleDimension(140f));
+        colorPreviewComponent.setBounds(controlsX, cursorY, previewSize, previewSize);
+
+        float colorLabelX = controlsX + previewSize + scaleDimension(16f);
+        float colorLabelY = cursorY + previewSize * 0.5f;
+        colorValueLabel.setScale(1.0f * norm);
+        colorValueLabel.setPosition(colorLabelX, colorLabelY);
+
+        cursorY += previewSize + scaleDimension(28f);
+
+        float sliderHeight = scaleDimension(54f);
+        float sliderWidth = controlsWidth;
+        float sliderSpacing = scaleDimension(22f);
+
+        applySliderLayout(redSlider, controlsX, cursorY, sliderWidth, sliderHeight, norm);
+        cursorY += sliderHeight + sliderSpacing;
+
+        applySliderLayout(greenSlider, controlsX, cursorY, sliderWidth, sliderHeight, norm);
+        cursorY += sliderHeight + sliderSpacing;
+
+        applySliderLayout(blueSlider, controlsX, cursorY, sliderWidth, sliderHeight, norm);
+        cursorY += sliderHeight + sliderSpacing;
+
+        applySliderLayout(alphaSlider, controlsX, cursorY, sliderWidth, sliderHeight, norm);
+        cursorY += sliderHeight + scaleDimension(36f);
+
+        float buttonHeight = scaleDimension(66f);
+        float actionButtonSpacing = scaleDimension(18f);
+        float buttonWidth = controlsWidth > 0f ? (controlsWidth - actionButtonSpacing * 2) / 3f : 0f;
+
+        saveButton.setBounds(controlsX, cursorY, buttonWidth, buttonHeight);
+        clearButton.setBounds(controlsX + buttonWidth + actionButtonSpacing, cursorY,
+            buttonWidth, buttonHeight);
+        backButton.setBounds(controlsX + (buttonWidth + actionButtonSpacing) * 2, cursorY,
+            buttonWidth, buttonHeight);
+
+        cursorY += buttonHeight + scaleDimension(26f);
+
+        statusLabel.setScale(0.9f * norm);
+        statusLabel.setPosition(controlsX, cursorY);
+
+        layoutDirty = false;
+    }
+
+    private Slider createColorSlider(String label, java.util.function.Consumer<Float> onChange) {
+        Slider slider = new Slider(0f, 0f, 0f, 0f, label, 0f, 255f, 255f, onChange);
         slider.setDecimalPlaces(0);
-        slider.setFontScale(Math.max(0.95f, width / 720f), Math.max(0.9f, width / 780f));
         addComponent(slider);
         return slider;
     }
 
+    private void applySliderLayout(Slider slider, float x, float y, float width, float height, float norm) {
+        slider.setBounds(x, y, width, height);
+        slider.setFontScale(0.95f * norm, 0.9f * norm);
+    }
     private void setTool(Tool tool) {
         this.currentTool = tool;
         updateToolButtons();
@@ -387,7 +468,7 @@ public class SkinEditorScreen extends UIScreen {
                 float cellSizeHover = width / SKIN_SIZE;
                 float hx = x + hoverX * cellSizeHover;
                 float hy = y + hoverY * cellSizeHover;
-                float border = Math.max(1.5f, cellSizeHover * 0.07f);
+                float border = Math.max(scaleDimension(1.5f), cellSizeHover * 0.07f);
                 renderer.drawRect(hx, hy, cellSizeHover, border, 0.05f, 0.95f, 0.95f, 0.8f);
                 renderer.drawRect(hx, hy + cellSizeHover - border, cellSizeHover, border, 0.05f, 0.95f, 0.95f, 0.8f);
                 renderer.drawRect(hx, hy, border, cellSizeHover, 0.05f, 0.95f, 0.95f, 0.8f);

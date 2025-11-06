@@ -138,6 +138,27 @@ public abstract class UIComponent {
     public float getHeight() { return height; }
     public void setHeight(float height) { this.height = height; }
     
+    public void setPosition(float x, float y) {
+        if (x < -10000f || y < -10000f) {
+            System.err.println("[UIComponent] Warning: extreme negative position: (" + x + ", " + y + ")");
+        }
+        this.x = x;
+        this.y = y;
+    }
+
+    public void setSize(float width, float height) {
+        if (width < 0f || height < 0f) {
+            System.err.println("[UIComponent] Clamping negative size: " + width + "x" + height);
+        }
+        this.width = Math.max(0f, width);
+        this.height = Math.max(0f, height);
+    }
+
+    public void setBounds(float x, float y, float width, float height) {
+        setPosition(x, y);
+        setSize(width, height);
+    }
+
     public boolean isVisible() { return visible; }
     public void setVisible(boolean visible) { this.visible = visible; }
     

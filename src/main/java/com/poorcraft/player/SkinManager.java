@@ -3,6 +3,7 @@ package com.poorcraft.player;
 import com.poorcraft.config.Settings;
 import com.poorcraft.resources.AssetManager;
 
+import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -37,8 +38,16 @@ public class SkinManager {
 
     public void init(Settings settings) {
         this.settings = Objects.requireNonNull(settings, "settings");
-        loadDefaultSkins();
-        loadUserSkins();
+        try {
+            loadDefaultSkins();
+        } catch (Exception ex) {
+            System.err.println("[SkinManager] Failed loading default skins: " + ex.getMessage());
+        }
+        try {
+            loadUserSkins();
+        } catch (Exception ex) {
+            System.err.println("[SkinManager] Failed loading user skins: " + ex.getMessage());
+        }
         String targetSkin = settings.player != null ? settings.player.selectedSkin : "steve";
         setCurrentSkin(targetSkin);
     }
@@ -63,11 +72,18 @@ public class SkinManager {
 
     public void setCurrentSkin(String name) {
         PlayerSkin skin = skins.get(name);
-        if (skin == null) {
-            skin = skins.get("steve");
+        if (skin == null && ensureSkinExists(name, DEFAULT_SKINS.contains(name))) {
+            skin = skins.get(name);
         }
         if (skin == null) {
-            System.err.println("[SkinManager] Unable to set skin '" + name + "' and steve fallback is missing.");
+            System.err.println("[SkinManager] Skin '" + name + "' missing, falling back to steve.");
+            System.out.println("[SkinManager] Attempting to regenerate fallback skin 'steve'.");
+            if (ensureSkinExists("steve", true)) {
+                skin = skins.get("steve");
+            }
+        }
+        if (skin == null) {
+            System.err.println("[SkinManager] Unable to set active skin. No default fallback available.");
             return;
         }
         uploadSkinTexture(skin);
@@ -139,20 +155,19 @@ public class SkinManager {
     }
 
     private void loadDefaultSkins() {
-        AssetManager assetManager = AssetManager.getInstance();
+        List<String> missing = new ArrayList<>();
         for (String id : DEFAULT_SKINS) {
-            Path path = assetManager.getDefaultSkinPath(id);
-            if (!Files.exists(path)) {
-                PlayerSkin loaded = loader.loadFromClasspath("/skins/default/" + id + ".png", id);
-                if (loaded == null) {
-                    System.err.println("[SkinManager] Failed to provision default skin: " + id);
-                }
+            boolean loaded = ensureSkinExists(id, true);
+            if (!loaded) {
+                missing.add(id);
             }
         }
-        List<PlayerSkin> defaultSkins = loader.loadAllDefaultSkins(DEFAULT_SKINS);
-        for (PlayerSkin skin : defaultSkins) {
-            registerSkin(skin);
-            uploadSkinTexture(skin);
+        if (!missing.isEmpty()) {
+            List<PlayerSkin> defaultSkins = loader.loadAllDefaultSkins(missing);
+            for (PlayerSkin skin : defaultSkins) {
+                registerSkin(skin);
+                uploadSkinTexture(skin);
+            }
         }
     }
 
@@ -162,6 +177,46 @@ public class SkinManager {
             registerSkin(skin);
             uploadSkinTexture(skin);
         }
+    }
+
+    public boolean ensureSkinExists(String skinId, boolean isDefault) {
+        Objects.requireNonNull(skinId, "skinId");
+        AssetManager assetManager = AssetManager.getInstance();
+        Path path = isDefault ? assetManager.getDefaultSkinPath(skinId) : assetManager.getSkinPath(skinId);
+        if (Files.exists(path)) {
+            PlayerSkin skin = loader.loadFromFile(path, isDefault);
+            if (skin != null) {
+                registerSkin(skin);
+                uploadSkinTexture(skin);
+                return true;
+            }
+        }
+
+        if (isDefault) {
+            PlayerSkin bundled = loader.loadFromClasspath("/skins/default/" + skinId + ".png", skinId);
+            if (bundled != null) {
+                registerSkin(bundled);
+                uploadSkinTexture(bundled);
+                return true;
+            }
+
+            System.out.println("[SkinManager] Generating missing default skin: " + skinId);
+            try {
+                BufferedImage generated = SkinGenerator.generateDefaultSkin(skinId, path);
+                if (generated != null) {
+                    PlayerSkin generatedSkin = loader.loadFromFile(path, true);
+                    if (generatedSkin != null) {
+                        registerSkin(generatedSkin);
+                        uploadSkinTexture(generatedSkin);
+                        return true;
+                    }
+                }
+            } catch (Exception ex) {
+                System.err.println("[SkinManager] Failed to generate skin '" + skinId + "': " + ex.getMessage());
+            }
+        }
+
+        return false;
     }
 
     private void registerSkin(PlayerSkin skin) {

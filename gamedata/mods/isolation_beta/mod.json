@@ -1,1 +1,8 @@
-{"id":"isolation_beta","name":"Isolation Beta","version":"1.0.0","main":"main.lua","enabled":true}
+{
+  "id": "isolation_beta",
+  "name": "Isolation Beta",
+  "version": "1.0.0",
+  "description": "Test mod for Lua environment isolation - companion to isolation_alpha. Enable only for testing.",
+  "main": "main.lua",
+  "enabled": true
+}

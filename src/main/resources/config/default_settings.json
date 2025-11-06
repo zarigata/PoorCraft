@@ -52,7 +52,27 @@
   },
   "ai": {
     "aiEnabled": false,
-    "aiProvider": "ollama"
+    "aiProvider": "ollama",
+    "companionName": "Companion",
+    "companionSkin": "alex",
+    "spawnOnStart": true,
+    "followDistance": 3.0,
+    "enableActions": true,
+    "actionCooldownSeconds": 10,
+    "maxGatherDistance": 20,
+    "filterReasoning": true,
+    "logReasoning": false,
+    "apiKeys": {
+      "ollama": "",
+      "gemini": "",
+      "openrouter": ""
+    },
+    "models": {
+      "ollama": "llama2",
+      "gemini": "gemini-pro",
+      "openrouter": "openai/gpt-3.5-turbo"
+    },
+    "systemPrompt": "You are a helpful AI companion in a Minecraft-like game. You can perform actions by saying them clearly. Available actions: gather wood, gather stone, follow player, stop following. Respond briefly and mention if you'll help with an action."
   },
   "world": {
     "seed": 0,

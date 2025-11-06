@@ -189,15 +189,16 @@ public class LuaModAPI {
         api.set("spawn_npc", new VarArgFunction() {
             @Override
             public LuaValue invoke(org.luaj.vm2.Varargs args) {
-                modAPI.spawnNPC(
-                    args.checkint(1),      // npcId
-                    args.checkjstring(2),  // name
-                    (float) args.checkdouble(3),  // x
-                    (float) args.checkdouble(4),  // y
-                    (float) args.checkdouble(5),  // z
-                    args.checkjstring(6)   // personality
-                );
-                return LuaValue.NIL;
+                int npcId = args.checkint(1);      // npcId (ignored)
+                String name = args.checkjstring(2);  // name
+                float x = (float) args.checkdouble(3);  // x
+                float y = (float) args.checkdouble(4);  // y
+                float z = (float) args.checkdouble(5);  // z
+                String personality = args.checkjstring(6);   // personality
+                String skinName = args.optjstring(7, "steve");  // skinName (optional)
+                
+                int actualId = modAPI.spawnNPC(npcId, name, x, y, z, personality, skinName);
+                return LuaValue.valueOf(actualId);
             }
         });
         
@@ -274,6 +275,125 @@ public class LuaModAPI {
             public LuaValue invoke(org.luaj.vm2.Varargs args) {
                 String biome = modAPI.getCurrentBiome();
                 return biome != null ? LuaValue.valueOf(biome) : LuaValue.NIL;
+            }
+        });
+        
+        // HTTP API
+        api.set("http_request", new VarArgFunction() {
+            @Override
+            public LuaValue invoke(org.luaj.vm2.Varargs args) {
+                try {
+                    String url = args.checkjstring(1);
+                    String method = args.checkjstring(2);
+                    String jsonBody = args.isnil(3) ? null : args.checkjstring(3);
+                    
+                    // Check if arg 4 is headers table or callback
+                    java.util.Map<String, String> headers = null;
+                    LuaValue callback;
+                    
+                    if (args.narg() >= 5) {
+                        // 5 args: url, method, body, headers, callback
+                        if (args.istable(4)) {
+                            headers = luaTableToStringMap(args.checktable(4));
+                        }
+                        callback = args.checkfunction(5);
+                    } else {
+                        // 4 args: url, method, body, callback
+                        callback = args.checkfunction(4);
+                    }
+                    
+                    modAPI.makeHttpRequest(url, method, jsonBody, headers, responseBody -> {
+                        try {
+                            if (responseBody != null) {
+                                callback.call(LuaValue.valueOf(responseBody));
+                            } else {
+                                callback.call(LuaValue.NIL);
+                            }
+                        } catch (Exception e) {
+                            System.err.println("[LuaModAPI] Error in HTTP callback: " + e.getMessage());
+                        }
+                    });
+                    
+                    return LuaValue.NIL;
+                } catch (Exception e) {
+                    System.err.println("[LuaModAPI] Error in http_request: " + e.getMessage());
+                    return LuaValue.NIL;
+                }
+            }
+        });
+        
+        api.set("http_request_sync", new VarArgFunction() {
+            @Override
+            public LuaValue invoke(org.luaj.vm2.Varargs args) {
+                try {
+                    String url = args.checkjstring(1);
+                    String method = args.checkjstring(2);
+                    String jsonBody = args.isnil(3) ? null : args.checkjstring(3);
+                    
+                    String response = modAPI.makeHttpRequestSync(url, method, jsonBody);
+                    return response != null ? LuaValue.valueOf(response) : LuaValue.NIL;
+                } catch (Exception e) {
+                    System.err.println("[LuaModAPI] Error in http_request_sync: " + e.getMessage());
+                    return LuaValue.NIL;
+                }
+            }
+        });
+        
+        // HTTP POST JSON API
+        api.set("http_post_json", new VarArgFunction() {
+            @Override
+            public LuaValue invoke(org.luaj.vm2.Varargs args) {
+                try {
+                    String url = args.checkjstring(1);
+                    LuaTable bodyTable = args.checktable(2);
+                    LuaTable headersTable = args.isnil(3) ? null : args.checktable(3);
+                    LuaValue callback = args.checkfunction(4);
+                    
+                    // Convert Lua tables to Java Maps
+                    java.util.Map<String, Object> body = luaTableToMap(bodyTable);
+                    java.util.Map<String, String> headers = headersTable != null ? luaTableToStringMap(headersTable) : null;
+                    
+                    modAPI.httpPostJson(url, body, headers, responseBody -> {
+                        try {
+                            if (responseBody != null) {
+                                callback.call(LuaValue.valueOf(responseBody));
+                            } else {
+                                callback.call(LuaValue.NIL);
+                            }
+                        } catch (Exception e) {
+                            System.err.println("[LuaModAPI] Error in HTTP POST JSON callback: " + e.getMessage());
+                        }
+                    });
+                    
+                    return LuaValue.NIL;
+                } catch (Exception e) {
+                    System.err.println("[LuaModAPI] Error in http_post_json: " + e.getMessage());
+                    return LuaValue.NIL;
+                }
+            }
+        });
+        
+        // JSON parsing API
+        api.set("parse_json", new OneArgFunction() {
+            @Override
+            public LuaValue call(LuaValue jsonString) {
+                try {
+                    String json = jsonString.checkjstring();
+                    java.util.Map<String, Object> parsed = modAPI.parseJson(json);
+                    return javaMapToLuaTable(parsed);
+                } catch (Exception e) {
+                    System.err.println("[LuaModAPI] Error in parse_json: " + e.getMessage());
+                    return LuaValue.NIL;
+                }
+            }
+        });
+        
+        // NPC follow distance API
+        api.set("set_npc_follow_distance", new TwoArgFunction() {
+            @Override
+            public LuaValue call(LuaValue npcId, LuaValue distance) {
+                modAPI.setNPCFollowDistance(npcId.checkint(), (float) distance.checkdouble());
+                return LuaValue.NIL;
             }
         });
         
@@ -364,6 +484,67 @@ public class LuaModAPI {
     }
     
     /**
+     * Converts a Lua table to a Java Map<String, String> for HTTP headers.
+     */
+    private java.util.Map<String, String> luaTableToStringMap(LuaTable table) {
+        java.util.Map<String, String> map = new java.util.HashMap<>();
+        if (table == null) {
+            return map;
+        }
+        
+        LuaValue key = LuaValue.NIL;
+        while (true) {
+            org.luaj.vm2.Varargs next = table.next(key);
+            if ((key = next.arg1()).isnil()) {
+                break;
+            }
+            LuaValue value = next.arg(2);
+            map.put(key.tojstring(), value.tojstring());
+        }
+        
+        return map;
+    }
+    
+    /**
+     * Converts a Lua table to a Java Map<String, Object> for JSON encoding.
+     */
+    private java.util.Map<String, Object> luaTableToMap(LuaTable table) {
+        java.util.Map<String, Object> map = new java.util.HashMap<>();
+        if (table == null) {
+            return map;
+        }
+        
+        LuaValue key = LuaValue.NIL;
+        while (true) {
+            org.luaj.vm2.Varargs next = table.next(key);
+            if ((key = next.arg1()).isnil()) {
+                break;
+            }
+            LuaValue value = next.arg(2);
+            
+            // Convert value to appropriate Java type
+            if (value.isnil()) {
+                map.put(key.tojstring(), null);
+            } else if (value.isboolean()) {
+                map.put(key.tojstring(), value.toboolean());
+            } else if (value.isint()) {
+                map.put(key.tojstring(), value.toint());
+            } else if (value.isnumber()) {
+                map.put(key.tojstring(), value.todouble());
+            } else if (value.isstring()) {
+                map.put(key.tojstring(), value.tojstring());
+            } else if (value.istable()) {
+                // Recursively convert nested tables
+                map.put(key.tojstring(), luaTableToMap((LuaTable) value));
+            } else {
+                map.put(key.tojstring(), value.tojstring());
+            }
+        }
+        
+        return map;
+    }
+    
+    /**
      * Wrapper for Lua callbacks to Java event system.
      */
     private static class LuaEventCallback {
@@ -376,13 +557,31 @@ public class LuaModAPI {
         public void invoke(Object event) {
             if (callback.isfunction()) {
                 try {
-                    // Convert event to Lua table if needed
-                    // For now, just pass nil - events will need proper conversion
-                    callback.call(LuaValue.NIL);
+                    // Convert event to Lua table based on event type
+                    LuaValue eventData = convertEventToLua(event);
+                    callback.call(eventData);
                 } catch (Exception e) {
                     System.err.println("[LuaModAPI] Error invoking Lua callback: " + e.getMessage());
                 }
             }
+        }
+        
+        private LuaValue convertEventToLua(Object event) {
+            if (event instanceof com.poorcraft.modding.events.BiomeChangeEvent) {
+                com.poorcraft.modding.events.BiomeChangeEvent biomeEvent = 
+                    (com.poorcraft.modding.events.BiomeChangeEvent) event;
+                
+                LuaTable table = new LuaTable();
+                table.set("player_id", LuaValue.valueOf(biomeEvent.getPlayerId()));
+                table.set("old_biome", LuaValue.valueOf(biomeEvent.getPreviousBiome()));
+                table.set("new_biome", LuaValue.valueOf(biomeEvent.getNewBiome()));
+                table.set("x", LuaValue.valueOf(biomeEvent.getWorldX()));
+                table.set("z", LuaValue.valueOf(biomeEvent.getWorldZ()));
+                return table;
+            }
+            
+            // For other events, return nil for now
+            return LuaValue.NIL;
         }
     }
 }

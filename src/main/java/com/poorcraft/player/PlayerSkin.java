@@ -5,6 +5,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -38,25 +39,22 @@ public class PlayerSkin {
     }
 
     private BufferedImage load(Path path) {
-        try {
-            if (!Files.exists(path)) {
-                throw new IOException("Skin file does not exist: " + path);
-            }
-            BufferedImage loaded = ImageIO.read(path.toFile());
-            validateDimensions(loaded, path);
-            return loaded;
-        } catch (IOException e) {
-            System.err.println("[PlayerSkin] Failed to load skin " + path + ": " + e.getMessage());
+        if (!Files.exists(path)) {
+            System.err.println("[PlayerSkin] Skin file not found: " + path);
             return null;
         }
-    }
-
-    private void validateDimensions(BufferedImage image, Path path) {
-        if (image == null) {
-            throw new IllegalArgumentException("Skin image is null for path: " + path);
+        if (!isValidSkinFile(path)) {
+            return null;
         }
-        if (image.getWidth() != 64 || image.getHeight() != 64) {
-            throw new IllegalArgumentException("Skin " + path + " must be 64x64 pixels");
+        try {
+            BufferedImage loaded = ImageIO.read(path.toFile());
+            if (!SkinLoader.validateSkinImage(loaded, path.getFileName().toString())) {
+                return null;
+            }
+            return loaded;
+        } catch (IOException e) {
+            System.err.println("[PlayerSkin] Failed to read skin " + path + ": " + e.getMessage());
+            return null;
         }
     }
 
@@ -130,7 +128,12 @@ public class PlayerSkin {
     }
 
     public void reload() {
-        this.image = load(filePath);
+        BufferedImage reloaded = load(filePath);
+        if (reloaded != null) {
+            this.image = reloaded;
+        } else {
+            System.err.println("[PlayerSkin] Reload failed for " + filePath + ", keeping previous image.");
+        }
     }
 
     public String getFileName() {
@@ -143,5 +146,35 @@ public class PlayerSkin {
 
     public void setTextureId(int textureId) {
         this.textureId = textureId;
+    }
+
+    public static boolean isValidSkinFile(Path path) {
+        if (path == null) {
+            return false;
+        }
+        try {
+            if (!Files.exists(path)) {
+                System.err.println("[PlayerSkin] Skin file missing: " + path);
+                return false;
+            }
+            String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+            if (!name.endsWith(".png")) {
+                System.err.println("[PlayerSkin] Skin file must be a PNG: " + path);
+                return false;
+            }
+            long size = Files.size(path);
+            if (size <= 0) {
+                System.err.println("[PlayerSkin] Skin file is empty: " + path);
+                return false;
+            }
+            if (size > 1_048_576L) {
+                System.err.println("[PlayerSkin] Skin file too large (>1MB): " + path + " size=" + size);
+                return false;
+            }
+            return true;
+        } catch (IOException e) {
+            System.err.println("[PlayerSkin] Unable to validate skin file " + path + ": " + e.getMessage());
+            return false;
+        }
     }
 }

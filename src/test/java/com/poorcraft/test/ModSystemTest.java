@@ -17,12 +17,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +37,6 @@ class ModSystemTest {
     private static final Path MODS_DIRECTORY = Paths.get("gamedata", "mods");
 
     private HeadlessGameContext context;
-    private final List<Path> transientMods = new ArrayList<>();
 
     @BeforeAll
     static void beforeAll() {
@@ -66,20 +61,6 @@ class ModSystemTest {
         if (context != null) {
             context.cleanup();
         }
-        for (Path modPath : transientMods) {
-            try {
-                Files.walk(modPath)
-                    .sorted(Comparator.reverseOrder())
-                    .forEach(path -> {
-                        try {
-                            Files.deleteIfExists(path);
-                        } catch (IOException ignored) {
-                        }
-                    });
-            } catch (IOException ignored) {
-            }
-        }
-        transientMods.clear();
     }
     @Test
     @DisplayName("Mod discovery loads expected mods")
@@ -152,7 +133,6 @@ class ModSystemTest {
     @Test
     @DisplayName("Faulty mod errors do not crash loader")
     void testModErrorHandling() throws IOException {
-        createFaultyMod();
         context.initializeSubsystem("game");
         LuaModLoader loader = context.getModLoader();
         LuaModContainer container = loader.getModById("faulty_test_mod");
@@ -171,22 +151,22 @@ class ModSystemTest {
         LuaModLoader loader = context.getModLoader();
         LuaModContainer container = loader.getModById("realtime_sync");
         Assumptions.assumeTrue(container != null, "realtime_sync mod not available");
-        boolean enabled = container.getState() == LuaModContainer.ModState.ENABLED;
+        LuaModContainer.ModState state = container.getState();
+        String errorMessage = state == LuaModContainer.ModState.ERROR && container.getLastError() != null
+            ? container.getLastError().getMessage()
+            : "none";
+        boolean enabled = state == LuaModContainer.ModState.ENABLED;
         ModAPI api = loader.getModAPI();
         api.setTimeControlEnabled(true);
         float time = api.getGameTime();
         REPORT.addTestResult("Modding", "testRealTimeSyncMod", enabled,
-            "Mod state=" + container.getState() + ", time=" + time);
-        assertTrue(enabled, "Realtime sync mod should be enabled");
+            "Mod state=" + state + ", error=" + errorMessage + ", time=" + time);
+        assertTrue(enabled, () -> "Realtime sync mod should be enabled. State=" + state + ", error=" + errorMessage);
     }
 
     @Test
     @DisplayName("Lua mods maintain isolated globals")
     void testModIsolation() throws IOException {
-        createLuaMod("isolation_alpha", "Isolation Alpha", "return {\n  init = function()\n    local observed = tostring(_G.isolation_probe)\n    api.set_shared_data(\"isolation_alpha_observed\", observed)\n    _G.isolation_probe = \"alpha\"\n    api.set_shared_data(\"isolation_alpha_written\", _G.isolation_probe)\n  end\n}");
-
-        createLuaMod("isolation_beta", "Isolation Beta", "return {\n  init = function()\n    local observed = tostring(_G.isolation_probe)\n    api.set_shared_data(\"isolation_beta_observed\", observed)\n    _G.isolation_probe = \"beta\"\n    api.set_shared_data(\"isolation_beta_written\", _G.isolation_probe)\n  end\n}");
-
         context.initializeSubsystem("game");
         LuaModLoader loader = context.getModLoader();
         ModAPI api = loader.getModAPI();
@@ -252,32 +232,4 @@ class ModSystemTest {
         void accept(com.poorcraft.modding.events.Event event);
     }
 
-    private void createFaultyMod() throws IOException {
-        Path faultyMod = MODS_DIRECTORY.resolve("faulty_test_mod");
-        Files.createDirectories(faultyMod);
-        JsonObject meta = new JsonObject();
-        meta.addProperty("id", "faulty_test_mod");
-        meta.addProperty("name", "Faulty Test Mod");
-        meta.addProperty("version", "0.0.1");
-        meta.addProperty("main", "main.lua");
-        meta.addProperty("enabled", true);
-        Files.writeString(faultyMod.resolve("mod.json"), meta.toString(), StandardCharsets.UTF_8);
-        String script = "return { init = function() error('intentional failure') end }";
-        Files.writeString(faultyMod.resolve("main.lua"), script, StandardCharsets.UTF_8);
-        transientMods.add(faultyMod);
-    }
-
-    private void createLuaMod(String id, String name, String scriptBody) throws IOException {
-        Path modDir = MODS_DIRECTORY.resolve(id);
-        Files.createDirectories(modDir);
-        JsonObject meta = new JsonObject();
-        meta.addProperty("id", id);
-        meta.addProperty("name", name);
-        meta.addProperty("version", "1.0.0");
-        meta.addProperty("main", "main.lua");
-        meta.addProperty("enabled", true);
-        Files.writeString(modDir.resolve("mod.json"), meta.toString(), StandardCharsets.UTF_8);
-        Files.writeString(modDir.resolve("main.lua"), scriptBody, StandardCharsets.UTF_8);
-        transientMods.add(modDir);
-    }
 }

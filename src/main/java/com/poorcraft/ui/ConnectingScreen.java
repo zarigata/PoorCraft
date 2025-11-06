@@ -17,9 +17,14 @@ package com.poorcraft.ui;
 public class ConnectingScreen extends UIScreen {
     
     private UIManager uiManager;
+    private Label titleLabel;
     private Label statusLabel;
+    private Label loadingLabel;
+    private Button cancelButton;
     private String statusMessage;
     private float animationTimer;
+    private boolean layoutDirty;
+    private boolean componentsInitialized;
     
     /**
      * Creates the connecting screen.
@@ -28,8 +33,8 @@ public class ConnectingScreen extends UIScreen {
      * @param windowHeight Window height
      * @param uiManager UI manager
      */
-    public ConnectingScreen(int windowWidth, int windowHeight, UIManager uiManager) {
-        super(windowWidth, windowHeight);
+    public ConnectingScreen(int windowWidth, int windowHeight, UIManager uiManager, UIScaleManager scaleManager) {
+        super(windowWidth, windowHeight, scaleManager);
         this.uiManager = uiManager;
         this.statusMessage = "Establishing connection...";
         this.animationTimer = 0;
@@ -37,39 +42,22 @@ public class ConnectingScreen extends UIScreen {
     
     @Override
     public void init() {
-        clearComponents();
-        
-        float centerX = windowWidth / 2.0f;
-        float centerY = windowHeight / 2.0f;
-        
-        // Title
-        Label titleLabel = new Label(centerX, centerY - 60, "Connecting to Server", 
-            1.0f, 1.0f, 1.0f, 1.0f);
-        titleLabel.setCentered(true);
-        addComponent(titleLabel);
-        
-        // Status label
-        statusLabel = new Label(centerX, centerY, statusMessage, 
-            0.8f, 0.8f, 0.8f, 1.0f);
-        statusLabel.setCentered(true);
-        addComponent(statusLabel);
-        
-        // Loading animation label (dots)
-        Label loadingLabel = new Label(centerX, centerY + 40, "...", 
-            0.6f, 0.6f, 0.6f, 1.0f);
-        loadingLabel.setCentered(true);
-        addComponent(loadingLabel);
-        
-        // Cancel button
-        float buttonWidth = 140;
-        float buttonHeight = 40;
-        Button cancelButton = new Button(centerX - buttonWidth / 2, centerY + 100, 
-            buttonWidth, buttonHeight, "Cancel", this::onCancel);
-        addComponent(cancelButton);
+        if (!componentsInitialized) {
+            clearComponents();
+            createComponents();
+            componentsInitialized = true;
+        }
+
+        layoutDirty = true;
+        recalculateLayout();
     }
     
     @Override
     public void update(float deltaTime) {
+        if (layoutDirty) {
+            recalculateLayout();
+        }
+
         super.update(deltaTime);
         
         // Update animation timer for loading dots
@@ -109,6 +97,59 @@ public class ConnectingScreen extends UIScreen {
     public void onResize(int width, int height) {
         this.windowWidth = width;
         this.windowHeight = height;
-        init();
+        if (!componentsInitialized) {
+            init();
+            return;
+        }
+        layoutDirty = true;
+    }
+
+    private void createComponents() {
+        titleLabel = new Label(0f, 0f, "Connecting to Server",
+            1.0f, 1.0f, 1.0f, 1.0f);
+        titleLabel.setCentered(true);
+        addComponent(titleLabel);
+
+        statusLabel = new Label(0f, 0f, statusMessage,
+            0.8f, 0.8f, 0.8f, 1.0f);
+        statusLabel.setCentered(true);
+        addComponent(statusLabel);
+
+        loadingLabel = new Label(0f, 0f, "...",
+            0.6f, 0.6f, 0.6f, 1.0f);
+        loadingLabel.setCentered(true);
+        addComponent(loadingLabel);
+
+        cancelButton = new Button(0f, 0f, 0f, 0f,
+            "Cancel", this::onCancel);
+        addComponent(cancelButton);
+    }
+
+    private void recalculateLayout() {
+        if (!componentsInitialized) {
+            layoutDirty = false;
+            return;
+        }
+
+        float centerX = windowWidth / 2.0f;
+        float centerY = windowHeight / 2.0f;
+        float norm = scaleManager.getTextScaleForFontSize(uiManager.getCurrentAtlasSize());
+
+        titleLabel.setScale(1.8f * norm);
+        titleLabel.setPosition(centerX, centerY - scaleDimension(60f));
+
+        statusLabel.setScale(norm);
+        statusLabel.setPosition(centerX, centerY);
+
+        loadingLabel.setScale(norm);
+        loadingLabel.setPosition(centerX, centerY + scaleDimension(40f));
+
+        float buttonWidth = scaleDimension(140f);
+        float buttonHeight = scaleDimension(40f);
+        float buttonX = centerX - buttonWidth / 2f;
+        float buttonY = centerY + scaleDimension(100f);
+        cancelButton.setBounds(buttonX, buttonY, buttonWidth, buttonHeight);
+
+        layoutDirty = false;
     }
 }

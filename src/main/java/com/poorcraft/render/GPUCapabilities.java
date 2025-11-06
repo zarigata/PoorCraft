@@ -60,41 +60,54 @@ public final class GPUCapabilities {
     private final long totalVRAMKB;
     private final long availableVRAMKB;
 
-    private GPUCapabilities() {
-        GL.createCapabilities();
-
-        vendor = safeString(glGetString(GL_VENDOR));
-        renderer = safeString(glGetString(GL11.GL_RENDERER));
-        versionString = safeString(glGetString(GL_VERSION));
-
-        int[] parsedVersion = parseVersion(versionString);
-        majorVersion = parsedVersion[0];
-        minorVersion = parsedVersion[1];
-
-        extensions = Collections.unmodifiableSet(queryExtensions());
-
-        supportsUniformBufferObjects = isVersionAtLeast(3, 1) || hasExtension("GL_ARB_uniform_buffer_object");
-        supportsBufferStorage = isVersionAtLeast(4, 4) || hasExtension("GL_ARB_buffer_storage");
-        supportsPersistentMappedBuffers = supportsBufferStorage && hasExtension("GL_ARB_buffer_storage");
-        supportsMultiDrawIndirect = isVersionAtLeast(4, 3) || hasExtension("GL_ARB_multi_draw_indirect");
-        supportsComputeShaders = isVersionAtLeast(4, 3) || hasExtension("GL_ARB_compute_shader");
-
-        maxTextureSize = glGetInteger(GL11.GL_MAX_TEXTURE_SIZE);
-        maxUniformBufferBindings = supportsUniformBufferObjects ? glGetInteger(GL_MAX_UNIFORM_BUFFER_BINDINGS) : 0;
-        maxUniformBlockSize = supportsUniformBufferObjects ? glGetInteger(GL_MAX_UNIFORM_BLOCK_SIZE) : 0;
-        maxVertexAttribs = glGetInteger(GL_MAX_VERTEX_ATTRIBS);
-        maxVertexAttribStride = isVersionAtLeast(4, 4) ? glGetInteger(GL_MAX_VERTEX_ATTRIB_STRIDE) : 0;
-
-        long[] vramInfo = queryVram();
-        totalVRAMKB = vramInfo[0];
-        availableVRAMKB = vramInfo[1];
-
-        logSummary();
+    private GPUCapabilities(String vendor,
+                            String renderer,
+                            String versionString,
+                            int majorVersion,
+                            int minorVersion,
+                            Set<String> extensions,
+                            boolean supportsUniformBufferObjects,
+                            boolean supportsBufferStorage,
+                            boolean supportsMultiDrawIndirect,
+                            boolean supportsComputeShaders,
+                            boolean supportsPersistentMappedBuffers,
+                            int maxTextureSize,
+                            int maxUniformBufferBindings,
+                            int maxUniformBlockSize,
+                            int maxVertexAttribs,
+                            int maxVertexAttribStride,
+                            long totalVRAMKB,
+                            long availableVRAMKB) {
+        this.vendor = safeString(vendor);
+        this.renderer = safeString(renderer);
+        this.versionString = safeString(versionString);
+        this.majorVersion = majorVersion;
+        this.minorVersion = minorVersion;
+        this.extensions = Collections.unmodifiableSet(new HashSet<>(extensions));
+        this.supportsUniformBufferObjects = supportsUniformBufferObjects;
+        this.supportsBufferStorage = supportsBufferStorage;
+        this.supportsMultiDrawIndirect = supportsMultiDrawIndirect;
+        this.supportsComputeShaders = supportsComputeShaders;
+        this.supportsPersistentMappedBuffers = supportsPersistentMappedBuffers;
+        this.maxTextureSize = maxTextureSize;
+        this.maxUniformBufferBindings = maxUniformBufferBindings;
+        this.maxUniformBlockSize = maxUniformBlockSize;
+        this.maxVertexAttribs = maxVertexAttribs;
+        this.maxVertexAttribStride = maxVertexAttribStride;
+        this.totalVRAMKB = totalVRAMKB;
+        this.availableVRAMKB = availableVRAMKB;
     }
 
     public static GPUCapabilities detect() {
-        // Cache per renderer string to support context recreation.
-        return CACHE.computeIfAbsent("default", key -> new GPUCapabilities());
+        return CACHE.computeIfAbsent("default", key -> {
+            try {
+                return detectInternal();
+            } catch (Exception ex) {
+                System.err.println("[GPU] Detection failed, falling back to conservative defaults: " + ex.getMessage());
+                ex.printStackTrace();
+                return createFallbackCapabilities();
+            }
+        });
     }
 
     public static GPUCapabilities getInstance() {
@@ -103,6 +116,81 @@ public final class GPUCapabilities {
             throw new IllegalStateException("GPUCapabilities.detect() must be called after OpenGL context creation");
         }
         return cached;
+    }
+
+    private static GPUCapabilities detectInternal() {
+        GL.createCapabilities();
+
+        String vendor = safeString(glGetString(GL_VENDOR));
+        String renderer = safeString(glGetString(GL11.GL_RENDERER));
+        String versionString = safeString(glGetString(GL_VERSION));
+
+        int[] parsedVersion = parseVersion(versionString);
+        int majorVersion = parsedVersion[0];
+        int minorVersion = parsedVersion[1];
+
+        Set<String> extensions = queryExtensions(majorVersion, minorVersion);
+
+        boolean supportsUniformBufferObjects = isVersionAtLeast(majorVersion, minorVersion, 3, 1) || extensions.contains("GL_ARB_uniform_buffer_object");
+        boolean supportsBufferStorage = isVersionAtLeast(majorVersion, minorVersion, 4, 4) || extensions.contains("GL_ARB_buffer_storage");
+        boolean supportsPersistentMappedBuffers = supportsBufferStorage && extensions.contains("GL_ARB_buffer_storage");
+        boolean supportsMultiDrawIndirect = isVersionAtLeast(majorVersion, minorVersion, 4, 3) || extensions.contains("GL_ARB_multi_draw_indirect");
+        boolean supportsComputeShaders = isVersionAtLeast(majorVersion, minorVersion, 4, 3) || extensions.contains("GL_ARB_compute_shader");
+
+        int maxTextureSize = glGetInteger(GL11.GL_MAX_TEXTURE_SIZE);
+        int maxUniformBufferBindings = supportsUniformBufferObjects ? glGetInteger(GL_MAX_UNIFORM_BUFFER_BINDINGS) : 0;
+        int maxUniformBlockSize = supportsUniformBufferObjects ? glGetInteger(GL_MAX_UNIFORM_BLOCK_SIZE) : 0;
+        int maxVertexAttribs = glGetInteger(GL_MAX_VERTEX_ATTRIBS);
+        int maxVertexAttribStride = isVersionAtLeast(majorVersion, minorVersion, 4, 4) ? glGetInteger(GL_MAX_VERTEX_ATTRIB_STRIDE) : 0;
+
+        long[] vramInfo = queryVram(extensions);
+
+        GPUCapabilities capabilities = new GPUCapabilities(
+            vendor,
+            renderer,
+            versionString,
+            majorVersion,
+            minorVersion,
+            extensions,
+            supportsUniformBufferObjects,
+            supportsBufferStorage,
+            supportsMultiDrawIndirect,
+            supportsComputeShaders,
+            supportsPersistentMappedBuffers,
+            maxTextureSize,
+            maxUniformBufferBindings,
+            maxUniformBlockSize,
+            maxVertexAttribs,
+            maxVertexAttribStride,
+            vramInfo[0],
+            vramInfo[1]
+        );
+        capabilities.logSummary();
+        return capabilities;
+    }
+
+    public static GPUCapabilities createFallbackCapabilities() {
+        System.err.println("[GPU] Using fallback capabilities due to detection failure");
+        return new GPUCapabilities(
+            "Unknown",
+            "Fallback Renderer",
+            "OpenGL 3.3 Fallback",
+            3,
+            3,
+            Collections.emptySet(),
+            false,
+            false,
+            false,
+            false,
+            false,
+            2048,
+            0,
+            0,
+            16,
+            0,
+            0,
+            0
+        );
     }
 
     public boolean isAMD() {
@@ -151,6 +239,10 @@ public final class GPUCapabilities {
     }
 
     public String getVersionString() {
+        return versionString;
+    }
+
+    public String getOpenGLVersion() {
         return versionString;
     }
 
@@ -224,9 +316,9 @@ public final class GPUCapabilities {
         CACHE.clear();
     }
 
-    private Set<String> queryExtensions() {
+    private static Set<String> queryExtensions(int majorVersion, int minorVersion) {
         Set<String> result = new HashSet<>();
-        if (isVersionAtLeast(3, 0)) {
+        if (isVersionAtLeast(majorVersion, minorVersion, 3, 0)) {
             int count = glGetInteger(GL_NUM_EXTENSIONS);
             for (int i = 0; i < count; i++) {
                 String ext = safeString(glGetStringi(GL_EXTENSIONS, i));
@@ -244,11 +336,11 @@ public final class GPUCapabilities {
         return result;
     }
 
-    private long[] queryVram() {
+    private static long[] queryVram(Set<String> extensions) {
         long total = 0;
         long available = 0;
 
-        if (hasExtension("GL_NVX_gpu_memory_info")) {
+        if (extensions.contains("GL_NVX_gpu_memory_info")) {
             try (var stack = stackPush()) {
                 IntBuffer buffer = stack.mallocInt(1);
                 GL11.glGetIntegerv(NVXGPUMemoryInfo.GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, buffer);
@@ -257,7 +349,7 @@ public final class GPUCapabilities {
                 GL11.glGetIntegerv(NVXGPUMemoryInfo.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, buffer);
                 available = buffer.get(0);
             }
-        } else if (hasExtension("GL_ATI_meminfo")) {
+        } else if (extensions.contains("GL_ATI_meminfo")) {
             try (var stack = stackPush()) {
                 IntBuffer buffer = stack.mallocInt(4);
                 GL11.glGetIntegerv(ATIMeminfo.GL_TEXTURE_FREE_MEMORY_ATI, buffer);
@@ -269,11 +361,15 @@ public final class GPUCapabilities {
         return new long[]{Math.max(total, 0), Math.max(available, 0)};
     }
 
-    private String safeString(String value) {
+    private static boolean isVersionAtLeast(int majorVersion, int minorVersion, int testMajor, int testMinor) {
+        return majorVersion > testMajor || (majorVersion == testMajor && minorVersion >= testMinor);
+    }
+
+    private static String safeString(String value) {
         return value == null ? "unknown" : value;
     }
 
-    private int[] parseVersion(String version) {
+    private static int[] parseVersion(String version) {
         if (version == null || version.isEmpty()) {
             return new int[]{0, 0};
         }
@@ -283,7 +379,7 @@ public final class GPUCapabilities {
         return new int[]{major, minor};
     }
 
-    private int parseIntSafe(String token) {
+    private static int parseIntSafe(String token) {
         try {
             return Integer.parseInt(token.trim());
         } catch (NumberFormatException ignored) {

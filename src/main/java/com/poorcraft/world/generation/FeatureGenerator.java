@@ -15,7 +15,15 @@ import java.util.Random;
  * Like Minecraft's feature generation but simpler. And poorer.
  */
 public class FeatureGenerator {
-    
+
+    private static final int MAX_PLAINS_TREES = 6;
+    private static final int MAX_JUNGLE_TREES = 8;
+    private static final int MAX_DESERT_CACTI = 10;
+    private static final int MAX_SNOW_COLUMNS = 64;
+
+    private static final int TREE_SPACING_RADIUS = 3;
+    private static final int TREE_SPACING_HEIGHT_CHECK = 6;
+
     private final long seed;
     private final BiomeGenerator biomeGenerator;
     private final TerrainGenerator terrainGenerator;
@@ -44,45 +52,67 @@ public class FeatureGenerator {
     public void generateFeatures(Chunk chunk) {
         int chunkWorldX = chunk.getPosition().x * Chunk.CHUNK_SIZE;
         int chunkWorldZ = chunk.getPosition().z * Chunk.CHUNK_SIZE;
-        
+
+        boolean plainsPresent = false;
+        boolean junglePresent = false;
+        boolean desertPresent = false;
+        boolean snowPresent = false;
+
+        int plainsFeaturesPlaced = 0;
+        int jungleFeaturesPlaced = 0;
+        int desertFeaturesPlaced = 0;
+        int snowFeaturesPlaced = 0;
+
         // Generate features column by column
         for (int x = 0; x < Chunk.CHUNK_SIZE; x++) {
             for (int z = 0; z < Chunk.CHUNK_SIZE; z++) {
                 int worldX = chunkWorldX + x;
                 int worldZ = chunkWorldZ + z;
-                
+
                 BiomeGenerator.BiomeSample sample = biomeGenerator.sample(worldX, worldZ);
                 BiomeType biome = sample.getBiome();
-                
+
                 // Seed random with deterministic value based on world coordinates
-                // This ensures same features generate at same coordinates every time
-                // The magic numbers are large primes to avoid patterns
                 random.setSeed(seed + worldX * 341873128712L + worldZ * 132897987541L);
-                
-                // Generate biome-specific features
+
                 switch (biome) {
                     case DESERT -> {
-                        if (random.nextFloat() < 0.02f) {
-                            placeCactus(chunk, x, z, worldX, worldZ);
+                        desertPresent = true;
+                        if (desertFeaturesPlaced < MAX_DESERT_CACTI
+                            && random.nextFloat() < 0.02f
+                            && placeCactus(chunk, x, z, worldX, worldZ)) {
+                            desertFeaturesPlaced++;
                         }
                     }
                     case SNOW -> {
-                        if (random.nextFloat() < 0.6f) {
-                            placeSnowLayer(chunk, x, z, worldX, worldZ);
+                        snowPresent = true;
+                        if (snowFeaturesPlaced < MAX_SNOW_COLUMNS
+                            && random.nextFloat() < 0.6f
+                            && placeSnowLayer(chunk, x, z, worldX, worldZ)) {
+                            snowFeaturesPlaced++;
                         }
                     }
                     case JUNGLE -> {
-                        if (random.nextFloat() < 0.12f) {
-                            placeTree(chunk, x, z, worldX, worldZ, biome, 5, 2);
+                        junglePresent = true;
+                        if (jungleFeaturesPlaced < MAX_JUNGLE_TREES
+                            && random.nextFloat() < 0.12f
+                            && !hasNearbyTreeTrunk(chunk, x, z, worldX, worldZ)
+                            && placeTree(chunk, x, z, worldX, worldZ, biome, 5, 2)) {
+                            jungleFeaturesPlaced++;
                         }
                     }
                     case PLAINS -> {
-                        if (random.nextFloat() < 0.035f) {
-                            placeTree(chunk, x, z, worldX, worldZ, biome, 4, 2);
+                        plainsPresent = true;
+                        if (plainsFeaturesPlaced < MAX_PLAINS_TREES
+                            && random.nextFloat() < 0.035f
+                            && !hasNearbyTreeTrunk(chunk, x, z, worldX, worldZ)
+                            && placeTree(chunk, x, z, worldX, worldZ, biome, 4, 2)) {
+                            plainsFeaturesPlaced++;
                         }
                     }
                     case FOREST -> {
-                        if (random.nextFloat() < 0.09f) {
+                        if (random.nextFloat() < 0.09f
+                            && !hasNearbyTreeTrunk(chunk, x, z, worldX, worldZ)) {
                             placeTree(chunk, x, z, worldX, worldZ, biome, 5, 3);
                         }
                     }
@@ -99,6 +129,12 @@ public class FeatureGenerator {
                 }
             }
         }
+
+        ensureFallbackFeatures(chunk, chunkWorldX, chunkWorldZ,
+            plainsPresent && plainsFeaturesPlaced == 0,
+            junglePresent && jungleFeaturesPlaced == 0,
+            desertPresent && desertFeaturesPlaced == 0,
+            snowPresent && snowFeaturesPlaced == 0);
     }
     
     /**
@@ -111,30 +147,33 @@ public class FeatureGenerator {
      * @param worldX World X coordinate
      * @param worldZ World Z coordinate
      */
-    private void placeCactus(Chunk chunk, int x, int z, int worldX, int worldZ) {
+    private boolean placeCactus(Chunk chunk, int x, int z, int worldX, int worldZ) {
         int height = terrainGenerator.getHeightAt(worldX, worldZ);
         
         // Check if height is within chunk bounds
         if (height < 0 || height >= Chunk.CHUNK_HEIGHT) {
-            return;
+            return false;
         }
         
         // Check if surface block is sand
         BlockType surfaceBlock = chunk.getBlock(x, height, z);
         if (surfaceBlock != BlockType.SAND) {
-            return;
+            return false;
         }
         
         // Generate cactus height (2-4 blocks)
         int cactusHeight = 2 + random.nextInt(3);
         
         // Place cactus blocks
+        boolean placed = false;
         for (int i = 1; i <= cactusHeight; i++) {
             int y = height + i;
             if (y < Chunk.CHUNK_HEIGHT) {
                 chunk.setBlock(x, y, z, BlockType.CACTUS);
+                placed = true;
             }
         }
+        return placed;
     }
     
     /**
@@ -148,18 +187,18 @@ public class FeatureGenerator {
      * @param worldZ World Z coordinate
      * @param biome Biome type (affects tree appearance)
      */
-    private void placeTree(Chunk chunk, int x, int z, int worldX, int worldZ, BiomeType biome, int baseTrunkHeight, int extraLeaves) {
+    private boolean placeTree(Chunk chunk, int x, int z, int worldX, int worldZ, BiomeType biome, int baseTrunkHeight, int extraLeaves) {
         int height = terrainGenerator.getHeightAt(worldX, worldZ);
         
         // Check if height is within chunk bounds
         if (height < 0 || height >= Chunk.CHUNK_HEIGHT - 8) {
-            return;  // Need space for tree
+            return false;  // Need space for tree
         }
         
         // Check if surface block is grass or jungle grass
         BlockType surfaceBlock = chunk.getBlock(x, height, z);
         if (surfaceBlock != BlockType.GRASS && surfaceBlock != BlockType.JUNGLE_GRASS) {
-            return;
+            return false;
         }
         
         // Generate tree dimensions
@@ -167,10 +206,12 @@ public class FeatureGenerator {
         int leafRadius = 2 + Math.max(0, extraLeaves - 2);
         
         // Place trunk
+        boolean placed = false;
         for (int i = 1; i <= trunkHeight; i++) {
             int y = height + i;
             if (y < Chunk.CHUNK_HEIGHT) {
                 chunk.setBlock(x, y, z, BlockType.WOOD);
+                placed = true;
             }
         }
         
@@ -203,11 +244,13 @@ public class FeatureGenerator {
                         BlockType currentBlock = chunk.getBlock(leafX, leafY, leafZ);
                         if (currentBlock == BlockType.AIR) {
                             chunk.setBlock(leafX, leafY, leafZ, BlockType.LEAVES);
+                            placed = true;
                         }
                     }
                 }
             }
         }
+        return placed;
     }
     
     /**
@@ -220,24 +263,206 @@ public class FeatureGenerator {
      * @param worldX World X coordinate
      * @param worldZ World Z coordinate
      */
-    private void placeSnowLayer(Chunk chunk, int x, int z, int worldX, int worldZ) {
+    private boolean placeSnowLayer(Chunk chunk, int x, int z, int worldX, int worldZ) {
         int height = terrainGenerator.getHeightAt(worldX, worldZ);
         
         // Check if height is within chunk bounds
         if (height < 0 || height >= Chunk.CHUNK_HEIGHT - 1) {
-            return;
+            return false;
         }
         
         // Check if surface block is solid
         BlockType surfaceBlock = chunk.getBlock(x, height, z);
         if (!surfaceBlock.isSolid()) {
-            return;
+            return false;
         }
         
         // Place snow layer on top
         int snowY = height + 1;
         if (snowY < Chunk.CHUNK_HEIGHT) {
-            chunk.setBlock(x, snowY, z, BlockType.SNOW_LAYER);
+            if (chunk.getBlock(x, snowY, z) != BlockType.SNOW_LAYER) {
+                chunk.setBlock(x, snowY, z, BlockType.SNOW_LAYER);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private boolean hasNearbyTreeTrunk(Chunk chunk, int localX, int localZ, int worldX, int worldZ) {
+        for (int dx = -TREE_SPACING_RADIUS; dx <= TREE_SPACING_RADIUS; dx++) {
+            for (int dz = -TREE_SPACING_RADIUS; dz <= TREE_SPACING_RADIUS; dz++) {
+                if (dx == 0 && dz == 0) {
+                    continue;
+                }
+
+                int checkLocalX = localX + dx;
+                int checkLocalZ = localZ + dz;
+                if (checkLocalX < 0 || checkLocalX >= Chunk.CHUNK_SIZE
+                    || checkLocalZ < 0 || checkLocalZ >= Chunk.CHUNK_SIZE) {
+                    continue;
+                }
+
+                int checkWorldX = worldX + dx;
+                int checkWorldZ = worldZ + dz;
+                int surfaceY = terrainGenerator.getHeightAt(checkWorldX, checkWorldZ);
+                if (surfaceY < 0 || surfaceY >= Chunk.CHUNK_HEIGHT) {
+                    continue;
+                }
+
+                for (int dy = 1; dy <= TREE_SPACING_HEIGHT_CHECK; dy++) {
+                    int checkY = surfaceY + dy;
+                    if (checkY >= Chunk.CHUNK_HEIGHT) {
+                        break;
+                    }
+                    if (chunk.getBlock(checkLocalX, checkY, checkLocalZ) == BlockType.WOOD) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private void ensureFallbackFeatures(Chunk chunk, int chunkWorldX, int chunkWorldZ,
+                                        boolean plainsNeeded, boolean jungleNeeded,
+                                        boolean desertNeeded, boolean snowNeeded) {
+        if (plainsNeeded) {
+            forcePlaceFeature(chunk, chunkWorldX, chunkWorldZ, BiomeType.PLAINS,
+                (localX, localZ, worldX, worldZ) -> {
+                    random.setSeed(seed + worldX * 341873128712L + worldZ * 132897987541L + 0x51A9E377L);
+                    return placeTree(chunk, localX, localZ, worldX, worldZ, BiomeType.PLAINS, 4, 2);
+                },
+                (localX, localZ, worldX, worldZ) -> placeGuaranteedTree(chunk, localX, localZ, worldX, worldZ, BiomeType.PLAINS));
+        }
+        if (jungleNeeded) {
+            forcePlaceFeature(chunk, chunkWorldX, chunkWorldZ, BiomeType.JUNGLE,
+                (localX, localZ, worldX, worldZ) -> {
+                    random.setSeed(seed + worldX * 341873128712L + worldZ * 132897987541L + 0x7F4A7C15L);
+                    return placeTree(chunk, localX, localZ, worldX, worldZ, BiomeType.JUNGLE, 5, 2);
+                },
+                (localX, localZ, worldX, worldZ) -> placeGuaranteedTree(chunk, localX, localZ, worldX, worldZ, BiomeType.JUNGLE));
+        }
+        if (desertNeeded) {
+            forcePlaceFeature(chunk, chunkWorldX, chunkWorldZ, BiomeType.DESERT,
+                (localX, localZ, worldX, worldZ) -> {
+                    random.setSeed(seed + worldX * 341873128712L + worldZ * 132897987541L + 0x3C6EF372L);
+                    return placeCactus(chunk, localX, localZ, worldX, worldZ);
+                },
+                (localX, localZ, worldX, worldZ) -> placeGuaranteedCactus(chunk, localX, localZ, worldX, worldZ));
+        }
+        if (snowNeeded) {
+            forcePlaceFeature(chunk, chunkWorldX, chunkWorldZ, BiomeType.SNOW,
+                (localX, localZ, worldX, worldZ) -> {
+                    random.setSeed(seed + worldX * 341873128712L + worldZ * 132897987541L + 0x9E3779B9L);
+                    return placeSnowLayer(chunk, localX, localZ, worldX, worldZ);
+                },
+                (localX, localZ, worldX, worldZ) -> placeGuaranteedSnow(chunk, localX, localZ, worldX, worldZ));
+        }
+    }
+
+    private void forcePlaceFeature(Chunk chunk, int chunkWorldX, int chunkWorldZ, BiomeType targetBiome,
+                                   FeatureAttempt attempt, SimpleFeature fallback) {
+        boolean placed = false;
+        int fallbackLocalX = -1;
+        int fallbackLocalZ = -1;
+        int fallbackWorldX = 0;
+        int fallbackWorldZ = 0;
+        for (int localX = 0; localX < Chunk.CHUNK_SIZE; localX++) {
+            for (int localZ = 0; localZ < Chunk.CHUNK_SIZE; localZ++) {
+                int worldX = chunkWorldX + localX;
+                int worldZ = chunkWorldZ + localZ;
+                if (biomeGenerator.getBiome(worldX, worldZ) != targetBiome) {
+                    continue;
+                }
+                if (!placed) {
+                    fallbackLocalX = localX;
+                    fallbackLocalZ = localZ;
+                    fallbackWorldX = worldX;
+                    fallbackWorldZ = worldZ;
+                }
+                if (attempt.place(localX, localZ, worldX, worldZ)) {
+                    placed = true;
+                    return;
+                }
+            }
+        }
+        if (!placed && fallbackLocalX >= 0 && fallback != null) {
+            fallback.place(fallbackLocalX, fallbackLocalZ, fallbackWorldX, fallbackWorldZ);
+        }
+    }
+
+    @FunctionalInterface
+    private interface FeatureAttempt {
+        boolean place(int localX, int localZ, int worldX, int worldZ);
+    }
+
+    @FunctionalInterface
+    private interface SimpleFeature {
+        void place(int localX, int localZ, int worldX, int worldZ);
+    }
+
+    private void placeGuaranteedTree(Chunk chunk, int localX, int localZ, int worldX, int worldZ, BiomeType biome) {
+        int baseY = terrainGenerator.getHeightAt(worldX, worldZ);
+        baseY = Math.max(1, Math.min(Chunk.CHUNK_HEIGHT - 8, baseY));
+        chunk.setBlock(localX, baseY, localZ, biome.getSurfaceBlock());
+
+        int trunkHeight = 4;
+        for (int i = 1; i <= trunkHeight; i++) {
+            int y = baseY + i;
+            if (y >= Chunk.CHUNK_HEIGHT) {
+                break;
+            }
+            chunk.setBlock(localX, y, localZ, BlockType.WOOD);
+        }
+
+        int leafStartY = baseY + trunkHeight - 1;
+        int radius = 2;
+        for (int dy = 0; dy <= 2; dy++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (Math.abs(dx) == radius && Math.abs(dz) == radius && dy < 2) {
+                        continue;
+                    }
+                    int lx = localX + dx;
+                    int ly = leafStartY + dy;
+                    int lz = localZ + dz;
+                    if (lx < 0 || lx >= Chunk.CHUNK_SIZE || lz < 0 || lz >= Chunk.CHUNK_SIZE) {
+                        continue;
+                    }
+                    if (ly < 0 || ly >= Chunk.CHUNK_HEIGHT) {
+                        continue;
+                    }
+                    if (dx == 0 && dz == 0 && dy < 2) {
+                        continue;
+                    }
+                    chunk.setBlock(lx, ly, lz, BlockType.LEAVES);
+                }
+            }
+        }
+    }
+
+    private void placeGuaranteedCactus(Chunk chunk, int localX, int localZ, int worldX, int worldZ) {
+        int baseY = terrainGenerator.getHeightAt(worldX, worldZ);
+        baseY = Math.max(1, Math.min(Chunk.CHUNK_HEIGHT - 4, baseY));
+        chunk.setBlock(localX, baseY, localZ, BlockType.SAND);
+        for (int i = 1; i <= 3; i++) {
+            int y = baseY + i;
+            if (y >= Chunk.CHUNK_HEIGHT) {
+                break;
+            }
+            chunk.setBlock(localX, y, localZ, BlockType.CACTUS);
+        }
+    }
+
+    private void placeGuaranteedSnow(Chunk chunk, int localX, int localZ, int worldX, int worldZ) {
+        int baseY = terrainGenerator.getHeightAt(worldX, worldZ);
+        baseY = Math.max(1, Math.min(Chunk.CHUNK_HEIGHT - 2, baseY));
+        if (!chunk.getBlock(localX, baseY, localZ).isSolid()) {
+            chunk.setBlock(localX, baseY, localZ, BlockType.SNOW_BLOCK);
+        }
+        int snowY = baseY + 1;
+        if (snowY < Chunk.CHUNK_HEIGHT) {
+            chunk.setBlock(localX, snowY, localZ, BlockType.SNOW_LAYER);
         }
     }
 

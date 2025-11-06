@@ -1,1 +1,8 @@
-{"id":"faulty_test_mod","name":"Faulty Test Mod","version":"0.0.1","main":"main.lua","enabled":true}
+{
+  "id": "faulty_test_mod",
+  "name": "Faulty Test Mod",
+  "version": "0.0.1",
+  "description": "Test mod for error handling - intentionally fails during init(). Enable only for testing.",
+  "main": "main.lua",
+  "enabled": true
+}

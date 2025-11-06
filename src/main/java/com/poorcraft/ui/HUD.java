@@ -1,5 +1,6 @@
 package com.poorcraft.ui;
 
+import com.poorcraft.ai.AICompanionManager;
 import com.poorcraft.core.Game;
 import com.poorcraft.inventory.Inventory;
 import com.poorcraft.inventory.ItemStack;
@@ -25,8 +26,12 @@ import java.util.Locale;
  */
 public class HUD extends UIScreen {
     
+    private static final long COMPANION_TOAST_DURATION_MS = 4000L;
+    private static final long COMPANION_TOAST_FADE_MS = 800L;
+
     private final Game game;  // Reference to game instance
     private boolean debugVisible;
+    private final List<CompanionToast> companionToasts = new ArrayList<>();
 
     private static Texture hotbarFrameTexture;
     private static Texture hotbarSlotTexture;
@@ -47,11 +52,127 @@ public class HUD extends UIScreen {
      * @param windowWidth Window width
      * @param windowHeight Window height
      * @param game Game instance for accessing stats
+     * @param scaleManager UI scale manager
      */
-    public HUD(int windowWidth, int windowHeight, Object game) {
-        super(windowWidth, windowHeight);
+    public HUD(int windowWidth, int windowHeight, Object game, UIScaleManager scaleManager) {
+        super(windowWidth, windowHeight, scaleManager);
         this.game = (game instanceof Game) ? (Game) game : null;
         this.debugVisible = false;
+    }
+
+    private void drawCompanionStatus(UIRenderer renderer, FontRenderer fontRenderer) {
+        if (game == null) {
+            return;
+        }
+        AICompanionManager companionManager = game.getAICompanionManager();
+        if (companionManager == null) {
+            return;
+        }
+
+        updateCompanionNotifications(companionManager);
+
+        AICompanionManager.CompanionStatusSnapshot snapshot = companionManager.getStatusSnapshot();
+        if (snapshot == null) {
+            return;
+        }
+
+        float margin = 12f;
+        float padding = 8f;
+        float textScale = getTextScale(fontRenderer) * 0.7f;
+        float lineHeight = fontRenderer.getTextHeight() * textScale + 4f;
+
+        List<String> lines = new ArrayList<>();
+        String companionName = companionManager.getCompanionName();
+        lines.add(companionName + " - " + formatCompanionStatus(snapshot.status()));
+        String detail = snapshot.detail();
+        if (detail != null && !detail.isBlank()) {
+            lines.add(detail);
+        }
+
+        float maxLineWidth = 0f;
+        for (String line : lines) {
+            float width = fontRenderer.getTextWidth(line) * textScale;
+            if (width > maxLineWidth) {
+                maxLineWidth = width;
+            }
+        }
+
+        float boxWidth = maxLineWidth + padding * 2f;
+        float boxHeight = lines.size() * lineHeight + padding * 2f;
+        float boxX = windowWidth - boxWidth - margin;
+        float boxY = margin;
+
+        renderer.drawRect(boxX, boxY, boxWidth, boxHeight, 0f, 0f, 0f, 0.6f);
+
+        float textX = boxX + padding;
+        float textY = boxY + padding;
+        for (String line : lines) {
+            fontRenderer.drawText(line, textX, textY, textScale, 0.95f, 0.95f, 0.95f, 1.0f);
+            textY += lineHeight;
+        }
+
+        long now = System.currentTimeMillis();
+        float toastScale = textScale;
+        float toastPadding = padding;
+        float toastY = boxY + boxHeight + margin;
+
+        for (CompanionToast toast : companionToasts) {
+            long age = now - toast.createdAt;
+            if (age >= COMPANION_TOAST_DURATION_MS) {
+                continue;
+            }
+            float alpha = 1f;
+            if (age > COMPANION_TOAST_DURATION_MS - COMPANION_TOAST_FADE_MS) {
+                long fadeElapsed = age - (COMPANION_TOAST_DURATION_MS - COMPANION_TOAST_FADE_MS);
+                alpha = Math.max(0f, 1f - fadeElapsed / (float) COMPANION_TOAST_FADE_MS);
+            }
+
+            String message = toast.message;
+            if (message == null || message.isBlank()) {
+                continue;
+            }
+            float textWidth = fontRenderer.getTextWidth(message) * toastScale;
+            float toastWidth = textWidth + toastPadding * 2f;
+            float toastHeight = fontRenderer.getTextHeight() * toastScale + toastPadding * 2f;
+            float toastX = windowWidth - toastWidth - margin;
+
+            renderer.drawRect(toastX, toastY, toastWidth, toastHeight, 0f, 0f, 0f, 0.5f * alpha);
+            fontRenderer.drawText(message, toastX + toastPadding, toastY + toastPadding, toastScale, 1f, 1f, 1f, alpha);
+
+            toastY += toastHeight + 6f;
+        }
+    }
+
+    private void updateCompanionNotifications(AICompanionManager companionManager) {
+        long now = System.currentTimeMillis();
+        List<AICompanionManager.CompanionNotification> drained = companionManager.drainNotifications();
+        if (!drained.isEmpty()) {
+            for (AICompanionManager.CompanionNotification notification : drained) {
+                String message = notification.message();
+                if (message == null || message.isBlank()) {
+                    continue;
+                }
+                long timestamp = notification.timestamp() > 0 ? notification.timestamp() : now;
+                companionToasts.add(new CompanionToast(message, timestamp));
+            }
+        }
+        companionToasts.removeIf(toast -> now - toast.createdAt >= COMPANION_TOAST_DURATION_MS);
+    }
+
+    private String formatCompanionStatus(AICompanionManager.CompanionStatus status) {
+        if (status == null) {
+            return "Unknown";
+        }
+        switch (status) {
+            case OFFLINE:
+                return "Offline";
+            case IDLE:
+                return "Idle";
+            case WORKING:
+                return "Working";
+            default:
+                return "Unknown";
+        }
     }
 
     @Override
@@ -75,7 +196,10 @@ public class HUD extends UIScreen {
 
         // Draw health/armor/xp bars
         drawPlayerStats(renderer, fontRenderer);
-        
+
+        // Draw AI companion status widget and notifications
+        drawCompanionStatus(renderer, fontRenderer);
+
         // Draw debug info if visible
         if (debugVisible) {
             drawDebugInfo(renderer, fontRenderer);
@@ -88,8 +212,8 @@ public class HUD extends UIScreen {
     private void drawCrosshair(UIRenderer renderer) {
         float centerX = windowWidth / 2.0f;
         float centerY = windowHeight / 2.0f;
-        float size = 10;
-        float thickness = 2;
+        float size = scaleDimension(10f);
+        float thickness = scaleDimension(2f);
         
         // Horizontal line
         renderer.drawRect(centerX - size, centerY - thickness / 2, 
@@ -116,12 +240,9 @@ public class HUD extends UIScreen {
         }
 
         final int hotbarSlots = 16;
+        float scale = scaleManager != null ? scaleManager.getEffectiveScale() : 1.0f;
         float baseSlotSize = 48f;
         float baseSlotSpacing = 4f;
-        float baseHotbarWidth = hotbarSlots * baseSlotSize + (hotbarSlots - 1) * baseSlotSpacing;
-        float targetHotbarWidth = Math.min(windowWidth * 0.82f, baseHotbarWidth * 1.25f);
-        float scale = Math.max(0.6f, Math.min(1.4f, targetHotbarWidth / baseHotbarWidth));
-
         float slotSize = baseSlotSize * scale;
         float slotSpacing = baseSlotSpacing * scale;
         float totalWidth = hotbarSlots * slotSize + (hotbarSlots - 1) * slotSpacing;
@@ -163,7 +284,8 @@ public class HUD extends UIScreen {
                 BlockType blockType = stack.getBlockType();
                 String label = formatBlockLabel(blockType);
                 if (!label.isEmpty()) {
-                    float labelScale = 0.5f * scale;
+                    float baseText = getTextScale(fontRenderer);
+                    float labelScale = 0.5f * baseText;
                     float labelWidth = fontRenderer.getTextWidth(label) * labelScale;
                     float labelX = slotX + (slotSize - labelWidth) / 2f;
                     float labelY = slotY + slotSize - 14f * scale;
@@ -173,7 +295,8 @@ public class HUD extends UIScreen {
                 int count = stack.getCount();
                 if (count > 0) {
                     String countText = formatCount(count);
-                    float countScale = 0.45f * scale;
+                    float baseText = getTextScale(fontRenderer);
+                    float countScale = 0.45f * baseText;
                     float countWidth = fontRenderer.getTextWidth(countText) * countScale;
                     float countX = slotX + slotSize - countWidth - 6f * scale;
                     float countY = slotY + slotSize - 6f * scale;
@@ -187,7 +310,8 @@ public class HUD extends UIScreen {
     }
 
     private void drawPlayerStats(UIRenderer renderer, FontRenderer fontRenderer) {
-        float scale = lastHotbarScale > 0 ? lastHotbarScale : Math.max(0.7f, Math.min(1.2f, windowWidth / 1920f));
+        float scale = scaleManager != null ? scaleManager.getEffectiveScale() : 
+            (lastHotbarScale > 0 ? lastHotbarScale : Math.max(0.7f, Math.min(1.2f, windowWidth / 1920f)));
 
         // Placeholder values until player stats are wired in
         int maxHearts = 10;
@@ -246,10 +370,12 @@ public class HUD extends UIScreen {
             }
 
             if (xpLevel > 0) {
-                float textWidth = fontRenderer.getTextWidth(Integer.toString(xpLevel)) * 0.7f;
+                float baseText = getTextScale(fontRenderer);
+                float levelScale = 0.7f * baseText;
+                float textWidth = fontRenderer.getTextWidth(Integer.toString(xpLevel)) * levelScale;
                 float textX = windowWidth / 2f - textWidth / 2f;
                 float textY = xpY + xpHeight - fontRenderer.getTextHeight() * 0.6f;
-                fontRenderer.drawText(Integer.toString(xpLevel), textX, textY, 0.7f, 0.9f, 0.9f, 0.4f, 1f);
+                fontRenderer.drawText(Integer.toString(xpLevel), textX, textY, levelScale, 0.9f, 0.9f, 0.4f, 1f);
             }
         }
     }
@@ -329,8 +455,8 @@ public class HUD extends UIScreen {
     private void drawDebugInfo(UIRenderer renderer, FontRenderer fontRenderer) {
         List<String> lines = new ArrayList<>();
 
-        float textScale = 1.0f;
-        float lineHeight = fontRenderer.getTextHeight() * textScale + 5f;
+        float textScale = getTextScale(fontRenderer);
+        float lineHeight = fontRenderer.getTextHeight() * textScale + scaleDimension(5f);
 
         if (game != null) {
             PerformanceMonitor pm = game.getPerformanceMonitor();
@@ -480,5 +606,15 @@ public class HUD extends UIScreen {
      */
     public boolean isDebugVisible() {
         return debugVisible;
+    }
+
+    private static final class CompanionToast {
+        private final String message;
+        private final long createdAt;
+
+        private CompanionToast(String message, long createdAt) {
+            this.message = message;
+            this.createdAt = createdAt;
+        }
     }
 }

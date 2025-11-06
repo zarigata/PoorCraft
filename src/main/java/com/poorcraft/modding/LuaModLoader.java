@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.poorcraft.core.Game;
 import org.luaj.vm2.Globals;
+import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.lib.jse.JsePlatform;
 
 import java.io.File;
@@ -36,7 +37,6 @@ public class LuaModLoader {
     private final ModAPI modAPI;
     private final EventBus eventBus;
     private final Game game;
-    private final Globals luaGlobals;
     
     /**
      * Creates a new Lua mod loader.
@@ -49,23 +49,35 @@ public class LuaModLoader {
         this.loadedMods = new ArrayList<>();
         this.eventBus = new EventBus();
         this.modAPI = new ModAPI(game, eventBus);
-        this.luaGlobals = JsePlatform.standardGlobals();
-        
-        // Set up Lua environment
-        setupLuaEnvironment();
     }
     
     /**
-     * Sets up the Lua environment with the mod API.
+     * Creates a LuaModAPI bridge for a mod.
+     *
+     * @return new LuaModAPI instance bound to the shared ModAPI
      */
-    private void setupLuaEnvironment() {
-        // Create Lua API bridge
-        LuaModAPI luaAPI = new LuaModAPI(modAPI);
-        
-        // Expose API to Lua
-        luaGlobals.set("api", luaAPI.toLuaValue(luaGlobals));
-        
-        System.out.println("[LuaModLoader] Lua environment initialized");
+    public LuaModAPI createModAPI() {
+        return new LuaModAPI(modAPI);
+    }
+
+    /**
+     * Creates sandboxed Lua globals for a mod execution context.
+     *
+     * @return sandboxed Globals instance
+     */
+    public Globals createSandboxedGlobals() {
+        Globals globals = JsePlatform.standardGlobals();
+
+        // Remove potentially unsafe standard libraries
+        globals.set("io", LuaValue.NIL);
+        globals.set("os", LuaValue.NIL);
+        globals.set("package", LuaValue.NIL);
+        globals.set("debug", LuaValue.NIL);
+        globals.set("dofile", LuaValue.NIL);
+        globals.set("loadfile", LuaValue.NIL);
+        globals.set("require", LuaValue.NIL);
+
+        return globals;
     }
     
     /**
@@ -120,13 +132,19 @@ public class LuaModLoader {
             try {
                 // Parse mod.json
                 JsonObject modJson = gson.fromJson(new FileReader(modJsonFile), JsonObject.class);
-                
+
+                boolean enabled = !modJson.has("enabled") || modJson.get("enabled").getAsBoolean();
+                if (!enabled) {
+                    System.out.println("[LuaModLoader] Skipping " + modDir.getName() + " (disabled in mod.json)");
+                    continue;
+                }
+
                 // Create mod container
-                LuaModContainer container = new LuaModContainer(modDir, modJson, luaGlobals);
+                LuaModContainer container = new LuaModContainer(modDir, modJson, this);
                 loadedMods.add(container);
-                
+
                 System.out.println("[LuaModLoader] Discovered mod: " + container.getName() + " v" + container.getVersion());
-                
+
             } catch (Exception e) {
                 System.err.println("[LuaModLoader] Failed to load mod.json from " + modDir.getName() + ": " + e.getMessage());
                 e.printStackTrace();
@@ -148,13 +166,14 @@ public class LuaModLoader {
                     System.out.println("[LuaModLoader] Skipping mod " + container.getName() + " (disabled)");
                     continue;
                 }
-                
+
                 container.load();
                 System.out.println("[LuaModLoader] Loaded Lua script for: " + container.getName());
-                
+
             } catch (Exception e) {
                 System.err.println("[LuaModLoader] Failed to load mod " + container.getName() + ": " + e.getMessage());
                 e.printStackTrace();
+                container.markError("load", e);
             }
         }
     }
@@ -171,8 +190,9 @@ public class LuaModLoader {
                     container.init();
                 }
             } catch (Exception e) {
-                System.err.println("[LuaModLoader] Failed to initialize mod " + container.getName());
+                System.err.println("[LuaModLoader] Failed to initialize mod " + container.getName() + ": " + e.getMessage());
                 e.printStackTrace();
+                container.markError("init", e);
             }
         }
     }
@@ -189,8 +209,9 @@ public class LuaModLoader {
                     container.enable();
                 }
             } catch (Exception e) {
-                System.err.println("[LuaModLoader] Failed to enable mod " + container.getName());
+                System.err.println("[LuaModLoader] Failed to enable mod " + container.getName() + ": " + e.getMessage());
                 e.printStackTrace();
+                container.markError("enable", e);
             }
         }
     }
@@ -281,7 +302,7 @@ public class LuaModLoader {
     public void update(float deltaTime) {
         for (LuaModContainer container : loadedMods) {
             try {
-                if (container.getState() == LuaModContainer.ModState.ENABLED) {
+                if (container.getState() == LuaModContainer.ModState.ENABLED && container.isHealthy()) {
                     container.update(deltaTime);
                 }
             } catch (Exception e) {

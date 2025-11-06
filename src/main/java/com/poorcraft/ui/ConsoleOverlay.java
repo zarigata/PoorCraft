@@ -21,9 +21,11 @@ public class ConsoleOverlay extends UIScreen {
     private boolean visible;
     private float scrollOffset;
     private int historyIndex;
+    private float lastLineHeight = 0f;
+    private float lastPanelHeight = 0f;
     
-    public ConsoleOverlay(int windowWidth, int windowHeight, Game game) {
-        super(windowWidth, windowHeight);
+    public ConsoleOverlay(int windowWidth, int windowHeight, Game game, UIScaleManager scaleManager) {
+        super(windowWidth, windowHeight, scaleManager);
         this.game = game;
         this.outputLines = new ArrayList<>();
         this.commandHistory = new ArrayList<>();
@@ -38,10 +40,16 @@ public class ConsoleOverlay extends UIScreen {
     public void init() {
         components.clear();
         
-        // Create command input field at bottom
-        inputField = new TextField(20, windowHeight - 60, windowWidth - 40, 35, "Enter command...");
+        // Create command input field at bottom with scaled dimensions
+        float fieldX = scaleDimension(20f);
+        float fieldY = windowHeight - scaleDimension(60f);
+        float fieldWidth = windowWidth - scaleDimension(40f);
+        float fieldHeight = scaleDimension(35f);
+        
+        inputField = new TextField(fieldX, fieldY, fieldWidth, fieldHeight, "Enter command...");
         inputField.setMaxLength(256);
         inputField.setVisible(false);  // Hidden by default
+        // Text scale will be set during render when FontRenderer is available
         addComponent(inputField);
     }
     
@@ -50,12 +58,13 @@ public class ConsoleOverlay extends UIScreen {
         this.windowWidth = width;
         this.windowHeight = height;
         
-        // Reposition input field
+        // Reposition input field with scaled dimensions
         if (inputField != null) {
-            inputField.setX(20);
-            inputField.setY(height - 60);
-            inputField.setWidth(width - 40);
-            inputField.setHeight(35);
+            inputField.setX(scaleDimension(20f));
+            inputField.setY(height - scaleDimension(60f));
+            inputField.setWidth(width - scaleDimension(40f));
+            inputField.setHeight(scaleDimension(35f));
+            // Text scale will be set during render when FontRenderer is available
         }
     }
     
@@ -65,11 +74,11 @@ public class ConsoleOverlay extends UIScreen {
             return;
         }
         
-        // Draw console background (darker than chat)
-        float panelWidth = windowWidth - 40;
-        float panelHeight = windowHeight / 2 - 40;
-        float panelX = 20;
-        float panelY = 20;
+        // Draw console background (darker than chat) with scaled dimensions
+        float panelWidth = windowWidth - scaleDimension(40f);
+        float panelHeight = windowHeight / 2 - scaleDimension(40f);
+        float panelX = scaleDimension(20f);
+        float panelY = scaleDimension(20f);
         
         renderer.drawRect(panelX, panelY, panelWidth, panelHeight, 0.02f, 0.02f, 0.03f, 0.85f);
         
@@ -84,13 +93,22 @@ public class ConsoleOverlay extends UIScreen {
     
     private void renderOutput(UIRenderer renderer, FontRenderer fontRenderer,
                              float panelX, float panelY, float panelWidth, float panelHeight) {
-        float textScale = 0.75f;
-        float lineHeight = fontRenderer.getTextHeight() * textScale + 2;
-        float textX = panelX + 10;
-        float startY = panelY + panelHeight - 20;
+        float textScale = getTextScale(fontRenderer);
+        float lineHeight = fontRenderer.getTextHeight() * textScale + scaleDimension(2f);
+        
+        // Store for scroll calculations
+        lastLineHeight = lineHeight;
+        lastPanelHeight = panelHeight;
+        
+        // Update input field text scale if needed
+        if (inputField != null && scaleManager != null) {
+            inputField.setTextScale(textScale);
+        }
+        float textX = panelX + scaleDimension(10f);
+        float startY = panelY + panelHeight - scaleDimension(20f);
         
         // Render from bottom to top (newest at bottom)
-        int maxVisibleLines = (int)((panelHeight - 30) / lineHeight);
+        int maxVisibleLines = (int)((panelHeight - scaleDimension(30f)) / lineHeight);
         int startIndex = Math.max(0, outputLines.size() - maxVisibleLines - (int)scrollOffset);
         int endIndex = Math.min(outputLines.size(), startIndex + maxVisibleLines);
         
@@ -111,7 +129,7 @@ public class ConsoleOverlay extends UIScreen {
             fontRenderer.drawText(line, textX, currentY, textScale, r, g, b, a);
             currentY -= lineHeight;
             
-            if (currentY < panelY + 10) {
+            if (currentY < panelY + scaleDimension(10f)) {
                 break;
             }
         }
@@ -318,9 +336,10 @@ public class ConsoleOverlay extends UIScreen {
             return;
         }
         
-        // Calculate max visible lines
-        float panelHeight = windowHeight / 2 - 40;
-        int maxVisibleLines = (int)((panelHeight - 30) / 20);  // Approximate line height
+        // Use cached values from last render to match exact calculation
+        float lineH = lastLineHeight > 0 ? lastLineHeight : scaleDimension(22f);
+        float panelH = lastPanelHeight > 0 ? lastPanelHeight : windowHeight / 2 - scaleDimension(40f);
+        int maxVisibleLines = (int)((panelH - scaleDimension(30f)) / lineH);
         int maxScroll = Math.max(0, outputLines.size() - maxVisibleLines);
         
         // Update scroll offset (inverted: positive scroll = scroll up = increase offset)

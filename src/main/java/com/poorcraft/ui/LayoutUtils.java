@@ -181,4 +181,57 @@ public final class LayoutUtils {
     public static float centerButtonStack(int windowHeight, float stackHeight) {
         return centerVertically(windowHeight, stackHeight);
     }
+    
+    /**
+     * Gets scaled button width using UIScaleManager.
+     * 
+     * @param scaleManager UI scale manager
+     * @return Scaled button width
+     */
+    public static float getScaledButtonWidth(UIScaleManager scaleManager) {
+        return scaleManager.scaleDimension(MINECRAFT_BUTTON_WIDTH);
+    }
+    
+    /**
+     * Gets scaled button height using UIScaleManager.
+     * 
+     * @param scaleManager UI scale manager
+     * @return Scaled button height
+     */
+    public static float getScaledButtonHeight(UIScaleManager scaleManager) {
+        return scaleManager.scaleDimension(MINECRAFT_BUTTON_HEIGHT);
+    }
+    
+    /**
+     * Gets scaled panel width using UIScaleManager.
+     * 
+     * @param scaleManager UI scale manager
+     * @return Scaled panel width
+     */
+    public static float getScaledPanelWidth(UIScaleManager scaleManager) {
+        float targetWidth = scaleManager.scaleWidth(0.5f);
+        return clamp(targetWidth, 400f, 600f);
+    }
+    
+    /**
+     * Gets scaled panel height using UIScaleManager.
+     * 
+     * @param scaleManager UI scale manager
+     * @return Scaled panel height
+     */
+    public static float getScaledPanelHeight(UIScaleManager scaleManager) {
+        float targetHeight = scaleManager.scaleHeight(0.6f);
+        return clamp(targetHeight, 400f, 700f);
+    }
+    
+    /**
+     * Gets scaled padding using UIScaleManager.
+     * 
+     * @param scaleManager UI scale manager
+     * @return Scaled padding
+     */
+    public static float getScaledPadding(UIScaleManager scaleManager) {
+        float padding = scaleManager.scaleDimension(MINECRAFT_PANEL_PADDING);
+        return clamp(padding, 24f, 48f);
+    }
 }

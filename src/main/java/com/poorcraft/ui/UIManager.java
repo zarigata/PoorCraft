@@ -35,6 +35,8 @@ public class UIManager {
     
     private UIRenderer uiRenderer;
     private FontRenderer fontRenderer;
+    private UIScaleManager scaleManager;
+    private int currentAtlasSize;
     
     private Map<GameState, UIScreen> screens;
     private UIScreen hudScreen;  // Special screen for in-game HUD
@@ -49,6 +51,12 @@ public class UIManager {
     // Input handling for cursor management
     private Object inputHandler;  // Will be set by Game
     private long windowHandle;    // GLFW window handle
+
+    private long lastResizeTime = 0L;
+    private int pendingWidth = 0;
+    private int pendingHeight = 0;
+    private boolean resizePending = false;
+    private static final long RESIZE_DEBOUNCE_MS = 150L;
     
     // Networking
     private GameClient gameClient;  // Network client (null when not connected)
@@ -94,17 +102,24 @@ public class UIManager {
     public void init(int windowWidth, int windowHeight) {
         System.out.println("[UIManager] Initializing UI system...");
         
+        // Create UI scale manager
+        scaleManager = new UIScaleManager(windowWidth, windowHeight, settings.graphics.uiScale);
+        System.out.println("[UIManager] UIScaleManager initialized (baseScale=" + scaleManager.getBaseScale() + 
+            ", effectiveScale=" + scaleManager.getEffectiveScale() + ")");
+        
         // Initialize renderers
         uiRenderer = new UIRenderer();
         uiRenderer.init(windowWidth, windowHeight);
+        uiRenderer.setScaleManager(scaleManager);
         
-        // Initialize font renderer with Silkscreen font for that retro vibe
-        // Using size 20 for better readability with the pixelated font
-        fontRenderer = new FontRenderer(uiRenderer, 20);
+        // Initialize font renderer with recommended font size from scale manager
+        currentAtlasSize = scaleManager.getFontSize();
+        fontRenderer = new FontRenderer(uiRenderer, currentAtlasSize);
         try {
             // Try to load Silkscreen font (the one we just added!)
             fontRenderer.init("src/main/resources/fonts/Silkscreen-Regular.ttf");
-            System.out.println("[UIManager] Loaded Silkscreen font - looking retro!");
+            fontRenderer.setFontSize(currentAtlasSize);
+            System.out.println("[UIManager] Loaded Silkscreen font at " + currentAtlasSize + "px - looking retro!");
         } catch (Exception e) {
             System.err.println("[UIManager] Failed to load Silkscreen font, using fallback: " + e.getMessage());
             // Font renderer will handle fallback internally (probably system font)
@@ -114,49 +129,53 @@ public class UIManager {
         System.out.println("[UIManager] Creating UI screens...");
         
         // Main menu
-        MainMenuScreen mainMenuScreen = new MainMenuScreen(windowWidth, windowHeight, this);
+        MainMenuScreen mainMenuScreen = new MainMenuScreen(windowWidth, windowHeight, this, scaleManager);
         screens.put(GameState.MAIN_MENU, mainMenuScreen);
         
         SettingsScreen settingsScreen = new SettingsScreen(windowWidth, windowHeight, 
-            this, settings, configManager);
+            this, settings, configManager, scaleManager);
         screens.put(GameState.SETTINGS_MENU, settingsScreen);
+
+        AICompanionScreen aiCompanionScreen = new AICompanionScreen(windowWidth, windowHeight,
+            this, settings, configManager, scaleManager);
+        screens.put(GameState.AI_COMPANION_SETTINGS, aiCompanionScreen);
         
         // World creation
-        WorldCreationScreen worldCreationScreen = new WorldCreationScreen(windowWidth, windowHeight, this);
+        WorldCreationScreen worldCreationScreen = new WorldCreationScreen(windowWidth, windowHeight, this, scaleManager);
         screens.put(GameState.WORLD_CREATION, worldCreationScreen);
         
         // Skin manager
-        skinManagerScreen = new SkinManagerScreen(windowWidth, windowHeight, this);
+        skinManagerScreen = new SkinManagerScreen(windowWidth, windowHeight, this, scaleManager);
         screens.put(GameState.SKIN_MANAGER, skinManagerScreen);
 
-        skinEditorScreen = new SkinEditorScreen(windowWidth, windowHeight, this);
+        skinEditorScreen = new SkinEditorScreen(windowWidth, windowHeight, this, scaleManager);
         screens.put(GameState.SKIN_EDITOR, skinEditorScreen);
         
         // Pause menu
-        PauseScreen pauseScreen = new PauseScreen(windowWidth, windowHeight, this);
+        PauseScreen pauseScreen = new PauseScreen(windowWidth, windowHeight, this, scaleManager);
         screens.put(GameState.PAUSED, pauseScreen);
         
         // Multiplayer screens
-        MultiplayerMenuScreen multiplayerMenuScreen = new MultiplayerMenuScreen(windowWidth, windowHeight, this);
+        MultiplayerMenuScreen multiplayerMenuScreen = new MultiplayerMenuScreen(windowWidth, windowHeight, this, scaleManager);
         screens.put(GameState.MULTIPLAYER_MENU, multiplayerMenuScreen);
-        ConnectingScreen connectingScreen = new ConnectingScreen(windowWidth, windowHeight, this);
+        ConnectingScreen connectingScreen = new ConnectingScreen(windowWidth, windowHeight, this, scaleManager);
         screens.put(GameState.CONNECTING, connectingScreen);
         
-        HostingScreen hostingScreen = new HostingScreen(windowWidth, windowHeight, this);
+        HostingScreen hostingScreen = new HostingScreen(windowWidth, windowHeight, this, scaleManager);
         screens.put(GameState.HOSTING, hostingScreen);
 
-        InventoryScreen inventoryScreen = new InventoryScreen(windowWidth, windowHeight, this);
+        InventoryScreen inventoryScreen = new InventoryScreen(windowWidth, windowHeight, this, scaleManager);
         screens.put(GameState.INVENTORY, inventoryScreen);
         
         // HUD
-        hudScreen = new HUD(windowWidth, windowHeight, game);
+        hudScreen = new HUD(windowWidth, windowHeight, game, scaleManager);
         
         // Chat overlay
-        chatOverlay = new ChatOverlay(windowWidth, windowHeight, (Game) game);
+        chatOverlay = new ChatOverlay(windowWidth, windowHeight, (Game) game, scaleManager);
         chatOverlay.init();
         
         // Console overlay
-        consoleOverlay = new ConsoleOverlay(windowWidth, windowHeight, (Game) game);
+        consoleOverlay = new ConsoleOverlay(windowWidth, windowHeight, (Game) game, scaleManager);
         consoleOverlay.init();
 
         System.out.println("[UIManager] Created " + screens.size() + " screens");
@@ -178,11 +197,19 @@ public class UIManager {
         
         previousState = currentState;
         currentState = newState;
-        
+
+        if (resizePending) {
+            processResizeDebounce();
+        }
+
         // Get screen for new state
         UIScreen screen = screens.get(newState);
         if (screen != null) {
             screen.init();
+            float[] mousePos = getCurrentMousePosition();
+            if (mousePos != null) {
+                screen.setLastMousePosition(mousePos[0], mousePos[1]);
+            }
         }
         
         // Handle cursor grabbing based on state
@@ -205,6 +232,23 @@ public class UIManager {
                 System.err.println("[UIManager] Failed to set cursor grabbed state: " + e.getMessage());
                 // Not fatal, just log it. The game can still run, just with wonky cursor behavior.
             }
+        }
+    }
+
+    private float[] getCurrentMousePosition() {
+        if (inputHandler == null) {
+            return null;
+        }
+        try {
+            var handlerClass = inputHandler.getClass();
+            var getMouseX = handlerClass.getMethod("getMouseX");
+            var getMouseY = handlerClass.getMethod("getMouseY");
+            double mouseX = (double) getMouseX.invoke(inputHandler);
+            double mouseY = (double) getMouseY.invoke(inputHandler);
+            return new float[]{(float) mouseX, (float) mouseY};
+        } catch (Exception e) {
+            System.err.println("[UIManager] Failed to query mouse position: " + e.getMessage());
+            return null;
         }
     }
     
@@ -263,6 +307,8 @@ public class UIManager {
      * @param deltaTime Time since last frame in seconds
      */
     public void update(float deltaTime) {
+        processResizeDebounce();
+
         // Update network client if connected
         if (gameClient != null && gameClient.isConnected()) {
             gameClient.tick();
@@ -336,6 +382,7 @@ public class UIManager {
         if (!currentState.capturesMouse()) {
             UIScreen screen = screens.get(currentState);
             if (screen != null) {
+                screen.setLastMousePosition(mouseX, mouseY);
                 screen.onMouseClick(mouseX, mouseY, button);
             }
         }
@@ -353,6 +400,40 @@ public class UIManager {
             UIScreen screen = screens.get(currentState);
             if (screen != null) {
                 screen.onMouseRelease(mouseX, mouseY, button);
+            }
+        }
+    }
+    
+    /**
+     * Forwards key event with action type to current screen.
+     * Filters out REPEAT actions for toggle keys to prevent oscillation.
+     * 
+     * @param key GLFW key code
+     * @param action Key action (PRESS, REPEAT, RELEASE)
+     */
+    public void onKeyEvent(int key, com.poorcraft.input.InputHandler.KeyAction action) {
+        // Only forward PRESS actions to onKeyPress to prevent toggle oscillation
+        // REPEAT actions are only useful for text editing/navigation keys
+        if (action == com.poorcraft.input.InputHandler.KeyAction.PRESS) {
+            onKeyPress(key, 0);
+        } else if (action == com.poorcraft.input.InputHandler.KeyAction.REPEAT) {
+            // For REPEAT, only forward to text input contexts (TextField handles this)
+            // Forward to console if visible
+            if (consoleOverlay != null && consoleOverlay.isVisible()) {
+                consoleOverlay.onKeyPress(key, 0);
+                return;
+            }
+            
+            // Forward to chat if visible
+            if (chatOverlay != null && chatOverlay.isVisible()) {
+                chatOverlay.onKeyPress(key, 0);
+                return;
+            }
+            
+            // Forward to current screen for text fields
+            UIScreen screen = screens.get(currentState);
+            if (screen != null) {
+                screen.onKeyPress(key, 0);
             }
         }
     }
@@ -477,6 +558,11 @@ public class UIManager {
             chatOverlay.onScroll(yOffset);
             return;
         }
+
+        UIScreen screen = screens.get(currentState);
+        if (screen != null) {
+            screen.onScroll(yOffset);
+        }
     }
     
     /**
@@ -487,22 +573,72 @@ public class UIManager {
      * @param height New window height
      */
     public void onResize(int width, int height) {
+        if (width < 1 || height < 1) {
+            System.out.println("[UIManager] Ignoring resize with invalid dimensions: " + width + "x" + height);
+            return;
+        }
+
+        pendingWidth = width;
+        pendingHeight = height;
+        resizePending = true;
+        lastResizeTime = System.currentTimeMillis();
+
+        scaleManager.updateWindowSize(width, height);
         uiRenderer.updateProjection(width, height);
-        
+
+        System.out.println("[UIManager] Resize event queued: " + width + "x" + height);
+    }
+
+    private void processResizeDebounce() {
+        if (!resizePending) {
+            return;
+        }
+
+        long elapsed = System.currentTimeMillis() - lastResizeTime;
+        if (elapsed < RESIZE_DEBOUNCE_MS) {
+            return;
+        }
+
+        int width = pendingWidth;
+        int height = pendingHeight;
+
+        if (width < 1 || height < 1) {
+            System.out.println("[UIManager] Waiting for valid dimensions before processing resize: " + width + "x" + height);
+            return;
+        }
+
+        // Update font size if scale changed significantly
+        int newFontSize = scaleManager.getFontSize();
+        if (fontRenderer.getFontSize() != newFontSize) {
+            fontRenderer.setFontSize(newFontSize);
+            currentAtlasSize = newFontSize;
+            System.out.println("[UIManager] Font size changed to " + newFontSize + "px");
+        }
+
+        float[] mousePos = getCurrentMousePosition();
         for (UIScreen screen : screens.values()) {
             screen.onResize(width, height);
+            if (mousePos != null) {
+                screen.setLastMousePosition(mousePos[0], mousePos[1]);
+            }
         }
-        
+
         if (hudScreen != null) {
             hudScreen.onResize(width, height);
+            if (mousePos != null) {
+                hudScreen.setLastMousePosition(mousePos[0], mousePos[1]);
+            }
         }
-        
+
         if (chatOverlay != null) {
             chatOverlay.onResize(width, height);
         }
         if (consoleOverlay != null) {
             consoleOverlay.onResize(width, height);
         }
+
+        System.out.println("[UIManager] Processing debounced resize: " + width + "x" + height);
+        resizePending = false;
     }
     
     /**
@@ -574,7 +710,65 @@ public class UIManager {
     public Settings getSettings() {
         return settings;
     }
-    
+
+    /**
+     * Exposes the bound {@link Game} instance when available.
+     *
+     * @return Game reference or {@code null} if not running with a Game instance
+     */
+    public Game getGame() {
+        return game instanceof Game ? (Game) game : null;
+    }
+
+    /**
+     * Returns whether a resize event is currently pending debounce processing.
+     *
+     * @return {@code true} if resize is pending, otherwise {@code false}
+     */
+    public boolean isResizePending() {
+        return resizePending;
+    }
+
+    /**
+     * Returns the pending resize width that will be applied once debounce elapses.
+     *
+     * @return pending window width in pixels
+     */
+    public int getPendingResizeWidth() {
+        return pendingWidth;
+    }
+
+    /**
+     * Returns the pending resize height that will be applied once debounce elapses.
+     *
+     * @return pending window height in pixels
+     */
+    public int getPendingResizeHeight() {
+        return pendingHeight;
+    }
+
+    /**
+     * Returns the configured debounce interval in milliseconds used for resize events.
+     *
+     * @return debounce interval in milliseconds
+     */
+    public long getResizeDebounceMillis() {
+        return RESIZE_DEBOUNCE_MS;
+    }
+
+    /**
+     * Provides access to the menu world renderer when the main menu is active.
+     *
+     * @return {@link MenuWorldRenderer} instance or {@code null} if not initialised
+     */
+    public MenuWorldRenderer getMenuWorldRenderer() {
+        UIScreen screen = screens.get(GameState.MAIN_MENU);
+        if (screen instanceof MainMenuScreen mainMenuScreen) {
+            return mainMenuScreen.getWorldRenderer();
+        }
+        return null;
+    }
+
     /**
      * Gets the config manager.
      * 
@@ -877,6 +1071,56 @@ public class UIManager {
      */
     public ConsoleOverlay getConsoleOverlay() {
         return consoleOverlay;
+    }
+    
+    /**
+     * Checks if UI is currently capturing input (e.g., text input in chat/console).
+     * When true, gameplay controls should be disabled.
+     * 
+     * @return true if UI is capturing input
+     */
+    public boolean isInputCaptured() {
+        // Check if chat overlay is visible and capturing input
+        if (chatOverlay != null && chatOverlay.isVisible()) {
+            return true;
+        }
+        
+        // Check if console overlay is visible and capturing input
+        if (consoleOverlay != null && consoleOverlay.isVisible()) {
+            return true;
+        }
+        
+        // Add future text input screens here if needed
+        // (e.g., world creation screen with text fields)
+        
+        return false;
+    }
+    
+    /**
+     * Gets the UI scale manager.
+     * 
+     * @return UI scale manager instance
+     */
+    public UIScaleManager getScaleManager() {
+        return scaleManager;
+    }
+    
+    /**
+     * Gets the current font atlas size being used by FontRenderer.
+     * 
+     * @return Current atlas size in pixels (16, 20, 24, or 32)
+     */
+    public int getCurrentAtlasSize() {
+        return currentAtlasSize;
+    }
+    
+    /**
+     * Gets the FontRenderer instance.
+     * 
+     * @return Font renderer
+     */
+    public FontRenderer getFontRenderer() {
+        return fontRenderer;
     }
     
     /**

@@ -263,6 +263,16 @@ public class World {
     public Collection<Chunk> getLoadedChunks() {
         return chunks.values();
     }
+
+    public void cleanup() {
+        if (chunkUnloadCallback != null && !chunks.isEmpty()) {
+            chunks.keySet().forEach(chunkUnloadCallback);
+        }
+        chunks.clear();
+        chunkUnloadCallback = null;
+        eventBus = null;
+        worldLoadEventFired = false;
+    }
     
     /**
      * Gets the block type at the specified world coordinates.
@@ -340,6 +350,44 @@ public class World {
         }
         
         chunk.setBlock(localX, worldY, localZ, type);
+
+        if (isEdgeBlock(localX, localZ)) {
+            if (localZ == 0) {
+                markNeighborChunkDirty(chunkPos, 0);
+            }
+            if (localZ == Chunk.CHUNK_SIZE - 1) {
+                markNeighborChunkDirty(chunkPos, 1);
+            }
+            if (localX == Chunk.CHUNK_SIZE - 1) {
+                markNeighborChunkDirty(chunkPos, 2);
+            }
+            if (localX == 0) {
+                markNeighborChunkDirty(chunkPos, 3);
+            }
+        }
+    }
+
+    private boolean isEdgeBlock(int localX, int localZ) {
+        return localX == 0 || localX == Chunk.CHUNK_SIZE - 1 || localZ == 0 || localZ == Chunk.CHUNK_SIZE - 1;
+    }
+
+    private void markNeighborChunkDirty(ChunkPos pos, int direction) {
+        ChunkPos neighborPos;
+        switch (direction) {
+            case 0 -> neighborPos = new ChunkPos(pos.x, pos.z - 1);
+            case 1 -> neighborPos = new ChunkPos(pos.x, pos.z + 1);
+            case 2 -> neighborPos = new ChunkPos(pos.x + 1, pos.z);
+            case 3 -> neighborPos = new ChunkPos(pos.x - 1, pos.z);
+            default -> {
+                return;
+            }
+        }
+
+        Chunk neighbor = getChunk(neighborPos);
+        if (neighbor != null) {
+            neighbor.markMeshDirty();
+            System.out.println("[World] Marked neighbor chunk dirty at " + neighborPos);
+        }
     }
     
     /**

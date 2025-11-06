@@ -39,6 +39,11 @@ public enum GameState {
     SETTINGS_MENU,
     
     /**
+     * Dedicated AI companion configuration screen.
+     */
+    AI_COMPANION_SETTINGS,
+    
+    /**
      * World creation/setup screen.
      * Configure seed, world name, and generation options.
      */

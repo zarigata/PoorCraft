@@ -7,6 +7,7 @@ local mod = {}
 local config = nil
 local sync_timer = 0.0
 local last_sync_time = 0
+local eventQueue = {}
 
 -- Default config values
 local default_config = {
@@ -79,6 +80,34 @@ function mod.init()
     if config.debug_logging then
         api.log("Real-Time Sync: Debug logging enabled")
     end
+
+    local sharedState = api.get_shared_data("realtime_sync_state") or {}
+    sharedState.lastSync = os.time()
+    api.set_shared_data("realtime_sync_state", sharedState)
+
+    api.register_event("on_block_change", function(event)
+        if event.mod_origin == "realtime_sync" then
+            return
+        end
+        eventQueue[#eventQueue + 1] = {
+            type = "block_change",
+            x = event.x,
+            y = event.y,
+            z = event.z,
+            block = event.block
+        }
+    end)
+
+    api.register_event("on_tick", function(_)
+        if #eventQueue == 0 then
+            return
+        end
+        local pending = eventQueue
+        eventQueue = {}
+        for _, queued in ipairs(pending) do
+            api.broadcast_network_event("realtime_sync", queued)
+        end
+    end)
 end
 
 -- Enable the mod
@@ -95,6 +124,17 @@ function mod.enable()
         api.set_game_time(game_time)
         log_debug("Real-Time Sync: Initial sync - game time set to " .. game_time)
     end
+
+    eventQueue = {}
+
+    api.register_event("network_event", function(event)
+        if event.channel ~= "realtime_sync" then
+            return
+        end
+        if event.payload.type == "block_change" then
+            api.set_block(event.payload.x, event.payload.y, event.payload.z, event.payload.block)
+        end
+    end)
 end
 
 -- Disable the mod

@@ -1,1 +1,8 @@
-{"id":"isolation_alpha","name":"Isolation Alpha","version":"1.0.0","main":"main.lua","enabled":true}
+{
+  "id": "isolation_alpha",
+  "name": "Isolation Alpha",
+  "version": "1.0.0",
+  "description": "Test mod for Lua environment isolation - verifies mods have separate global scopes. Enable only for testing.",
+  "main": "main.lua",
+  "enabled": true
+}

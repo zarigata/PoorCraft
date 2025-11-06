@@ -16,7 +16,7 @@ public class MenuBackground {
     private Texture[] textures;
     private int currentTextureIndex;
     private static final float TILE_SIZE = 64.0f;  // Size of each texture tile in pixels
-    private static final float OPACITY = 0.20f;     // 20% opacity - subtle but visible
+    private float opacity = 0.15f;     // 15% opacity - subtle but visible
     private float scrollOffsetX = 0.0f;
     private float scrollOffsetY = 0.0f;
     private static final float SCROLL_SPEED_X = 5.0f;  // Pixels per second
@@ -110,10 +110,23 @@ public class MenuBackground {
                 renderer.drawTexturedRect(
                     tileX, tileY, TILE_SIZE, TILE_SIZE, 
                     textureId,
-                    1.0f, 1.0f, 1.0f, OPACITY  // White tint with 20% opacity
+                    1.0f, 1.0f, 1.0f, opacity  // White tint with configured opacity
                 );
             }
         }
+    }
+
+    /**
+     * Adjusts the tiled background opacity.
+     *
+     * @param opacity Desired alpha (0.0 to 1.0)
+     */
+    public void setOpacity(float opacity) {
+        if (opacity < 0f || opacity > 1f) {
+            System.err.println("[MenuBackground] Ignoring invalid opacity: " + opacity);
+            return;
+        }
+        this.opacity = opacity;
     }
     
     /**

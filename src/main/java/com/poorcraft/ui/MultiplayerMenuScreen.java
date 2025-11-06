@@ -12,14 +12,39 @@ package com.poorcraft.ui;
  * No fancy server pinging or MOTD display. Just the basics!
  */
 public class MultiplayerMenuScreen extends UIScreen {
-    
-    private UIManager uiManager;
+
+    private enum ViewState {
+        MAIN,
+        DIRECT_CONNECT,
+        HOST_GAME
+    }
+
+    private final UIManager uiManager;
     private TextField directConnectField;
     private TextField hostPortField;
     private TextField worldSeedField;
     private Checkbox generateStructuresCheckbox;
-    private boolean showingDirectConnect;
-    private boolean showingHostGame;
+
+    private Label mainTitleLabel;
+    private Button serverListButton;
+    private Button directConnectButton;
+    private Button hostGameButton;
+    private Button backButton;
+
+    private Label directTitleLabel;
+    private Label directAddressLabel;
+    private Button directConnectActionButton;
+    private Button directCancelButton;
+
+    private Label hostTitleLabel;
+    private Label hostPortLabel;
+    private Label hostSeedLabel;
+    private Button hostStartButton;
+    private Button hostCancelButton;
+
+    private ViewState viewState;
+    private boolean componentsInitialized;
+    private boolean layoutDirty;
     
     /**
      * Creates the multiplayer menu screen.
@@ -28,131 +53,326 @@ public class MultiplayerMenuScreen extends UIScreen {
      * @param windowHeight Window height
      * @param uiManager UI manager
      */
-    public MultiplayerMenuScreen(int windowWidth, int windowHeight, UIManager uiManager) {
-        super(windowWidth, windowHeight);
+    public MultiplayerMenuScreen(int windowWidth, int windowHeight, UIManager uiManager, UIScaleManager scaleManager) {
+        super(windowWidth, windowHeight, scaleManager);
         this.uiManager = uiManager;
-        this.showingDirectConnect = false;
-        this.showingHostGame = false;
+        this.viewState = ViewState.MAIN;
+        this.componentsInitialized = false;
+        this.layoutDirty = true;
     }
-    
+
     @Override
     public void init() {
-        clearComponents();
-        showingDirectConnect = false;
-        showingHostGame = false;
-        showMainMenu();
+        if (!componentsInitialized) {
+            clearComponents();
+            createComponents();
+            componentsInitialized = true;
+        }
+        setViewState(ViewState.MAIN);
+        layoutDirty = true;
+        updateLayout();
     }
-    
-    /**
-     * Shows the main multiplayer menu.
-     */
-    private void showMainMenu() {
-        clearComponents();
-        
-        float centerX = windowWidth / 2.0f;
-        float startY = windowHeight * 0.25f;
-        float buttonWidth = 200;
-        float buttonHeight = 40;
-        float spacing = 50;
-        
-        // Title
-        Label titleLabel = new Label(centerX, startY, "Multiplayer", 
-            1.0f, 1.0f, 1.0f, 1.0f);
-        titleLabel.setCentered(true);
-        addComponent(titleLabel);
-        
-        float currentY = startY + 80;
-        
-        // Server List button (disabled for v1)
-        Button serverListButton = new Button(centerX - buttonWidth / 2, currentY, 
-            buttonWidth, buttonHeight, "Server List (Coming Soon)", () -> {});
+
+    private void createComponents() {
+        float norm = scaleManager.getTextScaleForFontSize(uiManager.getCurrentAtlasSize());
+
+        // Main view components
+        mainTitleLabel = new Label(0f, 0f, "Multiplayer", 1.0f, 1.0f, 1.0f, 1.0f);
+        mainTitleLabel.setCentered(true);
+        mainTitleLabel.setScale(2.0f * norm);
+        addComponent(mainTitleLabel);
+
+        serverListButton = new Button(0f, 0f, 0f, 0f, "Server List (Coming Soon)", () -> {});
         serverListButton.setEnabled(false);
         addComponent(serverListButton);
-        
-        currentY += spacing;
-        
-        // Direct Connect button
-        Button directConnectButton = new Button(centerX - buttonWidth / 2, currentY, 
-            buttonWidth, buttonHeight, "Direct Connect", this::showDirectConnectDialog);
+
+        directConnectButton = new Button(0f, 0f, 0f, 0f, "Direct Connect",
+            () -> setViewState(ViewState.DIRECT_CONNECT));
         addComponent(directConnectButton);
-        
-        currentY += spacing;
-        
-        // Host Game button
-        Button hostGameButton = new Button(centerX - buttonWidth / 2, currentY, 
-            buttonWidth, buttonHeight, "Host Game", this::showHostGameDialog);
+
+        hostGameButton = new Button(0f, 0f, 0f, 0f, "Host Game",
+            () -> setViewState(ViewState.HOST_GAME));
         addComponent(hostGameButton);
-        
-        currentY += spacing + 20;
-        
-        // Back button
-        Button backButton = new Button(centerX - buttonWidth / 2, currentY, 
-            buttonWidth, buttonHeight, "Back", () -> uiManager.setState(GameState.MAIN_MENU));
+
+        backButton = new Button(0f, 0f, 0f, 0f, "Back",
+            () -> uiManager.setState(GameState.MAIN_MENU));
         addComponent(backButton);
-    }
-    
-    /**
-     * Shows the direct connect dialog.
-     */
-    private void showDirectConnectDialog() {
-        clearComponents();
-        showingDirectConnect = true;
-        
-        float centerX = windowWidth / 2.0f;
-        float startY = windowHeight * 0.3f;
-        float fieldWidth = 300;
-        float fieldHeight = 35;
-        float buttonWidth = 140;
-        float buttonHeight = 40;
-        
-        // Title
-        Label titleLabel = new Label(centerX, startY, "Direct Connect", 
-            1.0f, 1.0f, 1.0f, 1.0f);
-        titleLabel.setCentered(true);
-        addComponent(titleLabel);
-        
-        // Server address label
-        float currentY = startY + 60;
-        Label addressLabel = new Label(centerX - fieldWidth / 2, currentY, 
-            "Server Address (IP:Port):");
-        addComponent(addressLabel);
-        
-        // Server address field
-        directConnectField = new TextField(centerX - fieldWidth / 2, currentY + 25, 
-            fieldWidth, fieldHeight, "localhost:25565");
+
+        // Direct connect components
+        directTitleLabel = new Label(0f, 0f, "Direct Connect", 1.0f, 1.0f, 1.0f, 1.0f);
+        directTitleLabel.setCentered(true);
+        directAddressLabel = new Label(0f, 0f, "Server Address (IP:Port):");
+        addComponent(directTitleLabel);
+        addComponent(directAddressLabel);
+
+        directConnectField = new TextField(0f, 0f, 0f, 0f, "localhost:25565");
         directConnectField.setText("localhost:25565");
         addComponent(directConnectField);
-        
-        // Buttons
-        currentY += 100;
-        float buttonSpacing = 20;
-        
-        Button connectButton = new Button(
-            centerX - buttonWidth - buttonSpacing / 2, currentY, 
-            buttonWidth, buttonHeight, "Connect", this::onDirectConnect);
-        addComponent(connectButton);
-        
-        Button cancelButton = new Button(
-            centerX + buttonSpacing / 2, currentY, 
-            buttonWidth, buttonHeight, "Cancel", this::init);
-        addComponent(cancelButton);
+
+        directConnectActionButton = new Button(0f, 0f, 0f, 0f, "Connect", this::onDirectConnect);
+        addComponent(directConnectActionButton);
+        directCancelButton = new Button(0f, 0f, 0f, 0f, "Cancel",
+            () -> setViewState(ViewState.MAIN));
+        addComponent(directCancelButton);
+
+        // Host game components
+        hostTitleLabel = new Label(0f, 0f, "Host Game", 1.0f, 1.0f, 1.0f, 1.0f);
+        hostTitleLabel.setCentered(true);
+        hostPortLabel = new Label(0f, 0f, "Server Port:");
+        hostSeedLabel = new Label(0f, 0f, "World Seed (leave empty for random):");
+        addComponent(hostTitleLabel);
+        addComponent(hostPortLabel);
+        addComponent(hostSeedLabel);
+
+        hostPortField = new TextField(0f, 0f, 0f, 0f, "25565");
+        hostPortField.setText("25565");
+        addComponent(hostPortField);
+
+        worldSeedField = new TextField(0f, 0f, 0f, 0f, "0");
+        addComponent(worldSeedField);
+
+        generateStructuresCheckbox = new Checkbox(0f, 0f, scaleDimension(20f),
+            "Generate Structures (trees, cacti, etc.)", true, checked -> {});
+        addComponent(generateStructuresCheckbox);
+
+        hostStartButton = new Button(0f, 0f, 0f, 0f, "Start Server", this::onHostGame);
+        addComponent(hostStartButton);
+        hostCancelButton = new Button(0f, 0f, 0f, 0f, "Cancel",
+            () -> setViewState(ViewState.MAIN));
+        addComponent(hostCancelButton);
+
+        updateViewVisibility();
     }
-    
-    /**
-     * Handles direct connect button click.
-     */
+
+    private void setViewState(ViewState newState) {
+        if (viewState == newState) {
+            return;
+        }
+        viewState = newState;
+        if (viewState == ViewState.DIRECT_CONNECT && directConnectField != null && directConnectField.getText().isEmpty()) {
+            directConnectField.setText("localhost:25565");
+        }
+        if (viewState == ViewState.HOST_GAME) {
+            if (hostPortField != null && hostPortField.getText().isEmpty()) {
+                hostPortField.setText("25565");
+            }
+            if (generateStructuresCheckbox != null) {
+                generateStructuresCheckbox.setChecked(true);
+            }
+        }
+        updateViewVisibility();
+        layoutDirty = true;
+    }
+
+    private void updateViewVisibility() {
+        boolean mainVisible = viewState == ViewState.MAIN;
+        boolean directVisible = viewState == ViewState.DIRECT_CONNECT;
+        boolean hostVisible = viewState == ViewState.HOST_GAME;
+
+        setMainViewVisible(mainVisible);
+        setDirectViewVisible(directVisible);
+        setHostViewVisible(hostVisible);
+    }
+
+    private void setMainViewVisible(boolean visible) {
+        if (mainTitleLabel != null) mainTitleLabel.setVisible(visible);
+        if (serverListButton != null) serverListButton.setVisible(visible);
+        if (directConnectButton != null) directConnectButton.setVisible(visible);
+        if (hostGameButton != null) hostGameButton.setVisible(visible);
+        if (backButton != null) backButton.setVisible(visible);
+    }
+
+    private void setDirectViewVisible(boolean visible) {
+        if (directTitleLabel != null) directTitleLabel.setVisible(visible);
+        if (directAddressLabel != null) directAddressLabel.setVisible(visible);
+        if (directConnectField != null) directConnectField.setVisible(visible);
+        if (directConnectActionButton != null) directConnectActionButton.setVisible(visible);
+        if (directCancelButton != null) directCancelButton.setVisible(visible);
+    }
+
+    private void setHostViewVisible(boolean visible) {
+        if (hostTitleLabel != null) hostTitleLabel.setVisible(visible);
+        if (hostPortLabel != null) hostPortLabel.setVisible(visible);
+        if (hostPortField != null) hostPortField.setVisible(visible);
+        if (hostSeedLabel != null) hostSeedLabel.setVisible(visible);
+        if (worldSeedField != null) worldSeedField.setVisible(visible);
+        if (generateStructuresCheckbox != null) generateStructuresCheckbox.setVisible(visible);
+        if (hostStartButton != null) hostStartButton.setVisible(visible);
+        if (hostCancelButton != null) hostCancelButton.setVisible(visible);
+    }
+
+    private void updateLayout() {
+        if (!layoutDirty || !componentsInitialized) {
+            return;
+        }
+
+        float centerX = windowWidth / 2.0f;
+        float norm = scaleManager.getTextScaleForFontSize(uiManager.getCurrentAtlasSize());
+
+        switch (viewState) {
+            case MAIN -> layoutMainView(centerX, norm);
+            case DIRECT_CONNECT -> layoutDirectConnectView(centerX, norm);
+            case HOST_GAME -> layoutHostGameView(centerX, norm);
+        }
+
+        layoutDirty = false;
+    }
+
+    private void layoutMainView(float centerX, float norm) {
+        float startY = windowHeight * 0.25f;
+        float buttonWidth = scaleDimension(200f);
+        float buttonHeight = scaleDimension(40f);
+        float spacing = scaleDimension(50f);
+
+        if (mainTitleLabel != null) {
+            mainTitleLabel.setScale(2.0f * norm);
+            mainTitleLabel.setPosition(centerX, startY);
+        }
+
+        float currentY = startY + scaleDimension(80f);
+
+        if (serverListButton != null) {
+            serverListButton.setBounds(centerX - buttonWidth / 2f, currentY, buttonWidth, buttonHeight);
+        }
+        currentY += spacing;
+
+        if (directConnectButton != null) {
+            directConnectButton.setBounds(centerX - buttonWidth / 2f, currentY, buttonWidth, buttonHeight);
+        }
+        currentY += spacing;
+
+        if (hostGameButton != null) {
+            hostGameButton.setBounds(centerX - buttonWidth / 2f, currentY, buttonWidth, buttonHeight);
+        }
+        currentY += spacing + scaleDimension(20f);
+
+        if (backButton != null) {
+            backButton.setBounds(centerX - buttonWidth / 2f, currentY, buttonWidth, buttonHeight);
+        }
+    }
+
+    private void layoutDirectConnectView(float centerX, float norm) {
+        float startY = windowHeight * 0.3f;
+        float fieldWidth = scaleDimension(300f);
+        float fieldHeight = scaleDimension(35f);
+        float buttonWidth = scaleDimension(140f);
+        float buttonHeight = scaleDimension(40f);
+        float buttonSpacing = scaleDimension(20f);
+
+        if (directTitleLabel != null) {
+            directTitleLabel.setScale(1.8f * norm);
+            directTitleLabel.setPosition(centerX, startY);
+        }
+
+        float currentY = startY + scaleDimension(60f);
+
+        if (directAddressLabel != null) {
+            directAddressLabel.setScale(norm);
+            directAddressLabel.setPosition(centerX - fieldWidth / 2f, currentY);
+        }
+
+        if (directConnectField != null) {
+            directConnectField.setBounds(centerX - fieldWidth / 2f,
+                currentY + scaleDimension(25f), fieldWidth, fieldHeight);
+        }
+
+        currentY += scaleDimension(100f);
+
+        if (directConnectActionButton != null) {
+            directConnectActionButton.setBounds(
+                centerX - buttonWidth - buttonSpacing / 2f,
+                currentY,
+                buttonWidth,
+                buttonHeight);
+        }
+        if (directCancelButton != null) {
+            directCancelButton.setBounds(
+                centerX + buttonSpacing / 2f,
+                currentY,
+                buttonWidth,
+                buttonHeight);
+        }
+    }
+
+    private void layoutHostGameView(float centerX, float norm) {
+        float startY = windowHeight * 0.2f;
+        float fieldWidth = scaleDimension(300f);
+        float fieldHeight = scaleDimension(35f);
+        float spacing = scaleDimension(60f);
+        float buttonWidth = scaleDimension(140f);
+        float buttonHeight = scaleDimension(40f);
+        float buttonSpacing = scaleDimension(20f);
+
+        if (hostTitleLabel != null) {
+            hostTitleLabel.setScale(1.8f * norm);
+            hostTitleLabel.setPosition(centerX, startY);
+        }
+
+        float currentY = startY + scaleDimension(60f);
+
+        if (hostPortLabel != null) {
+            hostPortLabel.setScale(norm);
+            hostPortLabel.setPosition(centerX - fieldWidth / 2f, currentY);
+        }
+
+        if (hostPortField != null) {
+            hostPortField.setBounds(centerX - fieldWidth / 2f,
+                currentY + scaleDimension(25f), fieldWidth, fieldHeight);
+        }
+
+        currentY += spacing;
+
+        if (hostSeedLabel != null) {
+            hostSeedLabel.setScale(norm);
+            hostSeedLabel.setPosition(centerX - fieldWidth / 2f, currentY);
+        }
+
+        if (worldSeedField != null) {
+            worldSeedField.setBounds(centerX - fieldWidth / 2f,
+                currentY + scaleDimension(25f), fieldWidth, fieldHeight);
+        }
+
+        currentY += spacing;
+
+        if (generateStructuresCheckbox != null) {
+            generateStructuresCheckbox.setBounds(centerX - fieldWidth / 2f,
+                currentY, scaleDimension(20f), scaleDimension(20f));
+        }
+
+        currentY += spacing + scaleDimension(20f);
+
+        if (hostStartButton != null) {
+            hostStartButton.setBounds(
+                centerX - buttonWidth - buttonSpacing / 2f,
+                currentY,
+                buttonWidth,
+                buttonHeight);
+        }
+
+        if (hostCancelButton != null) {
+            hostCancelButton.setBounds(
+                centerX + buttonSpacing / 2f,
+                currentY,
+                buttonWidth,
+                buttonHeight);
+        }
+    }
+
     private void onDirectConnect() {
+        if (directConnectField == null) {
+            return;
+        }
         String address = directConnectField.getText().trim();
-        
+
         if (address.isEmpty()) {
             System.err.println("[MultiplayerMenu] Server address is empty");
             return;
         }
-        
+
         // Parse IP and port
         String host;
         int port = 25565;  // Default port
-        
+
         if (address.contains(":")) {
             String[] parts = address.split(":");
             host = parts[0];
@@ -165,78 +385,11 @@ public class MultiplayerMenuScreen extends UIScreen {
         } else {
             host = address;
         }
-        
+
         // Connect to server
         uiManager.connectToServer(host, port);
     }
-    
-    /**
-     * Shows the host game dialog.
-     */
-    private void showHostGameDialog() {
-        clearComponents();
-        showingHostGame = true;
-        
-        float centerX = windowWidth / 2.0f;
-        float startY = windowHeight * 0.2f;
-        float fieldWidth = 300;
-        float fieldHeight = 35;
-        float spacing = 60;
-        
-        // Title
-        Label titleLabel = new Label(centerX, startY, "Host Game", 
-            1.0f, 1.0f, 1.0f, 1.0f);
-        titleLabel.setCentered(true);
-        addComponent(titleLabel);
-        
-        float currentY = startY + 60;
-        
-        // Server port
-        Label portLabel = new Label(centerX - fieldWidth / 2, currentY, "Server Port:");
-        addComponent(portLabel);
-        
-        hostPortField = new TextField(centerX - fieldWidth / 2, currentY + 25, 
-            fieldWidth, fieldHeight, "25565");
-        hostPortField.setText("25565");
-        addComponent(hostPortField);
-        
-        // World seed
-        currentY += spacing;
-        Label seedLabel = new Label(centerX - fieldWidth / 2, currentY, 
-            "World Seed (leave empty for random):");
-        addComponent(seedLabel);
-        
-        worldSeedField = new TextField(centerX - fieldWidth / 2, currentY + 25, 
-            fieldWidth, fieldHeight, "0");
-        addComponent(worldSeedField);
-        
-        // Generate structures
-        currentY += spacing;
-        generateStructuresCheckbox = new Checkbox(centerX - fieldWidth / 2, currentY, 
-            20, "Generate Structures (trees, cacti, etc.)", 
-            true, checked -> {});
-        addComponent(generateStructuresCheckbox);
-        
-        // Buttons
-        currentY += spacing + 20;
-        float buttonWidth = 140;
-        float buttonHeight = 40;
-        float buttonSpacing = 20;
-        
-        Button startButton = new Button(
-            centerX - buttonWidth - buttonSpacing / 2, currentY, 
-            buttonWidth, buttonHeight, "Start Server", this::onHostGame);
-        addComponent(startButton);
-        
-        Button cancelButton = new Button(
-            centerX + buttonSpacing / 2, currentY, 
-            buttonWidth, buttonHeight, "Cancel", this::init);
-        addComponent(cancelButton);
-    }
-    
-    /**
-     * Handles host game button click.
-     */
+
     private void onHostGame() {
         // Parse port
         int port = 25565;
@@ -249,7 +402,7 @@ public class MultiplayerMenuScreen extends UIScreen {
             System.err.println("[MultiplayerMenu] Invalid port number");
             return;
         }
-        
+
         // Parse seed
         long seed = 0;
         try {
@@ -261,25 +414,25 @@ public class MultiplayerMenuScreen extends UIScreen {
             // Try hashing the string as seed
             seed = worldSeedField.getText().hashCode();
         }
-        
-        boolean generateStructures = generateStructuresCheckbox.isChecked();
-        
+
+        boolean generateStructures = generateStructuresCheckbox != null && generateStructuresCheckbox.isChecked();
+
         // Host server
         uiManager.hostServer(port, seed, generateStructures);
     }
-    
+
     @Override
     public void onResize(int width, int height) {
         this.windowWidth = width;
         this.windowHeight = height;
-        
-        // Rebuild current view
-        if (showingDirectConnect) {
-            showDirectConnectDialog();
-        } else if (showingHostGame) {
-            showHostGameDialog();
-        } else {
-            init();
+        layoutDirty = true;
+    }
+
+    @Override
+    public void update(float deltaTime) {
+        if (layoutDirty) {
+            updateLayout();
         }
+        super.update(deltaTime);
     }
 }

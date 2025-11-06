@@ -6,6 +6,7 @@ import com.poorcraft.render.SkyRenderer;
 import com.poorcraft.render.SunLight;
 import com.poorcraft.world.World;
 import com.poorcraft.world.chunk.Chunk;
+import com.poorcraft.world.chunk.ChunkPos;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
@@ -41,6 +42,8 @@ public class MenuWorldRenderer {
     private float animationSpeed;
     private boolean loading;
     private float fadeAlpha;
+    private int viewportWidth = 1;
+    private int viewportHeight = 1;
     
     /**
      * Creates a new menu world renderer.
@@ -89,12 +92,11 @@ public class MenuWorldRenderer {
                 // We load a 3x3 area centered at origin
                 for (int cx = -1; cx <= 1; cx++) {
                     for (int cz = -1; cz <= 1; cz++) {
+                        ChunkPos chunkPos = new ChunkPos(cx, cz);
                         try {
-                            var worldClass = menuWorld.getClass();
-                            var method = worldClass.getMethod("getOrCreateChunk", int.class, int.class);
-                            method.invoke(menuWorld, cx, cz);
+                            menuWorld.getOrCreateChunk(chunkPos);
                         } catch (Exception e) {
-                            System.err.println("[MenuWorldRenderer] Failed to load chunk: " + e.getMessage());
+                            System.err.println("[MenuWorldRenderer] Failed to load chunk at " + chunkPos + ": " + e.getMessage());
                         }
                     }
                 }
@@ -158,9 +160,15 @@ public class MenuWorldRenderer {
      * @param windowHeight Window height
      */
     public void render(int windowWidth, int windowHeight) {
+        if (windowWidth > 0 && windowHeight > 0) {
+            viewportWidth = windowWidth;
+            viewportHeight = windowHeight;
+        }
+
         if (!initialized || menuWorld == null || menuCamera == null) {
             // Fallback to solid color while loading
             glClearColor(0.1f, 0.05f, 0.15f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             return;
         }
         
@@ -176,7 +184,8 @@ public class MenuWorldRenderer {
         glDisable(GL_BLEND);
         
         // Get matrices from camera
-        float aspect = (float)windowWidth / windowHeight;
+        int safeHeight = Math.max(1, viewportHeight);
+        float aspect = (float) viewportWidth / safeHeight;
         Matrix4f view = menuCamera.getViewMatrix();
         Matrix4f projection = menuCamera.getProjectionMatrix(70.0f, aspect, 0.1f, 1000.0f);
         
@@ -195,6 +204,11 @@ public class MenuWorldRenderer {
         if (!depthTestEnabled) glDisable(GL_DEPTH_TEST);
         if (!cullFaceEnabled) glDisable(GL_CULL_FACE);
         if (blendEnabled) glEnable(GL_BLEND);
+    }
+
+    public void onResize(int width, int height) {
+        viewportWidth = Math.max(1, width);
+        viewportHeight = Math.max(1, height);
     }
     
     /**

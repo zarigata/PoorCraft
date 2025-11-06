@@ -10,6 +10,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.luaj.vm2.Globals;
+import org.luaj.vm2.LuaError;
+import org.luaj.vm2.lib.jse.JsePlatform;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -289,18 +292,11 @@ class ResourceValidationTest {
     private Optional<String> validateLuaSyntax(Path luaFile) {
         try {
             String source = Files.readString(luaFile, StandardCharsets.UTF_8);
-            int balance = 0;
-            for (String line : source.split("\\R")) {
-                String trimmed = line.trim().toLowerCase();
-                if (trimmed.startsWith("function")) {
-                    balance++;
-                }
-                if (trimmed.equals("end") || trimmed.startsWith("end ")) {
-                    balance--;
-                }
-            }
-            if (balance != 0) {
-                return Optional.of("Unbalanced function/end in " + luaFile.getFileName());
+            Globals globals = JsePlatform.standardGlobals();
+            try {
+                globals.load(source, luaFile.getFileName().toString());
+            } catch (LuaError e) {
+                return Optional.of("Lua syntax error in " + luaFile.getFileName() + ": " + e.getMessage());
             }
         } catch (IOException e) {
             return Optional.of("Failed to read Lua file " + luaFile + ": " + e.getMessage());

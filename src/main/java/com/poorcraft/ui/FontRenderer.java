@@ -2,7 +2,6 @@ package com.poorcraft.ui;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBTTBakedChar;
-import org.lwjgl.stb.STBTruetype;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -11,7 +10,10 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
@@ -37,32 +39,80 @@ public class FontRenderer {
     private static final int CHAR_COUNT = 95;   // ASCII 32-126 (printable characters)
     
     private UIRenderer uiRenderer;
-    private int fontAtlasTexture;
-    private int fontSize;
-    private STBTTBakedChar.Buffer charData;
-    private float lineHeight;
+    private Map<Integer, FontAtlas> fontAtlases;
+    private int currentFontSize;
     private boolean useFallback = false;
+    private boolean usingSystemFallbackFont = false;
+    private int textVao;
+    private int textVbo;
+    
+    /**
+     * Encapsulates a font atlas with its texture, character data, and metrics.
+     */
+    private static class FontAtlas {
+        int texture;
+        STBTTBakedChar.Buffer charData;
+        float lineHeight;
+        
+        FontAtlas(int texture, STBTTBakedChar.Buffer charData, float lineHeight) {
+            this.texture = texture;
+            this.charData = charData;
+            this.lineHeight = lineHeight;
+        }
+        
+        void cleanup() {
+            if (texture != 0) {
+                glDeleteTextures(texture);
+            }
+            if (charData != null) {
+                charData.free();
+            }
+        }
+    }
     
     /**
      * Creates a new font renderer.
      * 
      * @param uiRenderer UI renderer for drawing character quads
-     * @param fontSize Font size in pixels
+     * @param fontSize Default font size in pixels
      */
     public FontRenderer(UIRenderer uiRenderer, int fontSize) {
         this.uiRenderer = uiRenderer;
-        this.fontSize = fontSize;
+        this.currentFontSize = fontSize;
+        this.fontAtlases = new HashMap<>();
     }
     
     /**
-     * Initializes the font renderer by baking a font atlas.
+     * Initializes the font renderer by baking multiple font atlases at different sizes.
+     * Creates atlases at 16px, 20px, 24px, and 32px for dynamic font size selection.
      * 
      * @param fontPath Path to TTF font file (can be resource path or filesystem path)
      */
     public void init(String fontPath) {
         useFallback = false;
-        STBTTBakedChar.Buffer bakedChars = null;
-        int createdTexture = 0;
+        usingSystemFallbackFont = false;
+        int requestedFontSize = currentFontSize;
+        fontAtlases.clear();
+        
+        // Create dedicated VAO/VBO for text rendering
+        // Attributes match UIRenderer shader: pos (vec2) + uv (vec2) = 4 floats per vertex
+        textVao = glGenVertexArrays();
+        textVbo = glGenBuffers();
+        
+        glBindVertexArray(textVao);
+        glBindBuffer(GL_ARRAY_BUFFER, textVbo);
+        
+        // Position attribute (location = 0)
+        glVertexAttribPointer(0, 2, GL_FLOAT, false, 4 * Float.BYTES, 0);
+        glEnableVertexAttribArray(0);
+        
+        // TexCoord attribute (location = 1)
+        glVertexAttribPointer(1, 2, GL_FLOAT, false, 4 * Float.BYTES, 2 * Float.BYTES);
+        glEnableVertexAttribArray(1);
+        
+        glBindVertexArray(0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        
         try {
             FontLoadResult fontResult = loadFontData(fontPath);
             if (fontResult == null) {
@@ -70,62 +120,120 @@ public class FontRenderer {
             }
 
             ByteBuffer fontBuffer = fontResult.buffer();
-
-            // Create bitmap for font atlas
-            ByteBuffer bitmap = BufferUtils.createByteBuffer(ATLAS_WIDTH * ATLAS_HEIGHT);
-
-            // Allocate character data buffer
-            bakedChars = STBTTBakedChar.malloc(CHAR_COUNT);
-
-            // Bake font bitmap
-            // This rasterizes all characters into the bitmap and fills charData with metrics
-            int result = stbtt_BakeFontBitmap(fontBuffer, fontSize, bitmap,
-                ATLAS_WIDTH, ATLAS_HEIGHT, FIRST_CHAR, bakedChars);
-
-            if (result <= 0) {
-                throw new RuntimeException("Failed to bake font bitmap");
+            usingSystemFallbackFont = !Objects.equals(fontResult.source(), fontPath);
+            
+            // Bake atlases at common sizes: 16px, 20px, 24px, 32px
+            int[] sizes = {16, 20, 24, 32};
+            int successCount = 0;
+            
+            for (int size : sizes) {
+                try {
+                    FontAtlas atlas = bakeAtlas(fontBuffer, size);
+                    fontAtlases.put(size, atlas);
+                    successCount++;
+                } catch (Exception e) {
+                    System.err.println("[FontRenderer] Failed to bake " + size + "px atlas: " + e.getMessage());
+                }
+            }
+            
+            if (successCount == 0) {
+                throw new RuntimeException("Failed to bake any font atlases");
+            }
+            
+            if (usingSystemFallbackFont) {
+                currentFontSize = resolveClosestAvailableSize(requestedFontSize);
+            } else {
+                currentFontSize = resolveClosestAvailableSize(20);
             }
 
-            // Create OpenGL texture from bitmap
-            createdTexture = glGenTextures();
-            glBindTexture(GL_TEXTURE_2D, createdTexture);
-
-            // Upload bitmap (single channel, using GL_RED for OpenGL 3.3 core compatibility)
-            // GL_ALPHA is deprecated in core profile, GL_RED works the same for grayscale
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, ATLAS_WIDTH, ATLAS_HEIGHT,
-                0, GL_RED, GL_UNSIGNED_BYTE, bitmap);
-
-            // Set texture parameters
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-            glBindTexture(GL_TEXTURE_2D, 0);
-
-            // Calculate line height (approximate)
-            lineHeight = fontSize * 1.2f;
-
-            charData = bakedChars;
-            fontAtlasTexture = createdTexture;
-
-            System.out.println("[FontRenderer] Font atlas created from " + fontResult.source() + 
-                ": " + ATLAS_WIDTH + "x" + ATLAS_HEIGHT + ", " + CHAR_COUNT + " characters at " + fontSize + "px");
+            System.out.println("[FontRenderer] Font atlases created from " + fontResult.source() +
+                ": " + successCount + " sizes (" + fontAtlases.keySet() + ")");
 
         } catch (Exception e) {
             System.err.println("[FontRenderer] Failed to initialize font: " + e.getMessage());
             System.err.println("[FontRenderer] Using fallback rendering (no font atlas)");
-            if (bakedChars != null) {
-                bakedChars.free();
-            }
-            if (createdTexture != 0) {
-                glDeleteTextures(createdTexture);
-            }
             useFallback = true;
-            charData = null;
-            fontAtlasTexture = 0;
-            lineHeight = fontSize;
+            usingSystemFallbackFont = false;
+            fontAtlases.clear();
         }
+    }
+    
+    /**
+     * Bakes a single font atlas at the specified size.
+     * 
+     * @param fontBuffer Font data buffer
+     * @param fontSize Font size in pixels
+     * @return FontAtlas instance
+     * @throws RuntimeException if baking fails
+     */
+    private FontAtlas bakeAtlas(ByteBuffer fontBuffer, int fontSize) {
+        // Create bitmap for font atlas
+        ByteBuffer bitmap = BufferUtils.createByteBuffer(ATLAS_WIDTH * ATLAS_HEIGHT);
+
+        // Allocate character data buffer
+        STBTTBakedChar.Buffer bakedChars = STBTTBakedChar.malloc(CHAR_COUNT);
+
+        // Bake font bitmap
+        int result = stbtt_BakeFontBitmap(fontBuffer, fontSize, bitmap,
+            ATLAS_WIDTH, ATLAS_HEIGHT, FIRST_CHAR, bakedChars);
+
+        if (result <= 0) {
+            bakedChars.free();
+            throw new RuntimeException("Failed to bake font bitmap at " + fontSize + "px");
+        }
+
+        // Create OpenGL texture from bitmap
+        int texture = glGenTextures();
+        glBindTexture(GL_TEXTURE_2D, texture);
+
+        // Upload bitmap (single channel, using GL_RED for OpenGL 3.3 core compatibility)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, ATLAS_WIDTH, ATLAS_HEIGHT,
+            0, GL_RED, GL_UNSIGNED_BYTE, bitmap);
+
+        // Set texture parameters
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        // Calculate line height
+        float lineHeight = fontSize * 1.2f;
+        
+        return new FontAtlas(texture, bakedChars, lineHeight);
+    }
+    
+    /**
+     * Sets the current font size by selecting the closest available atlas.
+     * 
+     * @param size Desired font size in pixels
+     */
+    public void setFontSize(int size) {
+        if (useFallback || fontAtlases.isEmpty()) {
+            return;
+        }
+        
+        currentFontSize = resolveClosestAvailableSize(size);
+    }
+
+    private int resolveClosestAvailableSize(int size) {
+        if (fontAtlases.containsKey(size)) {
+            return size;
+        }
+
+        int closestSize = currentFontSize;
+        int minDiff = Integer.MAX_VALUE;
+
+        for (int availableSize : fontAtlases.keySet()) {
+            int diff = Math.abs(availableSize - size);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestSize = availableSize;
+            }
+        }
+
+        return closestSize;
     }
     
     /**
@@ -157,17 +265,23 @@ public class FontRenderer {
      * @param a Alpha component (0.0 to 1.0)
      */
     public void drawText(String text, float x, float y, float scale, float r, float g, float b, float a) {
-        if (useFallback) {
+        if (useFallback || fontAtlases.isEmpty()) {
             return;
         }
 
         if (text == null || text.isEmpty()) {
             return;
         }
+        
+        // Get current atlas
+        FontAtlas atlas = fontAtlases.get(currentFontSize);
+        if (atlas == null) {
+            return;
+        }
 
         float appliedScale = scale <= 0 ? 1.0f : scale;
 
-        glBindTexture(GL_TEXTURE_2D, fontAtlasTexture);
+        glBindTexture(GL_TEXTURE_2D, atlas.texture);
 
         float currentX = x;
         float currentY = y;
@@ -180,7 +294,7 @@ public class FontRenderer {
 
             if (c == '\n') {
                 currentX = x;
-                currentY += lineHeight * appliedScale;
+                currentY += atlas.lineHeight * appliedScale;
                 continue;
             }
 
@@ -188,7 +302,7 @@ public class FontRenderer {
                 continue;
             }
 
-            STBTTBakedChar charInfo = charData.get(c - FIRST_CHAR);
+            STBTTBakedChar charInfo = atlas.charData.get(c - FIRST_CHAR);
 
             float charX = currentX + charInfo.xoff() * appliedScale;
             float charY = currentY + charInfo.yoff() * appliedScale;
@@ -220,19 +334,18 @@ public class FontRenderer {
 
         vertexBuffer.flip();
 
-        int vbo = uiRenderer.getVBO();
-        int vao = uiRenderer.getVAO();
-
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        // Use dedicated text VAO/VBO instead of UIRenderer's buffers
+        glBindBuffer(GL_ARRAY_BUFFER, textVbo);
         glBufferData(GL_ARRAY_BUFFER, vertexBuffer, GL_DYNAMIC_DRAW);
 
         uiRenderer.getShader().setUniform("uModel", new org.joml.Matrix4f().identity());
         uiRenderer.getShader().setUniform("uColor", r, g, b, a);
         uiRenderer.getShader().setUniform("uUseTexture", true);
 
-        glBindVertexArray(vao);
+        glBindVertexArray(textVao);
         glDrawArrays(GL_TRIANGLES, 0, quadCount * 6);
         glBindVertexArray(0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
 
         glBindTexture(GL_TEXTURE_2D, 0);
     }
@@ -274,7 +387,12 @@ public class FontRenderer {
      * @return Width in pixels
      */
     public float getTextWidth(String text) {
-        if (useFallback || text == null || text.isEmpty()) {
+        if (useFallback || fontAtlases.isEmpty() || text == null || text.isEmpty()) {
+            return 0;
+        }
+        
+        FontAtlas atlas = fontAtlases.get(currentFontSize);
+        if (atlas == null) {
             return 0;
         }
         
@@ -286,7 +404,7 @@ public class FontRenderer {
                 continue;
             }
             
-            STBTTBakedChar charInfo = charData.get(c - FIRST_CHAR);
+            STBTTBakedChar charInfo = atlas.charData.get(c - FIRST_CHAR);
             width += charInfo.xadvance();
         }
         
@@ -299,28 +417,46 @@ public class FontRenderer {
      * @return Line height in pixels
      */
     public float getTextHeight() {
-        return useFallback ? fontSize : lineHeight;
+        if (useFallback || fontAtlases.isEmpty()) {
+            return currentFontSize;
+        }
+
+        if (usingSystemFallbackFont) {
+            return currentFontSize;
+        }
+
+        FontAtlas atlas = fontAtlases.get(currentFontSize);
+        return atlas != null ? atlas.lineHeight : currentFontSize;
     }
     
     /**
-     * Returns the font size.
+     * Returns the current font size.
      * 
      * @return Font size in pixels
      */
     public int getFontSize() {
-        return fontSize;
+        return currentFontSize;
     }
     
     /**
      * Cleans up OpenGL resources.
      */
     public void cleanup() {
-        if (!useFallback && fontAtlasTexture != 0) {
-            glDeleteTextures(fontAtlasTexture);
+        for (FontAtlas atlas : fontAtlases.values()) {
+            atlas.cleanup();
         }
-        if (!useFallback && charData != null) {
-            charData.free();
+        fontAtlases.clear();
+        
+        // Clean up text VAO/VBO
+        if (textVao != 0) {
+            glDeleteVertexArrays(textVao);
+            textVao = 0;
         }
+        if (textVbo != 0) {
+            glDeleteBuffers(textVbo);
+            textVbo = 0;
+        }
+        
         System.out.println("[FontRenderer] Cleaned up");
     }
 
@@ -353,7 +489,9 @@ public class FontRenderer {
             // Ignore and try resource lookup
         }
 
-        try (var stream = getClass().getResourceAsStream(fontPath)) {
+        String resourcePath = fontPath.startsWith("/") ? fontPath : "/" + fontPath;
+
+        try (var stream = getClass().getResourceAsStream(resourcePath)) {
             if (stream != null) {
                 byte[] fontBytes = stream.readAllBytes();
                 return toByteBuffer(fontBytes);

@@ -2,17 +2,18 @@ package com.poorcraft.player;
 
 import com.poorcraft.resources.AssetManager;
 
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.nio.file.StandardCopyOption;
 
 /**
  * Utility responsible for loading player skins from user directories and bundled resources.
@@ -35,6 +36,13 @@ public class SkinLoader {
             return cache.get(filePath);
         }
         try {
+            if (!Files.exists(filePath)) {
+                System.err.println("[SkinLoader] Skin file missing: " + filePath);
+                return null;
+            }
+            if (!PlayerSkin.isValidSkinFile(filePath)) {
+                return null;
+            }
             validateSize(filePath);
             String fileName = filePath.getFileName().toString();
             String skinId = fileName.toLowerCase().endsWith(".png")
@@ -45,6 +53,7 @@ public class SkinLoader {
                 cache.put(filePath, skin);
                 return skin;
             }
+            System.err.println("[SkinLoader] Skin failed validation: " + filePath);
         } catch (Exception e) {
             System.err.println("[SkinLoader] Failed to load skin " + filePath + ": " + e.getMessage());
         }
@@ -57,7 +66,7 @@ public class SkinLoader {
         Path destination = assetManager.getDefaultSkinPath(skinId);
         try (InputStream stream = assetManager.openBundledResource(resourcePath)) {
             if (stream == null) {
-                System.err.println("[SkinLoader] Bundled resource missing: " + resourcePath);
+                System.err.println("[SkinLoader] Bundled resource not found: " + resourcePath + ", will attempt generation if possible.");
                 return null;
             }
             Files.createDirectories(destination.getParent());
@@ -92,11 +101,14 @@ public class SkinLoader {
         List<PlayerSkin> skins = new ArrayList<>();
         for (String id : defaultIds) {
             Path path = assetManager.getDefaultSkinPath(id);
+            System.out.println("[SkinLoader] Loading default skin: " + id);
             if (Files.exists(path)) {
                 PlayerSkin skin = loadFromFile(path, true);
                 if (skin != null) {
                     skins.add(skin);
                 }
+            } else {
+                System.err.println("[SkinLoader] Default skin file missing: " + id + ", generation may be needed");
             }
         }
         return skins;
@@ -123,5 +135,18 @@ public class SkinLoader {
         if (size <= 0 || size > MAX_SKIN_BYTES) {
             throw new IOException("Skin file size out of bounds: " + size + " bytes");
         }
+    }
+
+    public static boolean validateSkinImage(BufferedImage image, String skinRef) {
+        if (image == null) {
+            System.err.println("[SkinLoader] Skin '" + skinRef + "' image is null or unreadable");
+            return false;
+        }
+        if (image.getWidth() != 64 || image.getHeight() != 64) {
+            System.err.println("[SkinLoader] Skin '" + skinRef + "' has invalid dimensions " +
+                image.getWidth() + "x" + image.getHeight() + " (expected 64x64)");
+            return false;
+        }
+        return true;
     }
 }

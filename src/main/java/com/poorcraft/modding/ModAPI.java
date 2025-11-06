@@ -5,10 +5,17 @@ import com.poorcraft.core.Game;
 import com.poorcraft.modding.events.ChatMessageEvent;
 import com.poorcraft.world.World;
 import com.poorcraft.world.block.BlockType;
+import com.poorcraft.world.entity.NPCEntity;
+import com.poorcraft.world.entity.NPCManager;
 import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -19,17 +26,7 @@ import java.util.function.Consumer;
 /**
  * Primary scripting interface exposed to Lua mods (and other supported runtimes).
  *
- * <p>This class lets mods interact with the game engine by providing routines for:
- * <ul>
- *   <li>World access (blocks, biomes, terrain height)</li>
- *   <li>Event wiring (registering script callbacks)</li>
- *   <li>Utility helpers (logging, shared data, time/weather)</li>
- * </ul>
- *
- * <p>Methods are written defensively for sandboxed environments:
- * <ul>
- *   <li>Return safe defaults (null, -1) instead of throwing unchecked exceptions</li>
- *   <li>Validate inputs and log recoverable errors</li>
+{{ ... }}
  *   <li>Operate without assuming a specific scripting bridge implementation</li>
  * </ul>
  */
@@ -40,6 +37,7 @@ public class ModAPI {
     private final Map<String, Object> sharedData;
     private final Map<String, ByteBuffer> proceduralTextures;
     private final List<Consumer<ChatMessageData>> chatListeners;
+    private final HttpClient httpClient;
     
     /**
      * Creates a new ModAPI instance.
@@ -53,6 +51,9 @@ public class ModAPI {
         this.sharedData = new HashMap<>();
         this.proceduralTextures = new LinkedHashMap<>();
         this.chatListeners = new ArrayList<>();
+        this.httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(30))
+            .build();
     }
     
     // ========== World Access Methods ==========
@@ -449,45 +450,294 @@ public class ModAPI {
     }
 
     /**
-     * Stores NPC metadata in shared data for mods that manage conversational NPCs.
-     * The entity system will pick this up once NPC spawning is implemented in Java.
+     * Spawns an NPC in the world.
      *
-     * @param npcId       Unique NPC identifier
+     * @param npcId       Unique NPC identifier (ignored, auto-generated)
      * @param name        NPC display name
      * @param x           Spawn X coordinate
      * @param y           Spawn Y coordinate
      * @param z           Spawn Z coordinate
      * @param personality Personality descriptor for AI systems
+     * @return The actual NPC ID assigned by the manager
      */
-    public void spawnNPC(int npcId, String name, float x, float y, float z, String personality) {
-        Map<String, Object> npcData = new HashMap<>();
-        npcData.put("id", npcId);
-        npcData.put("name", name);
-        npcData.put("position", new float[]{x, y, z});
-        npcData.put("personality", personality);
-
-        sharedData.put("npc_" + npcId, npcData);
-        System.out.println("[ModAPI] Spawned NPC (#" + npcId + ") " + name + " at (" + x + ", " + y + ", " + z + ")");
+    public int spawnNPC(int npcId, String name, float x, float y, float z, String personality) {
+        return spawnNPC(npcId, name, x, y, z, personality, "steve");
+    }
+    
+    /**
+     * Spawns an NPC in the world with a specific skin.
+     *
+     * @param npcId       Unique NPC identifier (ignored, auto-generated)
+     * @param name        NPC display name
+     * @param x           Spawn X coordinate
+     * @param y           Spawn Y coordinate
+     * @param z           Spawn Z coordinate
+     * @param personality Personality descriptor for AI systems
+     * @param skinName    Player skin to use for rendering
+     * @return The actual NPC ID assigned by the manager
+     */
+    public int spawnNPC(int npcId, String name, float x, float y, float z, String personality, String skinName) {
+        try {
+            NPCManager npcManager = game.getNPCManager();
+            if (npcManager == null) {
+                System.err.println("[ModAPI] Cannot spawn NPC: NPCManager not initialized");
+                return -1;
+            }
+            
+            int actualId = npcManager.spawnNPC(name, x, y, z, personality, skinName);
+            
+            // Store in shared data for backward compatibility
+            Map<String, Object> npcData = new HashMap<>();
+            npcData.put("id", actualId);
+            npcData.put("name", name);
+            npcData.put("position", new float[]{x, y, z});
+            npcData.put("personality", personality);
+            npcData.put("skinName", skinName);
+            sharedData.put("npc_" + actualId, npcData);
+            
+            System.out.println("[ModAPI] Spawned NPC (#" + actualId + ") " + name + " at (" + x + ", " + y + ", " + z + ")");
+            return actualId;
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error spawning NPC: " + e.getMessage());
+            e.printStackTrace();
+            return -1;
+        }
     }
 
     /**
-     * Removes NPC metadata from the shared data map.
+     * Removes an NPC from the world.
      *
      * @param npcId Unique NPC identifier
      */
     public void despawnNPC(int npcId) {
-        sharedData.remove("npc_" + npcId);
-        System.out.println("[ModAPI] Despawned NPC (#" + npcId + ")");
+        try {
+            NPCManager npcManager = game.getNPCManager();
+            if (npcManager != null) {
+                npcManager.despawnNPC(npcId);
+            }
+            sharedData.remove("npc_" + npcId);
+            System.out.println("[ModAPI] Despawned NPC (#" + npcId + ")");
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error despawning NPC: " + e.getMessage());
+        }
     }
 
     /**
-     * Logs NPC dialogue so mods can provide conversational feedback.
+     * Makes an NPC say something in chat.
+     * Uses the NPC's name as the sender instead of a generic name.
      *
      * @param npcId   Unique NPC identifier
      * @param message Dialogue text spoken by the NPC
      */
     public void npcSay(int npcId, String message) {
-        System.out.println("[NPC " + npcId + "] " + message);
+        try {
+            NPCManager npcManager = game.getNPCManager();
+            if (npcManager != null) {
+                NPCEntity npc = npcManager.getNPC(npcId);
+                if (npc != null) {
+                    // Use NPC name in chat instead of generic sender
+                    var uiManager = game.getUIManager();
+                    if (uiManager != null) {
+                        var chatOverlay = uiManager.getChatOverlay();
+                        if (chatOverlay != null) {
+                            chatOverlay.enqueueMessage(npcId, npc.getName(), message, System.currentTimeMillis(), false);
+                        }
+                    }
+                    System.out.println("[NPC " + npc.getName() + "] " + message);
+                    return;
+                }
+            }
+            System.out.println("[NPC " + npcId + "] " + message);
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error in npcSay: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Sets the follow distance for an NPC.
+     *
+     * @param npcId NPC identifier
+     * @param distance Follow distance in blocks
+     */
+    public void setNPCFollowDistance(int npcId, float distance) {
+        try {
+            NPCManager npcManager = game.getNPCManager();
+            if (npcManager != null) {
+                NPCEntity npc = npcManager.getNPC(npcId);
+                if (npc != null) {
+                    npc.setFollowDistance(distance);
+                    System.out.println("[ModAPI] Set NPC #" + npcId + " follow distance to " + distance);
+                } else {
+                    System.err.println("[ModAPI] NPC #" + npcId + " not found");
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error setting NPC follow distance: " + e.getMessage());
+        }
+    }
+
+    public boolean npcGatherResource(int npcId, String resourceType, int quantity) {
+        try {
+            NPCManager npcManager = game.getNPCManager();
+            if (npcManager == null) {
+                System.err.println("[ModAPI] Cannot gather resource: NPC manager unavailable");
+                return false;
+            }
+
+            NPCEntity npc = npcManager.getNPC(npcId);
+            if (npc == null) {
+                System.err.println("[ModAPI] Cannot gather resource: NPC #" + npcId + " not found");
+                return false;
+            }
+
+            int searchRadius = 16;
+            if (game != null && game.getSettings() != null && game.getSettings().ai != null
+                && game.getSettings().ai.maxGatherDistance > 0) {
+                searchRadius = game.getSettings().ai.maxGatherDistance;
+            }
+
+            int safeQuantity = quantity > 0 ? quantity : 1;
+            npc.setCurrentTask(new NPCEntity.GatherTask(resourceType, safeQuantity, searchRadius));
+            return true;
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error gathering resource for NPC #" + npcId + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean npcMoveToPosition(int npcId, float x, float y, float z) {
+        try {
+            NPCManager npcManager = game.getNPCManager();
+            if (npcManager == null) {
+                System.err.println("[ModAPI] Cannot move NPC: NPC manager unavailable");
+                return false;
+            }
+
+            NPCEntity npc = npcManager.getNPC(npcId);
+            if (npc == null) {
+                System.err.println("[ModAPI] Cannot move NPC: NPC #" + npcId + " not found");
+                return false;
+            }
+
+            final Vector3f destination = new Vector3f(x, y, z);
+            npc.setCurrentTask(new NPCEntity.NPCTask(NPCEntity.TaskType.MOVE_TO) {
+                private final Vector3f targetPosition = new Vector3f(destination);
+                private boolean reached;
+
+                @Override
+                public boolean execute(com.poorcraft.world.World world, NPCEntity entity, float deltaTime) {
+                    entity.setTargetPosition(targetPosition);
+                    float distance = entity.getPosition().distance(targetPosition);
+                    if (distance <= 1.2f) {
+                        reached = true;
+                        return true;
+                    }
+                    return false;
+                }
+
+                @Override
+                public boolean isComplete() {
+                    return reached;
+                }
+            });
+            return true;
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error moving NPC #" + npcId + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean npcBreakBlock(int npcId, int x, int y, int z) {
+        try {
+            NPCManager npcManager = game.getNPCManager();
+            if (npcManager == null) {
+                System.err.println("[ModAPI] Cannot break block: NPC manager unavailable");
+                return false;
+            }
+
+            NPCEntity npc = npcManager.getNPC(npcId);
+            if (npc == null) {
+                System.err.println("[ModAPI] Cannot break block: NPC #" + npcId + " not found");
+                return false;
+            }
+
+            var world = game.getWorld();
+            if (world == null) {
+                System.err.println("[ModAPI] Cannot break block: world not loaded");
+                return false;
+            }
+
+            return npc.breakBlockAt(world, x, y, z);
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error breaking block for NPC #" + npcId + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    public double[] getNPCPosition(int npcId) {
+        try {
+            NPCManager npcManager = game.getNPCManager();
+            if (npcManager == null) {
+                System.err.println("[ModAPI] Cannot get NPC position: NPC manager unavailable");
+                return null;
+            }
+
+            NPCEntity npc = npcManager.getNPC(npcId);
+            if (npc == null) {
+                System.err.println("[ModAPI] Cannot get NPC position: NPC #" + npcId + " not found");
+                return null;
+            }
+
+            Vector3f pos = npc.getPosition();
+            return new double[] {pos.x, pos.y, pos.z};
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error getting position for NPC #" + npcId + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    public int[] findNearestBlock(int x, int y, int z, int blockTypeId, int searchRadius) {
+        try {
+            var world = game.getWorld();
+            if (world == null) {
+                System.err.println("[ModAPI] Cannot find block: world not loaded");
+                return null;
+            }
+
+            BlockType targetType = BlockType.fromId(blockTypeId);
+            if (targetType == null) {
+                System.err.println("[ModAPI] Cannot find block: invalid block type " + blockTypeId);
+                return null;
+            }
+
+            double bestDistance = Double.MAX_VALUE;
+            int[] best = null;
+
+            for (int dx = -searchRadius; dx <= searchRadius; dx++) {
+                for (int dy = -searchRadius; dy <= searchRadius; dy++) {
+                    for (int dz = -searchRadius; dz <= searchRadius; dz++) {
+                        int checkX = x + dx;
+                        int checkY = y + dy;
+                        int checkZ = z + dz;
+
+                        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                        if (distance > searchRadius || distance >= bestDistance) {
+                            continue;
+                        }
+
+                        if (world.getBlock(checkX, checkY, checkZ) == targetType) {
+                            bestDistance = distance;
+                            best = new int[] {checkX, checkY, checkZ};
+                        }
+                    }
+                }
+            }
+
+            return best;
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error finding nearest block: " + e.getMessage());
+            return null;
+        }
     }
     
     /**
@@ -681,6 +931,171 @@ public class ModAPI {
             return game.getWorld().getBiome((int)pos.x, (int)pos.z).toString();
         } catch (Exception e) {
             System.err.println("[ModAPI] Error getting current biome: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    // ========== HTTP API Methods ==========
+    
+    /**
+     * Makes an asynchronous HTTP request.
+     * The callback will be invoked on the main game thread when the response is received.
+     * 
+     * @param url URL to request
+     * @param method HTTP method ("GET" or "POST")
+     * @param jsonBody JSON body for POST requests (can be null for GET)
+     * @param callback Callback function to receive response body (null on error)
+     */
+    public void makeHttpRequest(String url, String method, String jsonBody, Consumer<String> callback) {
+        makeHttpRequest(url, method, jsonBody, null, callback);
+    }
+    
+    /**
+     * Makes an asynchronous HTTP request with custom headers.
+     * The callback will be invoked on the main game thread when the response is received.
+     * 
+     * @param url URL to request
+     * @param method HTTP method ("GET" or "POST")
+     * @param jsonBody JSON body for POST requests (can be null for GET)
+     * @param headers Custom HTTP headers (can be null)
+     * @param callback Callback function to receive response body (null on error)
+     */
+    public void makeHttpRequest(String url, String method, String jsonBody, Map<String, String> headers, Consumer<String> callback) {
+        if (url == null || method == null || callback == null) {
+            System.err.println("[ModAPI] Invalid HTTP request parameters");
+            if (callback != null) {
+                callback.accept(null);
+            }
+            return;
+        }
+        
+        try {
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(30));
+            
+            // Add custom headers
+            if (headers != null) {
+                for (Map.Entry<String, String> entry : headers.entrySet()) {
+                    requestBuilder.header(entry.getKey(), entry.getValue());
+                }
+            }
+            
+            if ("POST".equalsIgnoreCase(method) && jsonBody != null) {
+                requestBuilder.header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
+            } else {
+                requestBuilder.GET();
+            }
+            
+            HttpRequest request = requestBuilder.build();
+            
+            httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(HttpResponse::body)
+                .thenAccept(responseBody -> {
+                    // Post callback to main thread for thread safety
+                    game.postToMainThread(() -> callback.accept(responseBody));
+                })
+                .exceptionally(throwable -> {
+                    System.err.println("[ModAPI] HTTP request failed: " + throwable.getMessage());
+                    game.postToMainThread(() -> callback.accept(null));
+                    return null;
+                });
+                
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error making HTTP request: " + e.getMessage());
+            callback.accept(null);
+        }
+    }
+    
+    /**
+     * Makes an asynchronous HTTP POST request with JSON body from a Map.
+     * Safely encodes the body using Gson to prevent injection issues.
+     * The callback will be invoked on the main game thread when the response is received.
+     * 
+     * @param url URL to request
+     * @param body Map to encode as JSON body
+     * @param headers Custom HTTP headers (can be null)
+     * @param callback Callback function to receive response body (null on error)
+     */
+    public void httpPostJson(String url, Map<String, Object> body, Map<String, String> headers, Consumer<String> callback) {
+        if (body == null) {
+            System.err.println("[ModAPI] httpPostJson requires a non-null body");
+            if (callback != null) {
+                callback.accept(null);
+            }
+            return;
+        }
+        
+        try {
+            // Use Gson to safely encode JSON
+            String jsonBody = new Gson().toJson(body);
+            makeHttpRequest(url, "POST", jsonBody, headers, callback);
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error encoding JSON body: " + e.getMessage());
+            if (callback != null) {
+                callback.accept(null);
+            }
+        }
+    }
+    
+    /**
+     * Parses a JSON string into a Map for Lua consumption.
+     * 
+     * @param json JSON string to parse
+     * @return Map representation of JSON, or empty map on error
+     */
+    public Map<String, Object> parseJson(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return new HashMap<>();
+        }
+        
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = new Gson().fromJson(json, Map.class);
+            return result != null ? result : new HashMap<>();
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error parsing JSON: " + e.getMessage());
+            return new HashMap<>();
+        }
+    }
+    
+    /**
+     * Makes a synchronous HTTP request.
+     * WARNING: This blocks the game thread until the request completes!
+     * 
+     * @param url URL to request
+     * @param method HTTP method ("GET" or "POST")
+     * @param jsonBody JSON body for POST requests (can be null for GET)
+     * @return Response body, or null on error
+     */
+    public String makeHttpRequestSync(String url, String method, String jsonBody) {
+        if (url == null || method == null) {
+            System.err.println("[ModAPI] Invalid HTTP request parameters");
+            return null;
+        }
+        
+        System.out.println("[ModAPI] WARNING: Synchronous HTTP request will block the game thread!");
+        
+        try {
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(30));
+            
+            if ("POST".equalsIgnoreCase(method) && jsonBody != null) {
+                requestBuilder.header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
+            } else {
+                requestBuilder.GET();
+            }
+            
+            HttpRequest request = requestBuilder.build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            return response.body();
+            
+        } catch (Exception e) {
+            System.err.println("[ModAPI] Error making synchronous HTTP request: " + e.getMessage());
             return null;
         }
     }
