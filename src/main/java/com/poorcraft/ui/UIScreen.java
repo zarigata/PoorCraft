@@ -72,7 +72,15 @@ public abstract class UIScreen {
      * @param height New window height
      */
     public abstract void onResize(int width, int height);
-    
+
+    /**
+     * Lifecycle hook called when the screen is about to be hidden.
+     * Subclasses can override to release resources or persist state.
+     */
+    public void onClose() {
+        // Default no-op.
+    }
+
     /**
      * Renders all components on this screen.
      * Can be overridden to add custom background rendering.

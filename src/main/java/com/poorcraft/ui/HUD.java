@@ -2,6 +2,7 @@ package com.poorcraft.ui;
 
 import com.poorcraft.ai.AICompanionManager;
 import com.poorcraft.core.Game;
+import com.poorcraft.crafting.Recipe;
 import com.poorcraft.inventory.Inventory;
 import com.poorcraft.inventory.ItemStack;
 import com.poorcraft.render.BlockPreviewRenderer;
@@ -32,6 +33,11 @@ public class HUD extends UIScreen {
 
     private final Game game;  // Reference to game instance
     private boolean debugVisible;
+    private long lastCraftingCheckTime;
+    private int availableRecipeCount;
+    private boolean inventoryDirty;
+    private Inventory.ChangeListener inventoryListener;
+
     private final List<CompanionToast> companionToasts = new ArrayList<>();
     private BlockPreviewRenderer blockPreviewRenderer;
 
@@ -60,6 +66,84 @@ public class HUD extends UIScreen {
         super(windowWidth, windowHeight, scaleManager);
         this.game = (game instanceof Game) ? (Game) game : null;
         this.debugVisible = false;
+        this.lastCraftingCheckTime = 0L;
+        this.availableRecipeCount = 0;
+        this.inventoryDirty = true;
+        this.inventoryListener = null;
+    }
+
+    public void markInventoryDirty() {
+        this.inventoryDirty = true;
+    }
+
+    private void registerInventoryListener() {
+        if (game == null) {
+            return;
+        }
+        Inventory inventory = game.getInventory();
+        if (inventory == null) {
+            return;
+        }
+        if (inventoryListener == null) {
+            inventoryListener = inv -> markInventoryDirty();
+            inventory.addChangeListener(inventoryListener);
+        }
+    }
+
+    private void updateCraftingAvailability() {
+        if (game == null) {
+            availableRecipeCount = 0;
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        if (!inventoryDirty && now - lastCraftingCheckTime < 1000L) {
+            return;
+        }
+        lastCraftingCheckTime = now;
+
+        Inventory inventory = game.getInventory();
+        if (inventory == null) {
+            availableRecipeCount = 0;
+            return;
+        }
+
+        var registry = game.getRecipeRegistry();
+        if (registry == null) {
+            availableRecipeCount = 0;
+            return;
+        }
+
+        int count = 0;
+        for (Recipe recipe : registry.getAllRecipes()) {
+            if (recipe.canCraftFromInventory(inventory)) {
+                count++;
+            }
+        }
+        availableRecipeCount = count;
+        inventoryDirty = false;
+    }
+
+    private void drawCraftingIndicator(UIRenderer renderer, FontRenderer fontRenderer) {
+        if (availableRecipeCount <= 0) {
+            return;
+        }
+
+        float scale = scaleManager != null ? scaleManager.getEffectiveScale() : 1.0f;
+        float indicatorWidth = 96f * scale;
+        float indicatorHeight = 34f * scale;
+        float indicatorX = windowWidth / 2f + 220f * scale;
+        float indicatorY = windowHeight - indicatorHeight - 80f * scale;
+
+        renderer.drawRect(indicatorX, indicatorY, indicatorWidth, indicatorHeight, 0.08f, 0.18f, 0.25f, 0.72f);
+        renderer.drawRect(indicatorX, indicatorY, indicatorWidth, 2f * scale, 0.16f, 0.42f, 0.56f, 0.92f);
+
+        String text = "⚒ " + availableRecipeCount;
+        float textScale = getTextScale(fontRenderer) * 0.8f;
+        float textWidth = fontRenderer.getTextWidth(text) * textScale;
+        float textX = indicatorX + (indicatorWidth - textWidth) / 2f;
+        float textY = indicatorY + indicatorHeight / 2f + fontRenderer.getTextHeight() * textScale * 0.25f;
+        fontRenderer.drawText(text, textX, textY, textScale, 0.9f, 0.95f, 1.0f, 1.0f);
     }
 
     public void setBlockPreviewRenderer(BlockPreviewRenderer renderer) {
@@ -184,6 +268,7 @@ public class HUD extends UIScreen {
     @Override
     public void init() {
         ensureTexturesLoaded();
+        registerInventoryListener();
     }
     
     @Override
@@ -202,6 +287,9 @@ public class HUD extends UIScreen {
 
         // Draw health/armor/xp bars
         drawPlayerStats(renderer, fontRenderer);
+
+        updateCraftingAvailability();
+        drawCraftingIndicator(renderer, fontRenderer);
 
         // Draw AI companion status widget and notifications
         drawCompanionStatus(renderer, fontRenderer);

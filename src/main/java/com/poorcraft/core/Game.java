@@ -4,11 +4,13 @@ import com.poorcraft.ai.AICompanionManager;
 import com.poorcraft.camera.Camera;
 import com.poorcraft.config.ConfigManager;
 import com.poorcraft.config.Settings;
+import com.poorcraft.crafting.CraftingManager;
+import com.poorcraft.crafting.RecipeRegistry;
 import com.poorcraft.discord.DiscordRichPresenceManager;
 import com.poorcraft.input.InputHandler;
+import com.poorcraft.inventory.Inventory;
 import com.poorcraft.modding.LuaModContainer;
 import com.poorcraft.modding.LuaModLoader;
-import com.poorcraft.inventory.Inventory;
 import com.poorcraft.player.SkinManager;
 import com.poorcraft.render.BlurRenderer;
 import com.poorcraft.render.BlockHighlightRenderer;
@@ -74,6 +76,8 @@ public class Game {
     private DropManager dropManager;
     private NPCManager npcManager;
     private AICompanionManager aiCompanionManager;
+    private RecipeRegistry recipeRegistry;
+    private CraftingManager craftingManager;
     private LuaModLoader modLoader;
     private DiscordRichPresenceManager discordRPC;
     private SkinManager skinManager;
@@ -142,6 +146,8 @@ public class Game {
         this.dropManager = new DropManager();
         this.npcManager = new NPCManager();
         this.aiCompanionManager = null;
+        this.recipeRegistry = new RecipeRegistry();
+        this.craftingManager = new CraftingManager(this.recipeRegistry);
         this.miningSystem.setDropManager(this.dropManager);
         this.highlightRendererInitialized = false;
         this.selectedHotbarSlot = 0;
@@ -167,7 +173,15 @@ public class Game {
     public SkinManager getSkinManager() {
         return skinManager;
     }
-    
+
+    public RecipeRegistry getRecipeRegistry() {
+        return recipeRegistry;
+    }
+
+    public CraftingManager getCraftingManager() {
+        return craftingManager;
+    }
+
     public UIManager getUIManager() {
         return uiManager;
     }
@@ -271,7 +285,15 @@ public class Game {
         });
         
         System.out.println("[Game] UI Manager initialized");
-        
+
+        try {
+            int recipeCount = recipeRegistry.loadDefaultRecipes();
+            System.out.println("[Game] Loaded " + recipeCount + " crafting recipes");
+        } catch (Exception ex) {
+            System.err.println("[Game] Failed to load crafting recipes: " + ex.getMessage());
+            ex.printStackTrace();
+        }
+
         // Initialize mod loader to enable Lua mods
         try {
             modLoader = new LuaModLoader(this);

@@ -3,6 +3,8 @@ package com.poorcraft.inventory;
 import com.poorcraft.world.block.BlockType;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Represents the player's 16x16 inventory grid.
@@ -14,9 +16,11 @@ public class Inventory {
     public static final int SLOT_COUNT = WIDTH * HEIGHT;
 
     private final ItemStack[] slots;
+    private final List<ChangeListener> changeListeners;
 
     public Inventory() {
         this.slots = new ItemStack[SLOT_COUNT];
+        this.changeListeners = new CopyOnWriteArrayList<>();
     }
 
     public ItemStack getSlot(int index) {
@@ -34,7 +38,11 @@ public class Inventory {
         if (index < 0 || index >= SLOT_COUNT) {
             return;
         }
+        ItemStack previous = slots[index];
         slots[index] = stack;
+        if (previous != stack) {
+            notifyChanged();
+        }
     }
 
     public void setSlot(int row, int column, ItemStack stack) {
@@ -54,12 +62,17 @@ public class Inventory {
         }
 
         int remaining = amount;
+        boolean changed = false;
 
         // First, try to top off existing stacks of the same block type.
         for (int i = 0; i < SLOT_COUNT && remaining > 0; i++) {
             ItemStack stack = slots[i];
             if (stack != null && stack.getBlockType() == blockType && stack.getCount() < ItemStack.MAX_STACK_SIZE) {
+                int before = stack.getCount();
                 remaining = stack.add(remaining);
+                if (stack.getCount() != before) {
+                    changed = true;
+                }
             }
         }
 
@@ -69,9 +82,13 @@ public class Inventory {
                 int stackAmount = Math.min(ItemStack.MAX_STACK_SIZE, remaining);
                 slots[i] = new ItemStack(blockType, stackAmount);
                 remaining -= stackAmount;
+                changed = true;
             }
         }
 
+        if (changed) {
+            notifyChanged();
+        }
         return remaining;
     }
 
@@ -90,6 +107,7 @@ public class Inventory {
         if (stack.isEmpty()) {
             slots[index] = null;
         }
+        notifyChanged();
         return true;
     }
 
@@ -97,9 +115,30 @@ public class Inventory {
         return Arrays.copyOf(slots, slots.length);
     }
 
+    public void addChangeListener(ChangeListener listener) {
+        if (listener != null) {
+            changeListeners.add(listener);
+        }
+    }
+
+    public void removeChangeListener(ChangeListener listener) {
+        changeListeners.remove(listener);
+    }
+
+    private void notifyChanged() {
+        for (ChangeListener listener : changeListeners) {
+            listener.onInventoryChanged(this);
+        }
+    }
+
     private int toIndex(int row, int column) {
         int clampedRow = Math.max(0, Math.min(HEIGHT - 1, row));
         int clampedColumn = Math.max(0, Math.min(WIDTH - 1, column));
         return clampedRow * WIDTH + clampedColumn;
+    }
+
+    @FunctionalInterface
+    public interface ChangeListener {
+        void onInventoryChanged(Inventory inventory);
     }
 }

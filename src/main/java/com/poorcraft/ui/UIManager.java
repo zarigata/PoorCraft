@@ -82,6 +82,76 @@ public class UIManager {
         this.windowHandle = 0;
     }
 
+    /**
+     * Cleans up UI resources and releases screen assets.
+     */
+    public void cleanup() {
+        // Disconnect from server
+        disconnectFromServer();
+
+        if (screens != null) {
+            for (UIScreen screen : screens.values()) {
+                if (screen == null) {
+                    continue;
+                }
+                try {
+                    var cleanupMethod = screen.getClass().getMethod("cleanup");
+                    cleanupMethod.invoke(screen);
+                } catch (NoSuchMethodException ignored) {
+                    // Screen does not expose cleanup hook
+                } catch (Exception e) {
+                    System.err.println("[UIManager] Failed to cleanup screen "
+                        + screen.getClass().getSimpleName() + ": " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        if (hudScreen != null) {
+            try {
+                var cleanupMethod = hudScreen.getClass().getMethod("cleanup");
+                cleanupMethod.invoke(hudScreen);
+            } catch (NoSuchMethodException ignored) {
+                // HUD does not expose cleanup hook
+            } catch (Exception e) {
+                System.err.println("[UIManager] Failed to cleanup HUD screen: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        if (chatOverlay != null) {
+            try {
+                var cleanupMethod = chatOverlay.getClass().getMethod("cleanup");
+                cleanupMethod.invoke(chatOverlay);
+            } catch (NoSuchMethodException ignored) {
+                // Overlay does not expose cleanup hook
+            } catch (Exception e) {
+                System.err.println("[UIManager] Failed to cleanup ChatOverlay: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        if (consoleOverlay != null) {
+            try {
+                var cleanupMethod = consoleOverlay.getClass().getMethod("cleanup");
+                cleanupMethod.invoke(consoleOverlay);
+            } catch (NoSuchMethodException ignored) {
+                // Overlay does not expose cleanup hook
+            } catch (Exception e) {
+                System.err.println("[UIManager] Failed to cleanup ConsoleOverlay: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        if (uiRenderer != null) {
+            uiRenderer.cleanup();
+        }
+
+        if (fontRenderer != null) {
+            fontRenderer.cleanup();
+        }
+    }
+
     public void setBlockPreviewRenderer(BlockPreviewRenderer renderer) {
         this.blockPreviewRenderer = renderer;
 
@@ -222,32 +292,87 @@ public class UIManager {
      */
     public void setState(GameState newState) {
         System.out.println("[UIManager] State transition: " + currentState + " -> " + newState);
-        
-        previousState = currentState;
-        currentState = newState;
+
+        GameState fromState = currentState;
+        GameState requestedState = newState;
+        GameState targetState = requestedState;
 
         if (resizePending) {
             processResizeDebounce();
         }
 
-        // Get screen for new state
-        UIScreen screen = screens.get(newState);
-        if (screen != null) {
-            screen.init();
-            float[] mousePos = getCurrentMousePosition();
-            if (mousePos != null) {
-                screen.setLastMousePosition(mousePos[0], mousePos[1]);
+        if (fromState != null) {
+            UIScreen previousScreen = screens.get(fromState);
+            if (previousScreen != null) {
+                try {
+                    previousScreen.onClose();
+                } catch (Exception closeError) {
+                    System.err.println("[UIManager] ERROR: Failed to close screen for state " + fromState + ": " + closeError.getMessage());
+                    closeError.printStackTrace();
+                }
             }
         }
-        
+
+        UIScreen screen = screens.get(targetState);
+        if (screen == null) {
+            System.err.println("[UIManager] ERROR: No screen registered for state " + targetState);
+            targetState = (requestedState == GameState.AI_COMPANION_SETTINGS)
+                ? GameState.SETTINGS_MENU
+                : GameState.MAIN_MENU;
+            System.err.println("[UIManager] Falling back to " + targetState + " due to missing screen.");
+
+            screen = screens.get(targetState);
+            if (screen == null) {
+                System.err.println("[UIManager] ERROR: Fallback screen " + targetState + " is not registered. Aborting state change.");
+                return;
+            }
+        }
+
+        UIScreen activeScreen = screen;
+        try {
+            activeScreen.init();
+        } catch (Exception initError) {
+            System.err.println("[UIManager] ERROR: Failed to initialize screen for state " + targetState + ": " + initError.getMessage());
+            initError.printStackTrace();
+
+            if (targetState != GameState.MAIN_MENU) {
+                UIScreen fallbackScreen = screens.get(GameState.MAIN_MENU);
+                if (fallbackScreen == null) {
+                    System.err.println("[UIManager] ERROR: Fallback MAIN_MENU screen is not registered. Aborting state change.");
+                    return;
+                }
+
+                try {
+                    fallbackScreen.init();
+                    targetState = GameState.MAIN_MENU;
+                    activeScreen = fallbackScreen;
+                    System.err.println("[UIManager] Recovered by initializing MAIN_MENU after failure.");
+                } catch (Exception fallbackError) {
+                    System.err.println("[UIManager] ERROR: Failed to initialize fallback MAIN_MENU screen: " + fallbackError.getMessage());
+                    fallbackError.printStackTrace();
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+
+        float[] mousePos = getCurrentMousePosition();
+        if (mousePos != null) {
+            activeScreen.setLastMousePosition(mousePos[0], mousePos[1]);
+        }
+
+        previousState = fromState;
+        currentState = targetState;
+
         // Handle cursor grabbing based on state
         // IN_GAME captures mouse, all menu states release it
         if (inputHandler != null && windowHandle != 0) {
             try {
                 var inputHandlerClass = inputHandler.getClass();
                 var method = inputHandlerClass.getMethod("setCursorGrabbed", long.class, boolean.class);
-                
-                if (newState.capturesMouse()) {
+
+                if (targetState.capturesMouse()) {
                     // Grab cursor for in-game state
                     method.invoke(inputHandler, windowHandle, true);
                     System.out.println("[UIManager] Cursor grabbed for gameplay");
@@ -528,6 +653,8 @@ public class UIManager {
                 setState(GameState.IN_GAME);
             } else if (currentState == GameState.INVENTORY) {
                 setState(GameState.IN_GAME);
+            } else if (currentState == GameState.AI_COMPANION_SETTINGS) {
+                setState(GameState.SETTINGS_MENU);
             } else if (currentState == GameState.SETTINGS_MENU) {
                 // Return to previous state
                 if (previousState != null) {
@@ -1149,23 +1276,5 @@ public class UIManager {
      */
     public FontRenderer getFontRenderer() {
         return fontRenderer;
-    }
-    
-    /**
-     * Cleans up UI resources.
-     */
-    public void cleanup() {
-        System.out.println("[UIManager] Cleaning up UI system");
-        
-        // Disconnect from server
-        disconnectFromServer();
-        
-        if (uiRenderer != null) {
-            uiRenderer.cleanup();
-        }
-        
-        if (fontRenderer != null) {
-            fontRenderer.cleanup();
-        }
     }
 }

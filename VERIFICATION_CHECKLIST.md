@@ -31,6 +31,35 @@ Use this checklist to validate the native AI Companion system after the Lua mod 
 - [ ] Confirm reasoning tags (`<reasoning>`, `[reasoning]`, `Reasoning:` lines) are removed from player-facing replies
 - [ ] Verify sanitized content remains multiline when needed and does not trim legitimate text
 
+### ✅ AI Companion Settings Screen
+
+**Implementation**
+- [ ] MenuButton components replace legacy Button widgets on AI Companion screen
+- [ ] MenuBackground renders behind the screen with animated tiles
+- [ ] Panel layout uses LayoutUtils helpers for width/height/padding
+- [ ] Drop shadow and outset panel draw around the AI settings panel
+- [ ] Cyan inner border rendered via bordered rect
+- [ ] Title styled with cyan tint and text shadow
+- [ ] Navigation callbacks wrap state transitions with error handling/fallback
+- [ ] Null Game references in Test action log warnings instead of throwing
+- [ ] layoutDirty flag drives resize recalculation (no immediate rebuild on onResize)
+
+**Test**
+1. Open Settings → AI tab → Configure AI Companion
+2. Confirm tiled background, cyan title, and turquoise MenuButtons match other menus
+3. Click **Cancel** – returns to Settings menu without hang and discards edits
+4. Click **Save** after edits – persists values and returns to Settings menu without hang
+5. Click **Test** when AI enabled – logs result, stays responsive; with Game null logs warning
+6. Resize window between common resolutions – panel stays centered, scroll container reflows, buttons remain accessible
+7. Scroll entire list – all sections reachable, scrollbar behaves smoothly
+
+**Success Criteria**
+- ✅ Visual style consistent with Main/Pause/Settings screens
+- ✅ MenuButton styling and background present
+- ✅ Navigation actions reliable with fallback logging
+- ✅ Test button handles missing game gracefully
+- ✅ Resize + scrolling maintain usability without recreating components each frame
+
 ### 3. Action Parsing & Execution
 - [ ] Send "Companion follow" and confirm NPC begins following without false triggers from words like "unfollowable"
 - [ ] Send "Please stop now" and ensure NPC halts following

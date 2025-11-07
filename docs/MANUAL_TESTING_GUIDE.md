@@ -83,6 +83,44 @@ scripts\test-and-play.bat --skip-tests
 - [ ] **Chunk neighbor updates** – Build a 3×3 column of blocks and break the center block. Confirm adjacent chunks update lighting/geometry without seams or delayed updates.
 - [ ] **Block break overlay** – Begin mining a block and observe the highlight overlay. Verify both translucent fill and outline render without flicker or depth artifacts when moving the camera.
 
+### AI Companion Settings Screen
+
+1. **Visual Style Consistency**
+   - Open the settings menu (ESC) and switch to the AI tab.
+   - Click **Configure AI Companion…**.
+   - Confirm the screen shows the textured menu background, cyan-tinted title with shadow, and turquoise MenuButton controls.
+   - Ensure the central panel has a drop shadow, outset edges, and cyan border accents like the Pause screen.
+
+2. **Navigation – Cancel Button**
+   - Modify one or two fields (e.g., toggle “Enable AI Companion”).
+   - Click **Cancel**.
+   - Expect an immediate return to the main settings menu with previous values intact and no freeze.
+
+3. **Navigation – Save Button**
+   - Re-enter the AI Companion settings screen.
+   - Change companion name, skin, and provider, then click **Save**.
+   - Confirm the settings menu appears instantly and reopening the AI screen reflects saved values.
+
+4. **Test Connection Button**
+   - Enable the AI companion and select a configured provider.
+   - Use the **Test** button and watch for console feedback without UI hangs.
+   - With AI disabled or the game context missing, ensure the screen logs the appropriate warning and remains responsive.
+
+5. **Window Resize**
+   - While on the AI Companion settings screen, resize the game window between typical resolutions (e.g., 1280×720 → 1920×1080).
+   - Verify the panel remains centered, scroll content resizes, and all buttons stay visible/interactive.
+
+6. **Scroll Container**
+   - Scroll through all configuration sections.
+   - Ensure every option is reachable, the scrollbar behaves smoothly, and there are no overlapping components.
+
+> **Success Criteria:** Consistent visual style with other menus, reliable navigation (Save/Cancel/Test), graceful handling of missing game context, correctly scaling layout, and functional scrolling.
+
+### AI Companion System
+
+1. Launch the game and load a test world with AI enabled.
+- [ ] Verify the AI companion spawns near the player and follows commands.
+
 ### Inventory System
 - [ ] Inventory opens with E key
 - [ ] Hotbar displays correctly

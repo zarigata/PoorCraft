@@ -16,6 +16,7 @@ import java.util.Map;
 public class AICompanionScreen extends UIScreen {
 
     private static final List<String> PROVIDERS = Arrays.asList("ollama", "gemini", "openrouter");
+    private static final float PANEL_OPACITY = 0.85f;
 
     private final UIManager uiManager;
     private final ConfigManager configManager;
@@ -23,6 +24,14 @@ public class AICompanionScreen extends UIScreen {
 
     private Settings.AISettings workingSettings;
     private ScrollContainer scrollContainer;
+    private MenuBackground background;
+
+    private float panelX;
+    private float panelY;
+    private float panelWidth;
+    private float panelHeight;
+    private float contentPadding;
+    private boolean layoutDirty;
 
     private Checkbox aiEnabledCheckbox;
     private Dropdown providerDropdown;
@@ -48,11 +57,14 @@ public class AICompanionScreen extends UIScreen {
         this.settings = settings;
         this.apiKeyFields = new HashMap<>();
         this.modelFields = new HashMap<>();
+        this.background = new MenuBackground();
+        this.layoutDirty = true;
     }
 
     @Override
     public void init() {
         ensureWorkingSettings();
+        layoutDirty = true;
         rebuildLayout();
     }
 
@@ -64,20 +76,49 @@ public class AICompanionScreen extends UIScreen {
         clearComponents();
         scrollContainer = null;
         buildLayout();
+        layoutDirty = false;
     }
 
     private void buildLayout() {
-        float centerX = windowWidth / 2.0f;
+        float uiScale = settings != null && settings.graphics != null ? settings.graphics.uiScale : 1.0f;
+        float effectiveScale = scaleManager != null ? scaleManager.getEffectiveScale() : uiScale;
 
-        Label titleLabel = new Label(centerX, scaleDimension(32f), "AI Companion Settings", 1.0f, 1.0f, 1.0f, 1.0f);
+        panelWidth = scaleManager != null ? LayoutUtils.getScaledPanelWidth(scaleManager)
+            : LayoutUtils.getMinecraftPanelWidth(windowWidth, uiScale);
+        panelHeight = scaleManager != null ? LayoutUtils.getScaledPanelHeight(scaleManager)
+            : LayoutUtils.getMinecraftPanelHeight(windowHeight, uiScale);
+
+        float horizontalMargin = scaleManager != null
+            ? scaleManager.scaleDimension(120f)
+            : 120f * effectiveScale;
+        float verticalMargin = scaleManager != null
+            ? scaleManager.scaleDimension(140f)
+            : 140f * effectiveScale;
+        float minWidth = 340f * effectiveScale;
+        float minHeight = 320f * effectiveScale;
+        float maxWidth = Math.max(minWidth, windowWidth - horizontalMargin);
+        float maxHeight = Math.max(minHeight, windowHeight - verticalMargin);
+        panelWidth = LayoutUtils.clamp(panelWidth, minWidth, maxWidth);
+        panelHeight = LayoutUtils.clamp(panelHeight, minHeight, maxHeight);
+
+        panelX = LayoutUtils.centerHorizontally(windowWidth, panelWidth);
+        panelY = LayoutUtils.centerVertically(windowHeight, panelHeight);
+        contentPadding = scaleManager != null ? LayoutUtils.getScaledPadding(scaleManager)
+            : LayoutUtils.getMinecraftPanelPadding(panelWidth);
+
+        float titleY = panelY + scaleDimension(28f);
+        Label titleLabel = new Label(panelX + panelWidth / 2f, titleY,
+            "AI COMPANION SETTINGS", 0.02f, 0.96f, 0.96f, 1.0f);
         titleLabel.setCentered(true);
-        titleLabel.setScale(scaleManager != null ? scaleManager.getEffectiveScale() : 1.0f);
+        float titleScale = LayoutUtils.MINECRAFT_TITLE_SCALE * (scaleManager != null ? scaleManager.getEffectiveScale() : uiScale) * 0.55f;
+        titleLabel.setScale(titleScale);
+        titleLabel.setUseTextShadow(true);
         addComponent(titleLabel);
 
-        float containerWidth = Math.min(scaleDimension(600f), windowWidth - scaleDimension(80f));
-        float containerX = centerX - containerWidth / 2f;
-        float containerY = scaleDimension(90f);
-        float containerHeight = windowHeight - containerY - scaleDimension(150f);
+        float containerWidth = panelWidth - (contentPadding * 2f);
+        float containerX = panelX + contentPadding;
+        float containerY = titleY + scaleDimension(48f);
+        float containerHeight = panelHeight - (containerY - panelY) - (contentPadding * 1.2f);
 
         scrollContainer = new ScrollContainer(
             containerX,
@@ -98,18 +139,22 @@ public class AICompanionScreen extends UIScreen {
 
         scrollContainer.requestLayout();
 
-        float buttonWidth = scaleDimension(130f);
-        float buttonHeight = scaleDimension(42f);
-        float buttonSpacing = scaleDimension(14f);
-        float buttonRowY = windowHeight - scaleDimension(60f);
+        float buttonWidth = scaleManager != null ? LayoutUtils.getScaledButtonWidth(scaleManager)
+            : LayoutUtils.getMinecraftButtonWidth(windowWidth, uiScale);
+        float buttonHeight = scaleManager != null ? LayoutUtils.getScaledButtonHeight(scaleManager)
+            : LayoutUtils.getMinecraftButtonHeight(windowHeight, uiScale);
+        float buttonSpacing = LayoutUtils.getMinecraftButtonSpacing(buttonHeight);
+        float buttonRowY = panelY + panelHeight - contentPadding - buttonHeight;
+        float buttonRowWidth = (buttonWidth * 3f) + (buttonSpacing * 2f);
+        float buttonStartX = panelX + (panelWidth - buttonRowWidth) / 2f;
 
-        Button saveButton = new Button(centerX - buttonWidth - buttonSpacing, buttonRowY, buttonWidth, buttonHeight, "Save", this::onSave);
+        MenuButton saveButton = new MenuButton(buttonStartX, buttonRowY, buttonWidth, buttonHeight, "Save", this::onSave);
         addComponent(saveButton);
 
-        Button cancelButton = new Button(centerX, buttonRowY, buttonWidth, buttonHeight, "Cancel", this::onCancel);
+        MenuButton cancelButton = new MenuButton(buttonStartX + buttonWidth + buttonSpacing, buttonRowY, buttonWidth, buttonHeight, "Cancel", this::onCancel);
         addComponent(cancelButton);
 
-        Button testButton = new Button(centerX + buttonWidth + buttonSpacing, buttonRowY, buttonWidth, buttonHeight, "Test", this::onTestConnection);
+        MenuButton testButton = new MenuButton(buttonStartX + (buttonWidth + buttonSpacing) * 2f, buttonRowY, buttonWidth, buttonHeight, "Test", this::onTestConnection);
         addComponent(testButton);
     }
 
@@ -124,10 +169,11 @@ public class AICompanionScreen extends UIScreen {
         if (selectedIndex < 0) {
             selectedIndex = 0;
         }
+        float dropdownWidth = scrollContainer.getWidth() - (x - scrollContainer.getX());
         providerDropdown = new Dropdown(
             x,
             currentY,
-            scrollContainer.getWidth(),
+            dropdownWidth,
             scaleDimension(36f),
             PROVIDERS,
             selectedIndex,
@@ -264,12 +310,17 @@ public class AICompanionScreen extends UIScreen {
     private void onSave() {
         applyFieldValuesToWorkingSettings();
         settings.ai = cloneAISettings(workingSettings);
-        configManager.saveSettings(settings);
-        uiManager.setState(GameState.SETTINGS_MENU);
+        try {
+            configManager.saveSettings(settings);
+        } catch (Exception e) {
+            System.err.println("[AICompanionScreen] Failed to save settings: " + e.getMessage());
+            e.printStackTrace();
+        }
+        safeSetState(GameState.SETTINGS_MENU, "save AI companion settings");
     }
 
     private void onCancel() {
-        uiManager.setState(GameState.SETTINGS_MENU);
+        safeSetState(GameState.SETTINGS_MENU, "cancel AI companion configuration");
     }
 
     private void onTestConnection() {
@@ -282,7 +333,7 @@ public class AICompanionScreen extends UIScreen {
 
         Game game = uiManager.getGame();
         if (game == null) {
-            System.out.println("[AI] Game instance unavailable; cannot test connection.");
+            System.out.println("[AI] Cannot test connection - game not initialized.");
             return;
         }
 
@@ -448,6 +499,56 @@ public class AICompanionScreen extends UIScreen {
         this.windowWidth = width;
         this.windowHeight = height;
         ensureWorkingSettings();
-        rebuildLayout();
+        layoutDirty = true;
+    }
+
+    @Override
+    public void update(float deltaTime) {
+        if (layoutDirty) {
+            rebuildLayout();
+        }
+        if (background != null) {
+            background.update(deltaTime);
+        }
+        super.update(deltaTime);
+    }
+
+    @Override
+    public void render(UIRenderer renderer, FontRenderer fontRenderer) {
+        if (background != null) {
+            background.render(renderer, windowWidth, windowHeight);
+        } else {
+            renderer.drawRect(0f, 0f, windowWidth, windowHeight, 0.1f, 0.1f, 0.15f, 1.0f);
+        }
+
+        renderer.drawDropShadow(panelX, panelY, panelWidth, panelHeight, 8f, 0.5f);
+        renderer.drawOutsetPanel(panelX, panelY, panelWidth, panelHeight,
+            0.10f, 0.08f, 0.14f, PANEL_OPACITY);
+        renderer.drawBorderedRect(panelX + 2f, panelY + 2f, panelWidth - 4f, panelHeight - 4f, 2f,
+            new float[]{0f, 0f, 0f, 0f}, new float[]{0.0f, 0.95f, 0.95f, 0.4f});
+
+        super.render(renderer, fontRenderer);
+    }
+
+    public void cleanup() {
+        if (background != null) {
+            background.cleanup();
+        }
+    }
+
+    private void safeSetState(GameState targetState, String actionDescription) {
+        try {
+            uiManager.setState(targetState);
+        } catch (Exception primaryError) {
+            System.err.println("[AICompanionScreen] Failed to " + actionDescription + ": " + primaryError.getMessage());
+            primaryError.printStackTrace();
+            try {
+                uiManager.setState(GameState.MAIN_MENU);
+                System.err.println("[AICompanionScreen] Recovered by returning to main menu.");
+            } catch (Exception fallbackError) {
+                System.err.println("[AICompanionScreen] Fallback to main menu also failed: " + fallbackError.getMessage());
+                fallbackError.printStackTrace();
+            }
+        }
     }
 }

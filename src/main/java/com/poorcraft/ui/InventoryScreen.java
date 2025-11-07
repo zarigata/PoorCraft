@@ -1,13 +1,19 @@
 package com.poorcraft.ui;
 
+import com.poorcraft.config.Settings;
 import com.poorcraft.core.Game;
+import com.poorcraft.crafting.CraftingManager;
 import com.poorcraft.inventory.Inventory;
 import com.poorcraft.inventory.ItemStack;
 import com.poorcraft.render.BlockPreviewRenderer;
 import com.poorcraft.world.block.BlockType;
 
+import org.lwjgl.glfw.GLFW;
+
+
 /**
- * Overlay screen for managing the player's 16x16 inventory grid.
+ * Overlay screen for managing the player's 16x16 inventory grid. Crafting interactions are handled by
+ * {@link CraftingScreen}; this screen focuses solely on inventory management.
  */
 public class InventoryScreen extends UIScreen {
 
@@ -24,10 +30,9 @@ public class InventoryScreen extends UIScreen {
     private float gridWidth;
     private float gridHeight;
 
-    private int hoveredRow = -1;
-    private int hoveredColumn = -1;
-    private int selectedRow;
-    private int selectedColumn;
+    private int hoveredIndex = -1;
+    private int selectedIndex;
+    private ItemStack cursorStack;
     private BlockPreviewRenderer blockPreviewRenderer;
 
     public InventoryScreen(int windowWidth, int windowHeight, UIManager uiManager, UIScaleManager scaleManager) {
@@ -35,8 +40,8 @@ public class InventoryScreen extends UIScreen {
         this.uiManager = uiManager;
         this.game = resolveGameReference();
         this.inventory = game != null ? game.getInventory() : null;
-        this.selectedRow = Inventory.HEIGHT - 1;
-        this.selectedColumn = 0;
+        this.selectedIndex = Inventory.SLOT_COUNT - Inventory.WIDTH; // default to first hotbar slot
+        this.cursorStack = null;
     }
 
     @Override
@@ -44,8 +49,11 @@ public class InventoryScreen extends UIScreen {
         this.game = resolveGameReference();
         this.inventory = game != null ? game.getInventory() : null;
         if (game != null) {
-            selectedColumn = game.getSelectedHotbarSlot();
-            selectedRow = Inventory.HEIGHT - 1;
+            selectedIndex = Inventory.SLOT_COUNT - Inventory.WIDTH;
+            CraftingManager craftingManager = game.getCraftingManager();
+            if (craftingManager != null) {
+                craftingManager.clearCraftingGrid();
+            }
         }
         recalculateLayout();
     }
@@ -97,11 +105,9 @@ public class InventoryScreen extends UIScreen {
     public void onMouseMove(float mouseX, float mouseY) {
         SlotPosition position = findSlotAt(mouseX, mouseY);
         if (position != null) {
-            hoveredRow = position.row;
-            hoveredColumn = position.column;
+            hoveredIndex = position.index;
         } else {
-            hoveredRow = -1;
-            hoveredColumn = -1;
+            hoveredIndex = -1;
         }
     }
 
@@ -112,10 +118,9 @@ public class InventoryScreen extends UIScreen {
         }
         SlotPosition position = findSlotAt(mouseX, mouseY);
         if (position != null) {
-            selectedRow = position.row;
-            selectedColumn = position.column;
-            if (game != null && position.row == Inventory.HEIGHT - 1) {
-                game.selectHotbarSlot(position.column);
+            selectedIndex = position.index;
+            if (game != null && position.index >= Inventory.SLOT_COUNT - Inventory.WIDTH) {
+                game.selectHotbarSlot(position.index - (Inventory.SLOT_COUNT - Inventory.WIDTH));
             }
         }
     }
@@ -128,8 +133,8 @@ public class InventoryScreen extends UIScreen {
                 float cellY = gridY + row * (slotSize + slotSpacing);
 
                 boolean isHotbarRow = row == Inventory.HEIGHT - 1;
-                boolean isSelected = row == selectedRow && column == selectedColumn;
-                boolean isHovered = row == hoveredRow && column == hoveredColumn;
+                boolean isSelected = row * Inventory.WIDTH + column == selectedIndex;
+                boolean isHovered = row * Inventory.WIDTH + column == hoveredIndex;
                 boolean isHotbarSelected = isHotbarRow && game != null && column == game.getSelectedHotbarSlot();
 
                 float r = 0.15f;
@@ -206,7 +211,7 @@ public class InventoryScreen extends UIScreen {
         float infoAreaHeight = scaleDimension(80f);
         renderer.drawRect(panelX + scaleDimension(12f), infoY + scaleDimension(10f), panelWidth - scaleDimension(24f), infoAreaHeight - scaleDimension(20f), 0.1f, 0.1f, 0.14f, 0.8f);
 
-        ItemStack selectedStack = inventory != null ? inventory.getSlot(selectedRow, selectedColumn) : null;
+        ItemStack selectedStack = inventory != null ? inventory.getSlot(selectedIndex / Inventory.WIDTH, selectedIndex % Inventory.WIDTH) : null;
         String labelText;
         String countText;
         if (selectedStack != null && !selectedStack.isEmpty()) {
@@ -227,7 +232,7 @@ public class InventoryScreen extends UIScreen {
     }
 
     private void drawInstructions(FontRenderer fontRenderer, float panelX, float textY, float panelWidth) {
-        String instructions = "Press E or Esc to close • Click a hotbar slot to equip";
+        String instructions = getCraftingInstructionText();
         float textScale = getTextScale(fontRenderer);
         float instrScale = 0.8f * textScale;
         float textWidth = fontRenderer.getTextWidth(instructions) * instrScale;
@@ -245,7 +250,7 @@ public class InventoryScreen extends UIScreen {
             for (int column = 0; column < Inventory.WIDTH; column++) {
                 float cellX = gridX + column * (slotSize + slotSpacing);
                 if (mouseX >= cellX && mouseX <= cellX + slotSize) {
-                    return new SlotPosition(row, column);
+                    return new SlotPosition(row * Inventory.WIDTH + column);
                 }
             }
         }
@@ -336,16 +341,45 @@ public class InventoryScreen extends UIScreen {
     }
 
     private static final class SlotPosition {
-        final int row;
-        final int column;
+        final int index;
 
-        SlotPosition(int row, int column) {
-            this.row = row;
-            this.column = column;
+        SlotPosition(int index) {
+            this.index = index;
         }
     }
 
     public void setBlockPreviewRenderer(BlockPreviewRenderer renderer) {
         this.blockPreviewRenderer = renderer;
+    }
+
+    private String getCraftingInstructionText() {
+        int craftingKey = getCraftingKeyCode();
+        String keyName = formatKeyName(craftingKey, "C");
+        return "Press " + keyName + " to open crafting • Press E or Esc to close";
+    }
+
+    private int getCraftingKeyCode() {
+        Settings settings = uiManager != null ? uiManager.getSettings() : null;
+        if (settings != null && settings.controls != null) {
+            return settings.controls.getKeybind("crafting", GLFW.GLFW_KEY_C);
+        }
+        return GLFW.GLFW_KEY_C;
+    }
+
+    private String formatKeyName(int keyCode, String fallback) {
+        String name = GLFW.glfwGetKeyName(keyCode, GLFW.glfwGetKeyScancode(keyCode));
+        if (name == null || name.isBlank()) {
+            switch (keyCode) {
+                case GLFW.GLFW_KEY_ESCAPE:
+                    return "Esc";
+                case GLFW.GLFW_KEY_ENTER:
+                    return "Enter";
+                case GLFW.GLFW_KEY_TAB:
+                    return "Tab";
+                default:
+                    return fallback;
+            }
+        }
+        return name.toUpperCase();
     }
 }

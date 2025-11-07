@@ -87,6 +87,11 @@ public enum GameState {
     INVENTORY,
 
     /**
+     * Crafting screen for managing the 2x2 crafting grid outside the inventory UI.
+     */
+    CRAFTING,
+
+    /**
      * Skin manager screen for selecting and importing player skins.
      */
     SKIN_MANAGER,
@@ -102,7 +107,7 @@ public enum GameState {
      * @return True if state is IN_GAME or PAUSED
      */
     public boolean isInGame() {
-        return this == IN_GAME || this == PAUSED || this == INVENTORY;
+        return this == IN_GAME || this == PAUSED || this == INVENTORY || this == CRAFTING;
     }
     
     /**
@@ -111,7 +116,7 @@ public enum GameState {
      * @return True if state needs an active world
      */
     public boolean requiresWorldLoaded() {
-        return this == IN_GAME || this == PAUSED || this == INVENTORY;
+        return this == IN_GAME || this == PAUSED || this == INVENTORY || this == CRAFTING;
     }
     
     /**
