@@ -81,8 +81,12 @@ function mod.init()
         api.log("Real-Time Sync: Debug logging enabled")
     end
 
-    local sharedState = api.get_shared_data("realtime_sync_state") or {}
-    sharedState.lastSync = os.time()
+    -- Initialize shared state for cross-mod communication
+    local sharedState = api.get_shared_data("realtime_sync_state")
+    if sharedState == nil then
+        sharedState = {}
+    end
+    sharedState.lastSync = api.get_real_time()
     api.set_shared_data("realtime_sync_state", sharedState)
 
     api.register_event("on_block_change", function(event)

@@ -104,7 +104,7 @@ public class FeatureGenerator {
                     case PLAINS -> {
                         plainsPresent = true;
                         if (plainsFeaturesPlaced < MAX_PLAINS_TREES
-                            && random.nextFloat() < 0.035f
+                            && random.nextFloat() < 0.08f
                             && !hasNearbyTreeTrunk(chunk, x, z, worldX, worldZ)
                             && placeTree(chunk, x, z, worldX, worldZ, biome, 4, 2)) {
                             plainsFeaturesPlaced++;
@@ -195,9 +195,9 @@ public class FeatureGenerator {
             return false;  // Need space for tree
         }
         
-        // Check if surface block is grass or jungle grass
+        // Check if surface block is suitable for tree growth
         BlockType surfaceBlock = chunk.getBlock(x, height, z);
-        if (surfaceBlock != BlockType.GRASS && surfaceBlock != BlockType.JUNGLE_GRASS) {
+        if (!surfaceBlock.isSolid() || surfaceBlock == BlockType.SAND || surfaceBlock == BlockType.SANDSTONE) {
             return false;
         }
         

@@ -4,6 +4,7 @@ import com.poorcraft.config.ConfigManager;
 import com.poorcraft.config.Settings;
 import com.poorcraft.core.Game;
 import com.poorcraft.core.GameMode;
+import com.poorcraft.render.BlockPreviewRenderer;
 import com.poorcraft.network.client.GameClient;
 import com.poorcraft.network.server.GameServer;
 
@@ -61,6 +62,7 @@ public class UIManager {
     // Networking
     private GameClient gameClient;  // Network client (null when not connected)
     private GameServer gameServer;  // Integrated server (null when not hosting)
+    private BlockPreviewRenderer blockPreviewRenderer;
     
     /**
      * Creates a new UI manager.
@@ -78,6 +80,26 @@ public class UIManager {
         this.previousState = null;
         this.inputHandler = null;
         this.windowHandle = 0;
+    }
+
+    public void setBlockPreviewRenderer(BlockPreviewRenderer renderer) {
+        this.blockPreviewRenderer = renderer;
+
+        UIScreen hud = this.hudScreen;
+        if (hud instanceof HUD hudOverlay) {
+            hudOverlay.setBlockPreviewRenderer(renderer);
+        }
+
+        UIScreen inventoryScreen = screens.get(GameState.INVENTORY);
+        if (inventoryScreen instanceof InventoryScreen invScreen) {
+            invScreen.setBlockPreviewRenderer(renderer);
+        }
+
+        System.out.println("[UIManager] Block preview renderer set");
+    }
+
+    public BlockPreviewRenderer getBlockPreviewRenderer() {
+        return blockPreviewRenderer;
     }
     
     /**
@@ -165,10 +187,16 @@ public class UIManager {
         screens.put(GameState.HOSTING, hostingScreen);
 
         InventoryScreen inventoryScreen = new InventoryScreen(windowWidth, windowHeight, this, scaleManager);
+        if (blockPreviewRenderer != null) {
+            inventoryScreen.setBlockPreviewRenderer(blockPreviewRenderer);
+        }
         screens.put(GameState.INVENTORY, inventoryScreen);
         
         // HUD
         hudScreen = new HUD(windowWidth, windowHeight, game, scaleManager);
+        if (hudScreen instanceof HUD hud && blockPreviewRenderer != null) {
+            hud.setBlockPreviewRenderer(blockPreviewRenderer);
+        }
         
         // Chat overlay
         chatOverlay = new ChatOverlay(windowWidth, windowHeight, (Game) game, scaleManager);

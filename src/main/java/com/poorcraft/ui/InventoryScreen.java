@@ -3,6 +3,7 @@ package com.poorcraft.ui;
 import com.poorcraft.core.Game;
 import com.poorcraft.inventory.Inventory;
 import com.poorcraft.inventory.ItemStack;
+import com.poorcraft.render.BlockPreviewRenderer;
 import com.poorcraft.world.block.BlockType;
 
 /**
@@ -27,6 +28,7 @@ public class InventoryScreen extends UIScreen {
     private int hoveredColumn = -1;
     private int selectedRow;
     private int selectedColumn;
+    private BlockPreviewRenderer blockPreviewRenderer;
 
     public InventoryScreen(int windowWidth, int windowHeight, UIManager uiManager, UIScaleManager scaleManager) {
         super(windowWidth, windowHeight, scaleManager);
@@ -164,14 +166,25 @@ public class InventoryScreen extends UIScreen {
                 ItemStack stack = inventory != null ? inventory.getSlot(row, column) : null;
                 if (stack != null && !stack.isEmpty()) {
                     BlockType blockType = stack.getBlockType();
-                    String label = formatBlockLabel(blockType);
-                    if (!label.isEmpty()) {
-                        float baseText = getTextScale(fontRenderer);
-                        float labelScale = Math.min(0.55f * baseText, (slotSize - scaleDimension(6f)) / Math.max(fontRenderer.getTextWidth(label), 1f));
-                        float labelWidth = fontRenderer.getTextWidth(label) * labelScale;
-                        float labelX = cellX + (slotSize - labelWidth) / 2f;
-                        float labelY = cellY + slotSize / 2f + fontRenderer.getTextHeight() * (labelScale - baseText) * 0.5f;
-                        fontRenderer.drawText(label, labelX, labelY, labelScale, 0.92f, 0.92f, 0.95f, 1.0f);
+                    boolean renderedPreview = false;
+                    if (blockPreviewRenderer != null && blockType != null && blockType != BlockType.AIR) {
+                        float previewSize = slotSize * 0.7f;
+                        float previewX = cellX + (slotSize - previewSize) / 2f;
+                        float previewY = cellY + (slotSize - previewSize) / 2f - scaleDimension(3f);
+                        blockPreviewRenderer.renderBlockPreview(blockType, previewX, previewY, previewSize, windowWidth, windowHeight);
+                        renderedPreview = true;
+                    }
+
+                    if (!renderedPreview) {
+                        String label = formatBlockLabel(blockType);
+                        if (!label.isEmpty()) {
+                            float baseText = getTextScale(fontRenderer);
+                            float labelScale = Math.min(0.55f * baseText, (slotSize - scaleDimension(6f)) / Math.max(fontRenderer.getTextWidth(label), 1f));
+                            float labelWidth = fontRenderer.getTextWidth(label) * labelScale;
+                            float labelX = cellX + (slotSize - labelWidth) / 2f;
+                            float labelY = cellY + slotSize / 2f + fontRenderer.getTextHeight() * (labelScale - baseText) * 0.5f;
+                            fontRenderer.drawText(label, labelX, labelY, labelScale, 0.92f, 0.92f, 0.95f, 1.0f);
+                        }
                     }
 
                     int count = stack.getCount();
@@ -330,5 +343,9 @@ public class InventoryScreen extends UIScreen {
             this.row = row;
             this.column = column;
         }
+    }
+
+    public void setBlockPreviewRenderer(BlockPreviewRenderer renderer) {
+        this.blockPreviewRenderer = renderer;
     }
 }

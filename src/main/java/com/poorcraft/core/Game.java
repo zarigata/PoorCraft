@@ -12,6 +12,7 @@ import com.poorcraft.inventory.Inventory;
 import com.poorcraft.player.SkinManager;
 import com.poorcraft.render.BlurRenderer;
 import com.poorcraft.render.BlockHighlightRenderer;
+import com.poorcraft.render.BlockPreviewRenderer;
 import com.poorcraft.render.ChunkRenderer;
 import com.poorcraft.render.Frustum;
 import com.poorcraft.render.GPUCapabilities;
@@ -24,6 +25,8 @@ import com.poorcraft.render.TextureGenerator;
 import com.poorcraft.ui.GameState;
 import com.poorcraft.ui.UIManager;
 import com.poorcraft.world.ChunkManager;
+import com.poorcraft.world.LeafDecaySystem;
+import com.poorcraft.world.TreeFellingSystem;
 import com.poorcraft.world.World;
 import com.poorcraft.world.chunk.Chunk;
 import com.poorcraft.world.generation.BiomeType;
@@ -65,6 +68,7 @@ public class Game {
     private ChunkRenderer chunkRenderer;
     private SkyRenderer skyRenderer;
     private BlockHighlightRenderer blockHighlightRenderer;
+    private BlockPreviewRenderer blockPreviewRenderer;
     private ItemDropRenderer itemDropRenderer;
     private NPCRenderer npcRenderer;
     private DropManager dropManager;
@@ -83,6 +87,8 @@ public class Game {
     private PerformanceMonitor performanceMonitor;
     private boolean chunkRendererInitialized;
     private boolean chunkRendererUnavailableWarned;
+    private TreeFellingSystem treeFellingSystem;
+    private LeafDecaySystem leafDecaySystem;
     
     // Main thread task queue for async operations
     private final Queue<Runnable> mainThreadTasks;
@@ -130,6 +136,7 @@ public class Game {
         this.miningSystem = new MiningSystem();
         this.inventory = new Inventory();
         this.blockHighlightRenderer = new BlockHighlightRenderer();
+        this.blockPreviewRenderer = new BlockPreviewRenderer();
         this.itemDropRenderer = new ItemDropRenderer();
         this.npcRenderer = new NPCRenderer();
         this.dropManager = new DropManager();
@@ -146,6 +153,8 @@ public class Game {
         this.gpuCapabilities = null;
         this.chunkRendererInitialized = false;
         this.chunkRendererUnavailableWarned = false;
+        this.treeFellingSystem = null;
+        this.leafDecaySystem = null;
         this.blurRenderer = null;
         this.blurFbo = 0;
         this.blurTexture = 0;
@@ -212,6 +221,17 @@ public class Game {
             ex.printStackTrace();
         }
 
+        if (chunkRendererInitialized) {
+            try {
+                blockPreviewRenderer.init();
+                blockPreviewRenderer.setTextureAtlas(chunkRenderer.getTextureAtlas());
+                System.out.println("[Game] Block preview renderer initialized");
+            } catch (Exception ex) {
+                System.err.println("[Game] Block preview renderer failed to initialize: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        }
+
         // Initialize timer
         timer = new Timer();
         
@@ -234,6 +254,7 @@ public class Game {
         uiManager.init(window.getWidth(), window.getHeight());
         // Connect input handler to UI manager for cursor management
         uiManager.setInputHandler(inputHandler, window.getHandle());
+        uiManager.setBlockPreviewRenderer(blockPreviewRenderer);
         
         // Connect window resize events to UI manager
         window.setResizeCallback((width, height) -> {
@@ -345,7 +366,10 @@ public class Game {
             uiManager.onMouseRelease((float)inputHandler.getMouseX(), (float)inputHandler.getMouseY(), button);
         });
         inputHandler.setScrollCallback(yOffset -> {
-            uiManager.onScroll(yOffset);
+            if (shouldForwardScrollToUI()) {
+                inputHandler.consumeScrollOffset();
+                uiManager.onScroll(yOffset);
+            }
         });
         
         // Don't create world yet - wait for player to click "Create World" in UI
@@ -507,7 +531,11 @@ public class Game {
         if (dropManager != null && inventory != null && playerController != null) {
             dropManager.update(world, playerController.getPosition(), inventory, deltaTime);
         }
-        
+
+        if (leafDecaySystem != null) {
+            leafDecaySystem.update(deltaTime);
+        }
+
         if (npcManager != null && playerController != null) {
             npcManager.update(world, playerController.getPosition(), deltaTime);
         }
@@ -537,6 +565,26 @@ public class Game {
         if (monitorActive) {
             performanceMonitor.endZone();
         }
+    }
+
+    private boolean shouldForwardScrollToUI() {
+        if (uiManager == null) {
+            return true;
+        }
+
+        if (uiManager.isInputCaptured()) {
+            return true;
+        }
+
+        if (uiManager.getConsoleOverlay() != null && uiManager.getConsoleOverlay().isVisible()) {
+            return true;
+        }
+
+        if (uiManager.getChatOverlay() != null && uiManager.getChatOverlay().isVisible()) {
+            return true;
+        }
+
+        return uiManager.getCurrentState() != GameState.IN_GAME;
     }
 
     private void processBlurResizeDebounce() {
@@ -666,8 +714,8 @@ public class Game {
     /**
      * Cleans up resources and shuts down subsystems.
      */
-    private void cleanup() {
-        System.out.println("[Game] Cleaning up...");
+    public void cleanup() {
+        System.out.println("[Game] Cleaning up resources...");
         
         // Shutdown Discord Rich Presence
         // Important: Do this first so Discord knows we're leaving
@@ -695,18 +743,29 @@ public class Game {
         // Cleanup chunk renderer
         if (chunkRenderer != null) {
             chunkRenderer.cleanup();
-            System.out.println("[Game] Chunk renderer cleaned up");
+            chunkRenderer = null;
+        }
+        if (blockPreviewRenderer != null) {
+            blockPreviewRenderer.cleanup();
+            blockPreviewRenderer = null;
         }
 
         if (skyRenderer != null) {
             skyRenderer.cleanup();
         }
-        
+
         // Shutdown world system
         if (chunkManager != null) {
             chunkManager.shutdown();
             System.out.println("[Game] World cleaned up");
         }
+
+        if (leafDecaySystem != null) {
+            leafDecaySystem.clear();
+            leafDecaySystem = null;
+        }
+
+        treeFellingSystem = null;
 
         if (highlightRendererInitialized && blockHighlightRenderer != null) {
             blockHighlightRenderer.cleanup();
@@ -723,6 +782,10 @@ public class Game {
         }
 
         window.destroy();
+        
+        // Terminate GLFW only on final shutdown
+        Window.terminateGLFW();
+        
         System.out.println("[Game] Cleanup complete");
     }
     
@@ -818,6 +881,9 @@ public class Game {
         currentGameMode = mode;
         if (!multiplayerMode) {
             world = new World(seed, generateStructures);
+            if (settings != null && settings.world != null) {
+                world.setDebugLogging(settings.world.debugLogging);
+            }
             if (modLoader != null) {
                 world.setEventBus(modLoader.getEventBus());
             }
@@ -860,8 +926,11 @@ public class Game {
         }
 
         if (world != null) {
+            world.setAuthoritative(!multiplayerMode);
             world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
         }
+
+        initializeTreeSystems();
 
         updateSkyLighting(0.0f);
 
@@ -900,6 +969,50 @@ public class Game {
         }
 
         System.out.println("[Game] World creation complete!");
+    }
+
+    /**
+     * Initializes tree-related simulation systems for authoritative worlds only.
+     * <p>
+     * Multiplayer clients render server-provided state and must not run tree mutations locally.
+     */
+    private void initializeTreeSystems() {
+        if (world == null) {
+            return;
+        }
+
+        if (multiplayerMode) {
+            world.setAuthoritative(false);
+            return;
+        }
+
+        if (leafDecaySystem != null) {
+            leafDecaySystem.clear();
+        }
+
+        Settings.GameplaySettings gameplaySettings = settings != null ? settings.gameplay : null;
+        if (gameplaySettings == null) {
+            gameplaySettings = new Settings.GameplaySettings();
+        }
+        gameplaySettings.ensureNestedDefaults();
+
+        Settings.LeafDecaySettings leafSettings = gameplaySettings.leafDecay;
+        Settings.TreeFellingSettings treeSettings = gameplaySettings.treeFelling;
+
+        leafDecaySystem = new LeafDecaySystem(world, dropManager, leafSettings);
+        treeFellingSystem = new TreeFellingSystem(world, dropManager, leafDecaySystem, treeSettings);
+        if (settings != null && settings.world != null) {
+            world.setDebugLogging(settings.world.debugLogging);
+        }
+        world.setAuthoritative(true);
+        world.setTreeFellingSystem(treeFellingSystem);
+        world.setLeafDecaySystem(leafDecaySystem);
+        for (Chunk chunk : world.getLoadedChunks()) {
+            if (chunk != null) {
+                leafDecaySystem.onChunkLoaded(chunk);
+            }
+        }
+        System.out.println("[Game] Tree felling and leaf decay systems initialized");
     }
 
     public SunLight getSunLight() {
@@ -976,8 +1089,12 @@ public class Game {
         }
 
         if (world != null) {
+            world.setAuthoritative(false);
             world.setChunkUnloadCallback(pos -> chunkRenderer.onChunkUnloaded(pos));
         }
+
+        treeFellingSystem = null;
+        leafDecaySystem = null;
 
         updateSkyLighting(0.0f);
 

@@ -1,0 +1,9 @@
+{
+  "id": "ai_npc",
+  "name": "AI NPC System",
+  "version": "1.0.0",
+  "description": "AI-powered NPC system for PoorCraft",
+  "author": "PoorCraft Team",
+  "enabled": false,
+  "main": "main.lua"
+}

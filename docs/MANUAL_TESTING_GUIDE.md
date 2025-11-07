@@ -45,6 +45,18 @@ scripts\test-and-play.bat --skip-tests
 - [ ] Chunks load smoothly as player moves
 - [ ] No visible chunk boundaries or gaps
 
+### Tree Felling & Leaf Decay
+- [ ] **Basic Tree Felling** – Break the bottom log of a tall tree (4+ logs). Verify the entire trunk disappears instantly, dropping one log per segment.
+- [ ] **Short Tree Handling** – Fell a 2-log sapling. Confirm only the targeted block breaks and the top log persists.
+- [ ] **Mid-Trunk Break** – Break a middle log of a 4+ log tree. Confirm the entire trunk collapses, drops match trunk height, and leaves enter decay queue.
+- [ ] **Top-Log Break** – Break the top log of a tall tree. Confirm the trunk still collapses fully and leaves are marked for decay.
+- [ ] **Leaf Decay Timing** – After felling a tall tree, observe the canopy for 30–60 seconds. Leaves should disappear gradually, with occasional leaf drops.
+- [ ] **Supported Leaves** – Place logs within 5 blocks (Chebyshev distance) of a canopy and mark leaves manually (break/re-place one). Confirm nearby leaves persist while distant ones decay.
+- [ ] **Multiple Trees** – Fell one tree in a cluster of two. Ensure only the targeted tree falls and only its leaves decay. Leaves marked during felling now track a per-tree decay group, so neighbouring trunks should no longer keep felled leaves alive.
+- [ ] **Chunk Boundary Trees** – Fell a tree straddling a chunk edge (x or z = 0/15). Confirm all trunk blocks vanish and no mesh artifacts appear.
+- [ ] **Player-Placed Trees** – Build a custom tree from logs and leaves. Breaking the bottom log should trigger full felling and leaf decay.
+- [ ] **Performance Check** – Rapidly fell 5–10 trees in succession. Confirm no noticeable frame drops during log removal or leaf decay processing.
+
 ### Player Controls
 - [ ] WASD movement works
 - [ ] Mouse look works smoothly
@@ -53,6 +65,11 @@ scripts\test-and-play.bat --skip-tests
 - [ ] Fly mode (F) toggles correctly
 - [ ] Collision detection works
 - [ ] Gravity works in survival mode
+
+#### Mouse Wheel Hotbar Selection
+- [ ] **In-Game** – Enter a survival world with no overlays open. Scroll the mouse wheel up/down and confirm the hotbar selector moves accordingly with no skipped slots.
+- [ ] **Menus & Overlays** – Open the pause menu, inventory, chat, and console individually. Scroll the wheel and verify the hotbar does **not** change while the visible screen scrolls as expected.
+- [ ] **Settings Menu** – Open Settings → Controls. Use the mouse wheel to scroll long lists and confirm list position updates smoothly without affecting gameplay hotbar selection when you return in-game.
 
 ### Block Interaction
 - [ ] Left-click breaks blocks
@@ -82,6 +99,11 @@ scripts\test-and-play.bat --skip-tests
 - [ ] UI scales correctly on window resize (see [Window Resize Testing](#window-resize-testing) for scenarios)
 - [ ] **Settings menu scrolling** – Populate settings with multiple sections, scroll via wheel and drag the scrollbar. Confirm options stay aligned and clicks only affect visible rows.
 - [ ] **Window resize handling** – Resize the window to minimum and maximum supported sizes. Ensure scroll containers and overlays reposition correctly with no clipped controls or misaligned hit targets.
+
+#### 3D Block Preview Rendering
+- [ ] Open the inventory, hover items that show 3D previews, then close with `E`. Immediately open the pause menu and verify all UI elements are fully visible (no clipping or blank screens).
+- [ ] Open and close the inventory repeatedly (10x). Confirm previews render consistently and the rest of the UI remains stable.
+- [ ] Trigger multiple preview tooltips in different menus (inventory, crafting, creative tabs). Confirm no blue background or missing UI elements appear afterwards.
 
 ### Console Commands
 - [ ] `/help` shows command list
@@ -129,6 +151,11 @@ scripts\test-and-play.bat --skip-tests
 
 ## 5. Known Issues
 Document known defects from release notes and link to active tickets, then update this section after verifying fixes.
+
+### Troubleshooting Fixed Regressions
+- **Pause menu invisible / inventory turns blue** – Ensure you are running PoorCraft build X.X.X or later. The BlockPreviewRenderer now restores scissor and blend state correctly. If UI corruption reappears, restart the client and retest.
+- **Mouse wheel fails to scroll hotbar** – Confirm you are in gameplay with chat/console closed. Scroll routing now checks the active UI state; if the issue persists, capture logs for `Game.shouldForwardScrollToUI()`.
+- **Tree felling fails after breaking upper logs** – Trees now fall when any trunk segment is destroyed (minimum total height 4 logs). If a trunk remains, verify it meets height requirements and gather a reproduction world seed.
 
 ## 6. Reporting Issues
 - Include steps to reproduce, expected vs. actual behavior, logs, hardware specs.

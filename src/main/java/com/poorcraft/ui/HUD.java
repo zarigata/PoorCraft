@@ -4,6 +4,7 @@ import com.poorcraft.ai.AICompanionManager;
 import com.poorcraft.core.Game;
 import com.poorcraft.inventory.Inventory;
 import com.poorcraft.inventory.ItemStack;
+import com.poorcraft.render.BlockPreviewRenderer;
 import com.poorcraft.render.PerformanceMonitor;
 import com.poorcraft.render.Texture;
 import com.poorcraft.world.block.BlockType;
@@ -32,6 +33,7 @@ public class HUD extends UIScreen {
     private final Game game;  // Reference to game instance
     private boolean debugVisible;
     private final List<CompanionToast> companionToasts = new ArrayList<>();
+    private BlockPreviewRenderer blockPreviewRenderer;
 
     private static Texture hotbarFrameTexture;
     private static Texture hotbarSlotTexture;
@@ -58,6 +60,10 @@ public class HUD extends UIScreen {
         super(windowWidth, windowHeight, scaleManager);
         this.game = (game instanceof Game) ? (Game) game : null;
         this.debugVisible = false;
+    }
+
+    public void setBlockPreviewRenderer(BlockPreviewRenderer renderer) {
+        this.blockPreviewRenderer = renderer;
     }
 
     private void drawCompanionStatus(UIRenderer renderer, FontRenderer fontRenderer) {
@@ -282,14 +288,25 @@ public class HUD extends UIScreen {
             ItemStack stack = inventory.getSlot(i);
             if (stack != null && !stack.isEmpty()) {
                 BlockType blockType = stack.getBlockType();
-                String label = formatBlockLabel(blockType);
-                if (!label.isEmpty()) {
-                    float baseText = getTextScale(fontRenderer);
-                    float labelScale = 0.5f * baseText;
-                    float labelWidth = fontRenderer.getTextWidth(label) * labelScale;
-                    float labelX = slotX + (slotSize - labelWidth) / 2f;
-                    float labelY = slotY + slotSize - 14f * scale;
-                    fontRenderer.drawText(label, labelX, labelY, labelScale, 0.95f, 0.95f, 0.95f, 1.0f);
+                boolean renderedPreview = false;
+                if (blockPreviewRenderer != null && blockType != null && blockType != BlockType.AIR) {
+                    float previewSize = slotSize * 0.75f;
+                    float previewX = slotX + (slotSize - previewSize) / 2f;
+                    float previewY = slotY + (slotSize - previewSize) / 2f - 4f * scale;
+                    blockPreviewRenderer.renderBlockPreview(blockType, previewX, previewY, previewSize, windowWidth, windowHeight);
+                    renderedPreview = true;
+                }
+
+                if (!renderedPreview) {
+                    String label = formatBlockLabel(blockType);
+                    if (!label.isEmpty()) {
+                        float baseText = getTextScale(fontRenderer);
+                        float labelScale = 0.5f * baseText;
+                        float labelWidth = fontRenderer.getTextWidth(label) * labelScale;
+                        float labelX = slotX + (slotSize - labelWidth) / 2f;
+                        float labelY = slotY + slotSize - 14f * scale;
+                        fontRenderer.drawText(label, labelX, labelY, labelScale, 0.95f, 0.95f, 0.95f, 1.0f);
+                    }
                 }
 
                 int count = stack.getCount();

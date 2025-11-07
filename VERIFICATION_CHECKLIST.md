@@ -57,6 +57,36 @@ Use this checklist to validate the native AI Companion system after the Lua mod 
 
 ---
 
+## Critical Bug Fix Verification
+
+### Implementation
+- [ ] Scroll event routing updated to respect overlays and non-game states
+- [ ] BlockPreviewRenderer restores scissor, blend, and depth write state after previews
+- [ ] Removed duplicate scissor enable call in BlockPreviewRenderer
+- [ ] Tree felling logic counts logs above and below the broken segment
+
+### Test
+1. **Hotbar Scroll**
+   - Enter gameplay with no overlays, scroll mouse wheel → hotbar selection changes each notch
+   - Open settings menu, scroll → settings list moves while hotbar remains stable
+2. **Pause Menu Visibility**
+   - Open inventory, hover preview, close
+   - Open pause menu → all buttons visible, no clipping/blue screen
+3. **Inventory Rendering**
+   - Open inventory after previews
+   - Confirm slots, previews, background render normally
+4. **Tree Felling Any Log**
+   - For a tall tree, break bottom, middle, and top logs across separate trees
+   - Verify entire trunk falls and drops match trunk height each time
+
+### Success Criteria
+- ✅ Mouse wheel scroll behaves contextually (gameplay vs. UI)
+- ✅ UI overlays remain visible after using inventory previews
+- ✅ Tree felling removes the full trunk regardless of which segment was broken
+- ✅ Automated and manual tests updated/executed as per plan
+
+---
+
 ## Documentation & Support Checks
 - [ ] README troubleshooting section references AI Companion guide rather than deprecated mods
 - [ ] AI companion guide reflects latest provider setup steps and ModAPI helpers

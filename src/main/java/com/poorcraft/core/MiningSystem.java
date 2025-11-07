@@ -57,8 +57,11 @@ public class MiningSystem {
 
         if (hardness <= 0.0f) {
             BlockType brokenBlock = miningTarget.blockType;
-            world.setBlock(miningTarget.x, miningTarget.y, miningTarget.z, BlockType.AIR);
-            spawnDrop(brokenBlock, miningTarget.x, miningTarget.y, miningTarget.z);
+            int blockX = miningTarget.x;
+            int blockY = miningTarget.y;
+            int blockZ = miningTarget.z;
+            world.setBlock(blockX, blockY, blockZ, BlockType.AIR);
+            spawnDrop(world, brokenBlock, blockX, blockY, blockZ);
             miningTarget = null;
             breakProgress = 0.0f;
             aimedTarget = pickTarget(world, camera);
@@ -70,8 +73,11 @@ public class MiningSystem {
 
         if (breakProgress >= 1.0f) {
             BlockType brokenBlock = miningTarget.blockType;
-            world.setBlock(miningTarget.x, miningTarget.y, miningTarget.z, BlockType.AIR);
-            spawnDrop(brokenBlock, miningTarget.x, miningTarget.y, miningTarget.z);
+            int blockX = miningTarget.x;
+            int blockY = miningTarget.y;
+            int blockZ = miningTarget.z;
+            world.setBlock(blockX, blockY, blockZ, BlockType.AIR);
+            spawnDrop(world, brokenBlock, blockX, blockY, blockZ);
             miningTarget = null;
             breakProgress = 0.0f;
             aimedTarget = pickTarget(world, camera);
@@ -132,8 +138,13 @@ public class MiningSystem {
         return null;
     }
 
-    private void spawnDrop(BlockType blockType, int x, int y, int z) {
+    private void spawnDrop(World world, BlockType blockType, int x, int y, int z) {
         if (dropManager == null || blockType == null || blockType == BlockType.AIR) {
+            return;
+        }
+        // Tree felling registers the base log drop up-front; consume it to avoid duplicating the drop here.
+        boolean consumed = blockType == BlockType.WOOD && world.consumeTreeFellingBaseDrop(x, y, z);
+        if (consumed) {
             return;
         }
         dropManager.spawn(blockType, x + 0.5f, y + 0.1f, z + 0.5f, 1);

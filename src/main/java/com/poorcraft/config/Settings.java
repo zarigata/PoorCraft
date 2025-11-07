@@ -21,6 +21,7 @@ public class Settings {
     public WorldSettings world;
     public MultiplayerSettings multiplayer;
     public PlayerSettings player;
+    public GameplaySettings gameplay;
     
     /**
      * Default constructor required by Gson.
@@ -127,6 +128,9 @@ public class Settings {
         settings.player.playerName = "Player";
         settings.player.showSkinInFirstPerson = false;
         settings.player.enableSkinAnimations = true;
+
+        settings.gameplay = new GameplaySettings();
+        settings.gameplay.ensureNestedDefaults();
         
         return settings;
     }
@@ -251,6 +255,7 @@ public class Settings {
         public int chunkLoadDistance;        // How many chunks to load around player
         public int chunkUnloadDistance;      // Distance before unloading chunks
         public boolean generateStructures;   // Enable/disable feature generation (trees, cacti, etc.)
+        public boolean debugLogging = false; // Enables verbose world logging
     }
     
     /**
@@ -280,5 +285,47 @@ public class Settings {
 
         /** Enables advanced skin animations such as arm swinging. */
         public boolean enableSkinAnimations;
+    }
+
+    public static class GameplaySettings {
+        public TreeFellingSettings treeFelling;
+        public LeafDecaySettings leafDecay;
+
+        public GameplaySettings() {
+            // Intentionally empty; use ensureNestedDefaults for initialization
+        }
+
+        public void ensureNestedDefaults() {
+            if (treeFelling == null) {
+                treeFelling = new TreeFellingSettings();
+            }
+            if (leafDecay == null) {
+                leafDecay = new LeafDecaySettings();
+            }
+        }
+    }
+
+    public static class TreeFellingSettings {
+        public int minTrunkHeight = 3;
+        public int maxLeafFloodFill = 1024;
+        public int passiveLeafScanRadius = 4;
+        public int passiveLeafScanHeight = 3;
+        public int canopyHorizontalRadius = 5;
+        public int canopyVerticalRadius = 3;
+        public int canopyDistanceLimit = 6;
+        public int foreignLogCheckRadius = 2;
+        public boolean debugLogging = false;
+    }
+
+    public static class LeafDecaySettings {
+        public float decayCheckInterval = 0.5f;
+        public int maxLeafDistance = 5;
+        public float decayChance = 0.2f;
+        public float dropChance = 0.2f;
+        public int maxBatchSize = 50;
+        public int borderScanRadius = 6;
+        public int borderScanYRange = 8;
+        public boolean borderScanAdaptive = true;
+        public boolean debugLogging = false;
     }
 }

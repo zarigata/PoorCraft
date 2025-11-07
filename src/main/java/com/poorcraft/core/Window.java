@@ -136,11 +136,23 @@ public class Window {
     }
     
     /**
-     * Destroys the window and terminates GLFW.
-     * Call this when shutting down the game.
+     * Destroys the window but keeps GLFW initialized.
+     * Call this when closing a window but not shutting down the entire application.
      */
     public void destroy() {
-        glfwDestroyWindow(windowHandle);
+        if (windowHandle != NULL) {
+            glfwDestroyWindow(windowHandle);
+            windowHandle = NULL;
+        }
+        
+        System.out.println("[Window] Destroyed");
+    }
+    
+    /**
+     * Terminates GLFW completely.
+     * Call this only when shutting down the entire application.
+     */
+    public static void terminateGLFW() {
         glfwTerminate();
         
         GLFWErrorCallback callback = glfwSetErrorCallback(null);
@@ -148,7 +160,7 @@ public class Window {
             callback.free();
         }
         
-        System.out.println("[Window] Destroyed");
+        System.out.println("[Window] GLFW terminated");
     }
     
     /**

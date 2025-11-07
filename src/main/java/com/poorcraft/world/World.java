@@ -15,6 +15,7 @@ import com.poorcraft.world.generation.TerrainGenerator;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
@@ -33,9 +34,14 @@ public class World {
     private final FeatureGenerator featureGenerator;
     private final BiomeGenerator biomeGenerator;
     private final boolean generateStructures;
+    private final Set<BlockPosKey> treeFellingBaseDropClaims;
     private Consumer<ChunkPos> chunkUnloadCallback;
     private EventBus eventBus;
     private boolean worldLoadEventFired;  // Track if WorldLoadEvent has been fired
+    private TreeFellingSystem treeFellingSystem;
+    private LeafDecaySystem leafDecaySystem;
+    private boolean authoritative;
+    private boolean debugLogging;
     
     /**
      * Creates a new world with the given seed.
@@ -54,12 +60,15 @@ public class World {
         
         this.generateStructures = generateStructures;
         this.chunks = new ConcurrentHashMap<>();
+        this.treeFellingBaseDropClaims = ConcurrentHashMap.newKeySet();
         this.biomeGenerator = new BiomeGenerator(this.seed);
         this.terrainGenerator = new TerrainGenerator(this.seed);
         this.featureGenerator = new FeatureGenerator(this.seed, biomeGenerator, terrainGenerator);
         this.chunkUnloadCallback = null;
         this.eventBus = null;
         this.worldLoadEventFired = false;
+        this.authoritative = true;
+        this.debugLogging = false;
         
         System.out.println("[World] Created world with seed: " + this.seed);
         System.out.println("[World] Structure generation: " + (generateStructures ? "enabled" : "disabled"));
@@ -101,6 +110,47 @@ public class World {
             terrainGenerator.setEventBus(eventBus);
         }
     }
+
+    public void setAuthoritative(boolean authoritative) {
+        this.authoritative = authoritative;
+        if (!authoritative) {
+            this.treeFellingSystem = null;
+            this.leafDecaySystem = null;
+        }
+    }
+
+    public boolean isAuthoritative() {
+        return authoritative;
+    }
+
+    public void setTreeFellingSystem(TreeFellingSystem system) {
+        if (!authoritative) {
+            this.treeFellingSystem = null;
+            return;
+        }
+        this.treeFellingSystem = system;
+    }
+
+    public void setLeafDecaySystem(LeafDecaySystem system) {
+        if (!authoritative) {
+            this.leafDecaySystem = null;
+            return;
+        }
+        this.leafDecaySystem = system;
+    }
+
+    public void setDebugLogging(boolean debugLogging) {
+        this.debugLogging = debugLogging;
+    }
+
+    public void fireBlockBreakEvent(int worldX, int worldY, int worldZ, BlockType blockType, int playerId) {
+        if (eventBus == null || blockType == null || blockType == BlockType.AIR) {
+            return;
+        }
+
+        BlockBreakEvent event = new BlockBreakEvent(worldX, worldY, worldZ, blockType.getId(), playerId);
+        eventBus.fire(event);
+    }
     
     /**
      * Gets a chunk at the specified position.
@@ -124,7 +174,16 @@ public class World {
     public Chunk getChunk(int chunkX, int chunkZ) {
         return getChunk(new ChunkPos(chunkX, chunkZ));
     }
-    
+
+    public boolean isChunkLoaded(int worldX, int worldZ) {
+        ChunkPos pos = ChunkPos.fromWorldPos(worldX, worldZ);
+        return chunks.containsKey(pos);
+    }
+
+    public boolean areChunksLoadedForBlock(int worldX, int worldZ) {
+        return isChunkLoaded(worldX, worldZ);
+    }
+
     /**
      * Gets an existing chunk or generates a new one if it doesn't exist.
      * This is the main method for chunk loading.
@@ -137,7 +196,9 @@ public class World {
         if (chunk == null) {
             chunk = generateChunk(pos);
             chunks.put(pos, chunk);
+            return chunk;
         }
+
         return chunk;
     }
     
@@ -163,7 +224,11 @@ public class World {
         
         // Set up neighbor references for face culling
         setupNeighbors(chunk);
-        
+
+        if (leafDecaySystem != null) {
+            leafDecaySystem.onChunkLoaded(chunk);
+        }
+
         return chunk;
     }
     
@@ -272,6 +337,10 @@ public class World {
         chunkUnloadCallback = null;
         eventBus = null;
         worldLoadEventFired = false;
+        treeFellingSystem = null;
+        leafDecaySystem = null;
+        treeFellingBaseDropClaims.clear();
+        authoritative = true;
     }
     
     /**
@@ -348,7 +417,33 @@ public class World {
         if (worldY < 0 || worldY >= Chunk.CHUNK_HEIGHT) {
             return;
         }
-        
+
+        BlockType previousBlock = chunk.getBlock(localX, worldY, localZ);
+        boolean isWoodBreak = previousBlock == BlockType.WOOD && type == BlockType.AIR;
+        if (debugLogging) {
+            System.out.println("[World][Debug] setBlock prev=" + previousBlock + ", new=" + type + " at "
+                + worldX + "," + worldY + "," + worldZ + ", isWoodBreak=" + isWoodBreak);
+        }
+
+        if (isWoodBreak && treeFellingSystem != null && authoritative) {
+            if (debugLogging) {
+                System.out.println("[World][Debug] Detected wood break. previousBlock=" + previousBlock + ", type="
+                    + type + " at " + worldX + "," + worldY + "," + worldZ);
+            }
+            treeFellingSystem.onWoodBlockBroken(worldX, worldY, worldZ);
+        }
+
+        if (isWoodBreak && type == BlockType.AIR) {
+            BlockType currentBlock = chunk.getBlock(localX, worldY, localZ);
+            if (currentBlock == BlockType.AIR) {
+                if (debugLogging) {
+                    System.out.println("[World][Debug] Skipping redundant AIR write at " + worldX + "," + worldY
+                        + "," + worldZ + " after felling");
+                }
+                return;
+            }
+        }
+
         chunk.setBlock(localX, worldY, localZ, type);
 
         if (isEdgeBlock(localX, localZ)) {
@@ -367,11 +462,44 @@ public class World {
         }
     }
 
+    public void setBlockSilent(int worldX, int worldY, int worldZ, BlockType type) {
+        ChunkPos chunkPos = ChunkPos.fromWorldPos(worldX, worldZ);
+        Chunk chunk = getOrCreateChunk(chunkPos);
+
+        int localX = Math.floorMod(worldX, Chunk.CHUNK_SIZE);
+        int localZ = Math.floorMod(worldZ, Chunk.CHUNK_SIZE);
+
+        if (worldY < 0 || worldY >= Chunk.CHUNK_HEIGHT) {
+            return;
+        }
+
+        chunk.setBlock(localX, worldY, localZ, type);
+
+        if (isEdgeBlock(localX, localZ)) {
+            if (localZ == 0) {
+                markNeighborChunkDirtyInternal(chunkPos, 0, false);
+            }
+            if (localZ == Chunk.CHUNK_SIZE - 1) {
+                markNeighborChunkDirtyInternal(chunkPos, 1, false);
+            }
+            if (localX == Chunk.CHUNK_SIZE - 1) {
+                markNeighborChunkDirtyInternal(chunkPos, 2, false);
+            }
+            if (localX == 0) {
+                markNeighborChunkDirtyInternal(chunkPos, 3, false);
+            }
+        }
+    }
+
     private boolean isEdgeBlock(int localX, int localZ) {
         return localX == 0 || localX == Chunk.CHUNK_SIZE - 1 || localZ == 0 || localZ == Chunk.CHUNK_SIZE - 1;
     }
 
     private void markNeighborChunkDirty(ChunkPos pos, int direction) {
+        markNeighborChunkDirtyInternal(pos, direction, true);
+    }
+
+    private void markNeighborChunkDirtyInternal(ChunkPos pos, int direction, boolean log) {
         ChunkPos neighborPos;
         switch (direction) {
             case 0 -> neighborPos = new ChunkPos(pos.x, pos.z - 1);
@@ -386,7 +514,9 @@ public class World {
         Chunk neighbor = getChunk(neighborPos);
         if (neighbor != null) {
             neighbor.markMeshDirty();
-            System.out.println("[World] Marked neighbor chunk dirty at " + neighborPos);
+            if (log && debugLogging) {
+                System.out.println("[World][Debug] Marked neighbor chunk dirty at " + neighborPos);
+            }
         }
     }
     
@@ -419,5 +549,75 @@ public class World {
      */
     public int getHeightAt(int worldX, int worldZ) {
         return terrainGenerator.getHeightAt(worldX, worldZ);
+    }
+
+    /**
+     * Records that tree felling already spawned the base log drop for the given coordinates.
+     * Tree felling callers must invoke this when they internally remove the base log so that
+     * other systems can avoid duplicating the drop.
+     *
+     * @param x block X coordinate of the felled trunk base
+     * @param y block Y coordinate of the felled trunk base
+     * @param z block Z coordinate of the felled trunk base
+     */
+    public void registerTreeFellingBaseDrop(int x, int y, int z) {
+        treeFellingBaseDropClaims.add(new BlockPosKey(x, y, z));
+    }
+
+    /**
+     * Consumes a previously registered tree felling base drop claim.
+     * Drop spawning code should call this before emitting a log drop for the same base location;
+     * a {@code true} result signals that tree felling already handled the drop and callers must skip it.
+     *
+     * @param x block X coordinate being checked
+     * @param y block Y coordinate being checked
+     * @param z block Z coordinate being checked
+     * @return {@code true} if a claim existed and has been consumed, otherwise {@code false}
+     */
+    public boolean consumeTreeFellingBaseDrop(int x, int y, int z) {
+        return treeFellingBaseDropClaims.remove(new BlockPosKey(x, y, z));
+    }
+
+    public boolean fireBlockBreakEventWithCancellation(int worldX, int worldY, int worldZ, BlockType blockType,
+        int playerId) {
+        if (eventBus == null || blockType == null || blockType == BlockType.AIR) {
+            return false;
+        }
+
+        BlockBreakEvent event = new BlockBreakEvent(worldX, worldY, worldZ, blockType.getId(), playerId);
+        eventBus.fire(event);
+        return event.isCancelled();
+    }
+
+    private static final class BlockPosKey {
+        private final int x;
+        private final int y;
+        private final int z;
+
+        private BlockPosKey(int x, int y, int z) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            BlockPosKey other = (BlockPosKey) obj;
+            return x == other.x && y == other.y && z == other.z;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Integer.hashCode(x);
+            result = 31 * result + Integer.hashCode(y);
+            result = 31 * result + Integer.hashCode(z);
+            return result;
+        }
     }
 }
